@@ -79,7 +79,6 @@ export default function CompteFormModal({ isOpen, onClose, compte = null }) {
   const [etablissement, setEtablissement] = useState('')
   const [devise, setDevise] = useState('')
   const [soldeInitial, setSoldeInitial] = useState('0')
-  const [soldeReel, setSoldeReel] = useState('0')
   const [actif, setActif] = useState(true)
   const [dateOuverture, setDateOuverture] = useState('')
   const [notes, setNotes] = useState('')
@@ -107,7 +106,6 @@ export default function CompteFormModal({ isOpen, onClose, compte = null }) {
       setEtablissement(compte.etablissement ?? '')
       setDevise(compte.devise ?? '')
       setSoldeInitial(String(compte.solde_initial ?? '0'))
-      setSoldeReel(String(compte.solde_reel ?? '0'))
       setActif(compte.actif ?? true)
       setDateOuverture(compte.date_ouverture ?? '')
       setNotes(compte.notes ?? '')
@@ -119,7 +117,6 @@ export default function CompteFormModal({ isOpen, onClose, compte = null }) {
       setEtablissement('')
       setDevise('')
       setSoldeInitial('0')
-      setSoldeReel('0')
       setActif(true)
       setDateOuverture('')
       setNotes('')
@@ -153,7 +150,6 @@ export default function CompteFormModal({ isOpen, onClose, compte = null }) {
       etablissement,
       devise,
       solde_initial: parseDecimal(soldeInitial).toFixed(2),
-      solde_reel: parseDecimal(soldeReel).toFixed(2),
       actif,
       date_ouverture: dateOuverture || null,
       notes,
@@ -266,18 +262,11 @@ export default function CompteFormModal({ isOpen, onClose, compte = null }) {
           options={devisesOpts} error={errors.devise} required
         />
 
-        <div className="grid grid-cols-2 gap-3">
-          <Input
-            label="Solde initial (€)" type="text" inputMode="decimal"
-            value={soldeInitial} onChange={setSoldeInitial}
-            placeholder="0,00"
-          />
-          <Input
-            label="Solde réel (€)" type="text" inputMode="decimal"
-            value={soldeReel} onChange={setSoldeReel}
-            placeholder="0,00"
-          />
-        </div>
+        <Input
+          label="Solde initial (€)" type="text" inputMode="decimal"
+          value={soldeInitial} onChange={setSoldeInitial}
+          placeholder="0,00"
+        />
 
         <Input
           label="Date d'ouverture" type="date"

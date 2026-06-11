@@ -7,6 +7,9 @@ class CompteSerializer(serializers.ModelSerializer):
     solde_theorique = serializers.DecimalField(
         max_digits=12, decimal_places=2, read_only=True
     )
+    solde_reel = serializers.DecimalField(
+        max_digits=12, decimal_places=2, read_only=True
+    )
     ecart_solde = serializers.DecimalField(
         max_digits=12, decimal_places=2, read_only=True
     )
@@ -61,18 +64,14 @@ class CompteSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "id",
             "solde_theorique",
+            "solde_reel",
             "ecart_solde",
             "created_at",
             "updated_at",
         ]
 
     def validate(self, data):
-        """
-        Bloque toute tentative d'écriture sur les champs calculés.
-        La déclaration read_only suffit normalement, mais on double
-        la protection explicitement.
-        """
-        champs_interdits = {"solde_theorique", "ecart_solde"}
+        champs_interdits = {"solde_theorique", "solde_reel", "ecart_solde"}
         tentatives = champs_interdits & set(self.initial_data.keys())
         if tentatives:
             raise serializers.ValidationError(

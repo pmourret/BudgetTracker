@@ -6,13 +6,14 @@ import {
 import apiClient from '../api/client'
 
 const RESOURCE_DEPENDENCIES = {
-  flux:        ['comptes', 'budgets', 'alertes', 'analytics'],
-  transferts:  ['comptes', 'flux', 'analytics'],
-  budgets:     ['analytics'],
-  comptes:     ['flux', 'analytics'],
-  patrimoine:  ['analytics'],
-  alertes:     ['analytics'],
-  categories:  ['flux', 'budgets', 'abonnements'],
+  flux:               ['comptes', 'budgets', 'alertes', 'analytics'],
+  transferts:         ['comptes', 'flux', 'analytics'],
+  budgets:            ['analytics'],
+  'budget-templates': ['budgets', 'analytics'],
+  comptes:            ['flux', 'analytics'],
+  patrimoine:         ['analytics'],
+  alertes:            ['analytics'],
+  categories:         ['flux', 'budgets', 'abonnements', 'budget-templates'],
 }
 
 function invalidateWithDependencies(queryClient, resource) {

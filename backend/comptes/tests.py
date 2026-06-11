@@ -11,56 +11,77 @@ from referentiels.models import TypeCompte, Titulaire, Etablissement, Devise
 
 class CalculSoldeServiceTest(TestCase):
 
-    def _make_compte(self, solde_initial, solde_reel):
+    def _make_compte(self, solde_initial):
         compte = MagicMock()
         compte.solde_initial = Decimal(str(solde_initial))
-        compte.solde_reel = Decimal(str(solde_reel))
         compte.solde_theorique = Decimal("0.00")
+        compte.solde_reel = Decimal("0.00")
         compte.ecart_solde = Decimal("0.00")
         return compte
 
-    def _make_flux_model(self, total_flux):
+    def _make_flux_model(self, total_flux, total_definitifs=None):
+        """
+        total_definitifs : flux confirmés (statut.est_definitif=True).
+        Si None, on suppose tous les flux confirmés (écart = 0).
+        """
+        if total_definitifs is None:
+            total_definitifs = total_flux
         MockFlux = MagicMock()
-        MockFlux.objects.filter.return_value.aggregate.return_value = {
+        mock_all = MagicMock()
+        mock_all.aggregate.return_value = {
             "total": Decimal(str(total_flux)) if total_flux is not None else None
         }
+        mock_definitif = MagicMock()
+        mock_definitif.aggregate.return_value = {
+            "total": Decimal(str(total_definitifs)) if total_definitifs is not None else None
+        }
+        MockFlux.objects.filter.side_effect = [mock_all, mock_definitif]
         return MockFlux
 
     def test_solde_theorique_avec_flux_negatifs(self):
-        compte = self._make_compte("4196.49", "3500.00")
+        compte = self._make_compte("4196.49")
         _calculer_solde_avec_model(compte, self._make_flux_model("-696.49"))
         self.assertEqual(compte.solde_theorique, Decimal("3500.00"))
+        self.assertEqual(compte.solde_reel, Decimal("3500.00"))
         self.assertEqual(compte.ecart_solde, Decimal("0.00"))
 
     def test_solde_theorique_avec_flux_positifs(self):
-        compte = self._make_compte("1000.00", "1500.00")
+        compte = self._make_compte("1000.00")
         _calculer_solde_avec_model(compte, self._make_flux_model("500.00"))
         self.assertEqual(compte.solde_theorique, Decimal("1500.00"))
+        self.assertEqual(compte.solde_reel, Decimal("1500.00"))
         self.assertEqual(compte.ecart_solde, Decimal("0.00"))
 
-    def test_ecart_solde_positif(self):
-        compte = self._make_compte("1000.00", "1200.00")
-        _calculer_solde_avec_model(compte, self._make_flux_model("100.00"))
+    def test_ecart_positif_depense_en_attente(self):
+        # total_flux = 100 (net), total_definitifs = 200 (plus confirmé que prévu)
+        # → solde_reel > solde_theorique → dépenses prévisionnelles en attente
+        compte = self._make_compte("1000.00")
+        _calculer_solde_avec_model(compte, self._make_flux_model("100.00", "200.00"))
         self.assertEqual(compte.solde_theorique, Decimal("1100.00"))
+        self.assertEqual(compte.solde_reel, Decimal("1200.00"))
         self.assertEqual(compte.ecart_solde, Decimal("100.00"))
 
-    def test_ecart_solde_negatif(self):
-        compte = self._make_compte("1000.00", "900.00")
-        _calculer_solde_avec_model(compte, self._make_flux_model("100.00"))
+    def test_ecart_negatif_recette_en_attente(self):
+        # total_definitifs = -100 (dépenses confirmées), total_flux = +100 (recette prévisionnelle)
+        # → solde_theorique > solde_reel → recette pas encore perçue
+        compte = self._make_compte("1000.00")
+        _calculer_solde_avec_model(compte, self._make_flux_model("100.00", "-100.00"))
         self.assertEqual(compte.solde_theorique, Decimal("1100.00"))
+        self.assertEqual(compte.solde_reel, Decimal("900.00"))
         self.assertEqual(compte.ecart_solde, Decimal("-200.00"))
 
     def test_aucun_flux(self):
-        compte = self._make_compte("4196.49", "4196.49")
+        compte = self._make_compte("4196.49")
         _calculer_solde_avec_model(compte, self._make_flux_model(None))
         self.assertEqual(compte.solde_theorique, Decimal("4196.49"))
+        self.assertEqual(compte.solde_reel, Decimal("4196.49"))
         self.assertEqual(compte.ecart_solde, Decimal("0.00"))
 
     def test_save_appele_avec_bons_champs(self):
-        compte = self._make_compte("1000.00", "1000.00")
+        compte = self._make_compte("1000.00")
         _calculer_solde_avec_model(compte, self._make_flux_model("0.00"))
         compte.save.assert_called_once_with(
-            update_fields=["solde_theorique", "ecart_solde", "updated_at"]
+            update_fields=["solde_theorique", "solde_reel", "ecart_solde", "updated_at"]
         )
 
 
@@ -87,7 +108,6 @@ class CompteAPITest(APITestCase):
             "etablissement": str(self.etablissement.id),
             "devise": str(self.devise.id),
             "solde_initial": "4196.49",
-            "solde_reel": "4196.49",
         }
 
     def test_creation_compte(self):
@@ -102,6 +122,13 @@ class CompteAPITest(APITestCase):
         response = self.client.post(url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("solde_theorique", response.data)
+
+    def test_solde_reel_read_only_a_la_creation(self):
+        url = reverse("compte-list")
+        payload = {**self.payload_valide, "solde_reel": "9999.99"}
+        response = self.client.post(url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("solde_reel", response.data)
 
     def test_ecart_solde_read_only_a_la_creation(self):
         url = reverse("compte-list")

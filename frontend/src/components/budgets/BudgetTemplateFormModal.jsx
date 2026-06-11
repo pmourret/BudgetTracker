@@ -5,23 +5,18 @@ import Input from '../ui/Input'
 import Select from '../ui/Select'
 import Button from '../ui/Button'
 
-function moisActuelISO() {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
-}
-
-export default function BudgetFormModal({ isOpen, onClose, moisDefaut, budget = null }) {
-  const isEdit = Boolean(budget)
+export default function BudgetTemplateFormModal({ isOpen, onClose, template = null }) {
+  const isEdit = Boolean(template)
 
   const [categorie, setCategorie] = useState('')
-  const [mois, setMois] = useState(moisDefaut || moisActuelISO())
-  const [montantPrevu, setMontantPrevu] = useState('')
+  const [montantDefaut, setMontantDefaut] = useState('')
   const [notes, setNotes] = useState('')
+  const [actif, setActif] = useState(true)
   const [categoriesIncluses, setCategoriesIncluses] = useState([])
   const [errors, setErrors] = useState({})
 
-  const createBudget = useCreateResource('budgets')
-  const updateBudget = useUpdateResource('budgets')
+  const createTemplate = useCreateResource('budget-templates')
+  const updateTemplate = useUpdateResource('budget-templates')
   const { data: categoriesData } = useResourceList('categories')
 
   const allCats = categoriesData?.results ?? []
@@ -36,7 +31,6 @@ export default function BudgetFormModal({ isOpen, onClose, moisDefaut, budget = 
     .map((maj) => ({
       label: maj.nom,
       options: [
-        // La majeure elle-même en premier pour créer un budget d'ensemble
         { value: String(maj.id), label: `${maj.nom} — budget global` },
         ...minCats
           .filter((m) => String(m.parent) === String(maj.id))
@@ -44,18 +38,13 @@ export default function BudgetFormModal({ isOpen, onClose, moisDefaut, budget = 
       ],
     }))
 
-  // Catégorie sélectionnée et ses informations
-  // Majeure = racine avec au moins une sous-catégorie active (cohérent avec le backend)
   const selectedCat = allCats.find((c) => String(c.id) === categorie)
   const mineuresActives = allCats.filter(
     (c) => !c.est_racine && String(c.parent) === categorie && c.actif
   )
   const estMajeure = selectedCat?.est_racine === true && mineuresActives.length > 0
-
-  // Mineures actives de la majeure sélectionnée (déjà calculé dans mineuresActives)
   const mineuresDisponibles = estMajeure ? mineuresActives : []
 
-  // Quand on change de catégorie vers une majeure → cocher toutes les mineures actives
   useEffect(() => {
     if (!isEdit && estMajeure) {
       setCategoriesIncluses(mineuresDisponibles.map((m) => String(m.id)))
@@ -66,24 +55,23 @@ export default function BudgetFormModal({ isOpen, onClose, moisDefaut, budget = 
 
   useEffect(() => {
     if (!isOpen) return
-    if (isEdit && budget) {
-      setCategorie(budget.categorie ? String(budget.categorie) : '')
-      setMois(budget.mois ?? moisDefaut ?? moisActuelISO())
-      setMontantPrevu(String(budget.montant_prevu ?? ''))
-      setNotes(budget.notes ?? '')
-      // Pré-cocher les mineures déjà incluses
+    if (isEdit && template) {
+      setCategorie(template.categorie ? String(template.categorie) : '')
+      setMontantDefaut(String(template.montant_defaut ?? ''))
+      setNotes(template.notes ?? '')
+      setActif(template.actif ?? true)
       setCategoriesIncluses(
-        (budget.categories_incluses ?? []).map((id) => String(id))
+        (template.categories_incluses ?? []).map((id) => String(id))
       )
     } else {
       setCategorie('')
-      setMois(moisDefaut || moisActuelISO())
-      setMontantPrevu('')
+      setMontantDefaut('')
       setNotes('')
+      setActif(true)
       setCategoriesIncluses([])
     }
     setErrors({})
-  }, [isOpen, isEdit, budget, moisDefaut])
+  }, [isOpen, isEdit, template])
 
   const toggleMineure = (id) => {
     setCategoriesIncluses((prev) =>
@@ -93,9 +81,9 @@ export default function BudgetFormModal({ isOpen, onClose, moisDefaut, budget = 
 
   const validate = () => {
     const e = {}
-    const montant = parseFloat(String(montantPrevu).replace(',', '.')) || 0
+    const montant = parseFloat(String(montantDefaut).replace(',', '.')) || 0
     if (!categorie) e.categorie = 'Catégorie requise.'
-    if (!montant || montant <= 0) e.montantPrevu = 'Montant prévu requis (> 0).'
+    if (!montant || montant <= 0) e.montantDefaut = 'Montant par défaut requis (> 0).'
     if (estMajeure && categoriesIncluses.length === 0) {
       e.categoriesIncluses = 'Sélectionnez au moins une sous-catégorie.'
     }
@@ -105,21 +93,20 @@ export default function BudgetFormModal({ isOpen, onClose, moisDefaut, budget = 
 
   const handleSubmit = () => {
     if (!validate()) return
-    const montant = parseFloat(String(montantPrevu).replace(',', '.'))
+    const montant = parseFloat(String(montantDefaut).replace(',', '.'))
 
     const payload = {
       categorie,
-      mois,
-      montant_prevu: montant.toFixed(2),
+      montant_defaut: montant.toFixed(2),
       notes,
+      actif,
     }
-
     if (estMajeure) {
       payload.categories_incluses = categoriesIncluses
     }
 
-    const mutation = isEdit ? updateBudget : createBudget
-    const mutateArg = isEdit ? { id: budget.id, payload } : payload
+    const mutation = isEdit ? updateTemplate : createTemplate
+    const mutateArg = isEdit ? { id: template.id, payload } : payload
 
     mutation.mutate(mutateArg, {
       onSuccess: () => onClose(),
@@ -137,14 +124,14 @@ export default function BudgetFormModal({ isOpen, onClose, moisDefaut, budget = 
     })
   }
 
-  const isPending = createBudget.isPending || updateBudget.isPending
+  const isPending = createTemplate.isPending || updateTemplate.isPending
   const submitDisabled = isPending || (estMajeure && categoriesIncluses.length === 0)
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={isEdit ? 'Modifier le budget' : 'Nouveau budget'}
+      title={isEdit ? 'Modifier le modèle' : 'Nouveau modèle de budget'}
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>Annuler</Button>
@@ -163,9 +150,9 @@ export default function BudgetFormModal({ isOpen, onClose, moisDefaut, budget = 
           groups={categoriesGroups}
           error={errors.categorie}
           required
+          disabled={isEdit}
         />
 
-        {/* Section mineures — visible uniquement pour une catégorie majeure */}
         {estMajeure && mineuresDisponibles.length > 0 && (
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
@@ -199,24 +186,27 @@ export default function BudgetFormModal({ isOpen, onClose, moisDefaut, budget = 
         )}
 
         <Input
-          label="Mois"
-          type="month"
-          value={mois.slice(0, 7)}
-          onChange={(val) => setMois(`${val}-01`)}
-          error={errors.mois}
+          label="Montant par défaut (€)"
+          type="text"
+          inputMode="decimal"
+          value={montantDefaut}
+          onChange={setMontantDefaut}
+          placeholder="0,00"
+          error={errors.montantDefaut || errors.montant_defaut}
           required
         />
 
-        <Input
-          label="Montant prévu (€)"
-          type="text"
-          inputMode="decimal"
-          value={montantPrevu}
-          onChange={setMontantPrevu}
-          placeholder="0,00"
-          error={errors.montantPrevu || errors.montant_prevu}
-          required
-        />
+        {isEdit && (
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              className="w-4 h-4 accent-purple-600 cursor-pointer"
+              checked={actif}
+              onChange={(e) => setActif(e.target.checked)}
+            />
+            <span className="text-sm text-content">Modèle actif (reconduit automatiquement)</span>
+          </label>
+        )}
 
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-content-2">Notes</label>

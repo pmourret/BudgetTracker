@@ -181,10 +181,22 @@ class SignalRecalculSoldeTest(TestCase):
         self.assertEqual(self.compte.solde_theorique, Decimal("1000.00"))
 
     def test_ecart_solde_recalcule(self):
-        """L'écart de solde est recalculé après chaque flux."""
-        self._make_flux("-100.00")
+        """L'écart de solde est recalculé après un flux prévisionnel."""
+        from referentiels.models import StatutFlux
+        statut_prev = StatutFlux.objects.create(
+            code="PREV_TEST", libelle="Prévisionnel", est_definitif=False
+        )
+        Flux.objects.create(
+            compte=self.compte,
+            type_flux=self.type_flux,
+            statut=statut_prev,
+            devise=self.devise,
+            categorie=self.categorie,
+            montant=Decimal("-100.00"),
+            date_flux=datetime.date(2024, 3, 15),
+        )
         self.compte.refresh_from_db()
-        # solde_reel=1000, solde_theorique=900 → ecart=100
+        # solde_reel=1000 (flux non définitif ignoré), solde_theorique=900 → ecart=100
         self.assertEqual(self.compte.ecart_solde, Decimal("100.00"))
 
     def test_solde_recalcule_apres_modification(self):

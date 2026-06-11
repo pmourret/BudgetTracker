@@ -27,7 +27,6 @@ export default function FluxFormModal({ isOpen, onClose, flux = null }) {
   const [compte, setCompte] = useState('')
   const [categorie, setCategorie] = useState('')
   const [dateFlux, setDateFlux] = useState(todayISO())
-  const [typeFlux, setTypeFlux] = useState('')
   const [modePaiement, setModePaiement] = useState('')
   const [statut, setStatut] = useState('')
   const [errors, setErrors] = useState({})
@@ -36,7 +35,7 @@ export default function FluxFormModal({ isOpen, onClose, flux = null }) {
   const updateFlux = useUpdateResource('flux')
   const { data: comptesData } = useResourceList('comptes')
   const { data: categoriesData } = useResourceList('categories')
-  const { options: typesFluxOpts } = useTypesFlux()
+  const { data: typesFluxData } = useTypesFlux()
   const { options: modesPaiementOpts } = useModesPaiement()
   const { options: statutsOpts } = useStatutsFlux()
   const { data: devises } = useDevises()
@@ -71,16 +70,19 @@ export default function FluxFormModal({ isOpen, onClose, flux = null }) {
       setCompte(flux.compte ? String(flux.compte) : '')
       setCategorie(flux.categorie ? String(flux.categorie) : '')
       setDateFlux(flux.date_flux ?? todayISO())
-      setTypeFlux(flux.type_flux ? String(flux.type_flux) : '')
       setModePaiement(flux.mode_paiement ? String(flux.mode_paiement) : '')
       setStatut(flux.statut ? String(flux.statut) : '')
     } else {
       setSens('depense'); setMontant(''); setLibelle(''); setCategorie('')
       setCompte(''); setDateFlux(todayISO())
-      setTypeFlux(''); setModePaiement(''); setStatut('')
+      setModePaiement(''); setStatut('')
     }
     setErrors({})
   }, [isOpen, isEdit, flux])
+
+  const typeFluxId = (typesFluxData ?? []).find(
+    (t) => t.code === (sens === 'depense' ? 'DEBIT' : 'CREDIT')
+  )?.id ?? null
 
   const montantNum = parseFloat(montant.replace(',', '.')) || 0
   const montantSigne = sens === 'depense' ? -Math.abs(montantNum) : Math.abs(montantNum)
@@ -91,7 +93,6 @@ export default function FluxFormModal({ isOpen, onClose, flux = null }) {
     if (!libelle.trim()) e.libelle = 'Libellé requis.'
     if (!compte) e.compte = 'Compte requis.'
     if (sens === 'depense' && !categorie) e.categorie = 'Catégorie requise pour une dépense.'
-    if (!typeFlux) e.typeFlux = 'Type requis.'
     if (!statut) e.statut = 'Statut requis.'
     setErrors(e)
     return Object.keys(e).length === 0
@@ -103,7 +104,7 @@ export default function FluxFormModal({ isOpen, onClose, flux = null }) {
     const payload = {
       compte,
       categorie: categorie || null,
-      type_flux: typeFlux,
+      type_flux: typeFluxId,
       mode_paiement: modePaiement || null,
       statut,
       montant: montantSigne.toFixed(2),
@@ -266,10 +267,6 @@ export default function FluxFormModal({ isOpen, onClose, flux = null }) {
           </div>
         </div>
 
-        <Select
-          label="Type de flux" value={typeFlux} onChange={setTypeFlux}
-          options={typesFluxOpts} error={errors.typeFlux} required
-        />
         <Select
           label="Mode de paiement" value={modePaiement} onChange={setModePaiement}
           options={modesPaiementOpts} placeholder="Optionnel"

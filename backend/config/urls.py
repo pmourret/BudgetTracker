@@ -22,7 +22,7 @@ from comptes.views import CompteViewSet
 from categories.views import CategorieViewSet
 from flux.views import FluxViewSet
 from transferts.views import TransfertViewSet
-from budgets.views import BudgetViewSet
+from budgets.views import BudgetViewSet, BudgetTemplateViewSet
 from abonnements.views import AbonnementViewSet
 from alertes.views import AlerteViewSet
 from patrimoine.views import ActifViewSet
@@ -42,6 +42,7 @@ router.register(r"categories", CategorieViewSet, basename="categorie")
 router.register(r"flux", FluxViewSet, basename="flux")
 router.register(r"transferts", TransfertViewSet, basename="transfert")
 router.register(r"budgets", BudgetViewSet, basename="budget")
+router.register(r"budget-templates", BudgetTemplateViewSet, basename="budget-template")
 router.register(r"abonnements", AbonnementViewSet, basename="abonnement")
 router.register(r"alertes", AlerteViewSet, basename="alerte")
 router.register(r"patrimoine", ActifViewSet, basename="actif")

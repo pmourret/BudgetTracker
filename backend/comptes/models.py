@@ -54,7 +54,8 @@ class Compte(BaseModel):
         max_digits=12,
         decimal_places=2,
         default=0,
-        help_text="Solde réel constaté (saisi manuellement ou via import bancaire)"
+        editable=False,
+        help_text="Calculé : solde_initial + Σ(flux dont statut.est_definitif=True). Jamais éditable."
     )
     solde_theorique = models.DecimalField(
         max_digits=12,
