@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+@theme {
+  /* Palette violette (accent — identique dans les deux thèmes) */
+  --color-purple-50: #EEEDFE;
+  --color-purple-100: #CECBF6;
+  --color-purple-200: #AFA9EC;
+  --color-purple-400: #7F77DD;
+  --color-purple-600: #534AB7;
+  --color-purple-800: #3C3489;
+  --color-purple-900: #26215C;
+
+  /* Sémantiques métier */
+  --color-teal-50: #E1F5EE;
+  --color-teal-600: #1D9E75;
+  --color-teal-800: #0F6E56;
+  --color-red-50: #FCEBEB;
+  --color-red-600: #E24B4A;
+  --color-red-800: #A32D2D;
+  --color-amber-50: #FAEEDA;
+  --color-amber-600: #EF9F27;
+  --color-amber-800: #854F0B;
+  --color-blue-50: #E6F1FB;
+  --color-blue-600: #378ADD;
+  --color-blue-800: #185FA5;
+
+  --color-ink: #1e1b4b;
+  --color-ink-light: #312e81;
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  /* --- Variables sémantiques de surface (pilotées par le thème) --- */
+  --color-surface: #ffffff;          /* fond des cartes */
+  --color-surface-2: #f8fafc;        /* fond de page */
+  --color-surface-3: #f1f5f9;        /* fond des métriques */
+  --color-border-app: #e2e8f0;       /* bordures */
+  --color-content: #1e293b;          /* texte principal */
+  --color-content-2: #64748b;        /* texte secondaire */
+  --color-content-3: #94a3b8;        /* texte tertiaire */
+
+  /* --- Icones --- */
+  --icon-badge-bg: #EEEDFE;   /* violet très clair */
+  --icon-badge-fg: #534AB7;   /* violet moyen */
+}
+
+/* --- Surcharge des variables sémantiques en mode sombre --- */
+.dark {
+  --color-surface: #1e293b;
+  --color-surface-2: #0f172a;
+  --color-surface-3: #283548;
+  --color-border-app: #334155;
+  --color-content: #f1f5f9;
+  --color-content-2: #94a3b8;
+  --color-content-3: #64748b;
+  --icon-badge-bg: #312e81;   /* violet foncé bien visible */
+  --icon-badge-fg: #c7d2fe;   /* violet très clair, fort contraste */
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  background: var(--color-surface-2);
+  color: var(--color-content);
+}

@@ -1,0 +1,11 @@
+from .base import *  # noqa
+
+DEBUG = False
+
+ALLOWED_HOSTS = config("ALLOWED_HOSTS").split(",")
+
+# Sécurité HTTPS
+SECURE_HSTS_SECONDS = 31536000
+SECURE_SSL_REDIRECT = True
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
