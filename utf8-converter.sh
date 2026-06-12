@@ -2,67 +2,77 @@
 # fix-encoding.sh — reconvertit les fichiers texte du projet en UTF-8 (sans BOM)
 set -euo pipefail
 
-# Extensions de fichiers texte à traiter
 EXTENSIONS=(py txt md json js jsx ts tsx css html yml yaml toml cfg ini env sh)
-
-# Dossiers à ignorer
-PRUNE=(node_modules .git __pycache__ .venv venv dist build .vite migrations/__pycache__)
+PRUNE=(node_modules .git __pycache__ .venv venv dist build .vite)
 
 DRY_RUN=false
 [[ "${1:-}" == "--dry-run" ]] && DRY_RUN=true
 
-# Vérifie la présence de iconv
 command -v iconv >/dev/null || { echo "iconv requis (apt install libc-bin)"; exit 1; }
 
-# Construit l'expression -prune pour find
+# Expression -prune pour les dossiers à ignorer
 prune_expr=()
 for d in "${PRUNE[@]}"; do
-  prune_expr+=(-path "*/$d" -prune -o)
+  prune_expr+=(-name "$d" -prune -o)
 done
 
-# Construit l'expression des extensions
-name_expr=(-false)
+# Expression des extensions (groupée)
+name_expr=()
 for e in "${EXTENSIONS[@]}"; do
   name_expr+=(-o -name "*.$e")
 done
+name_expr=("${name_expr[@]:1}")  # retire le premier -o
 
 converted=0
 skipped=0
 
+# Convertit $file depuis l'encodage $1 vers UTF-8 (avec gestion dry-run)
+convert_file() {
+  local src="$1"
+  $DRY_RUN && { echo "$src -> utf-8 : $file"; ((converted++)) || true; return; }
+  if iconv -f "$src" -t UTF-8 "$file" -o "$file.tmp" 2>/dev/null; then
+    mv "$file.tmp" "$file"
+    echo "Converti ($src -> utf-8) : $file"
+    ((converted++)) || true
+  else
+    rm -f "$file.tmp"
+    echo "ÉCHEC ($src) : $file" >&2
+    ((skipped++)) || true
+  fi
+}
+
 while IFS= read -r -d '' file; do
-  # Détecte l'encodage réel
   enc=$(file -b --mime-encoding "$file")
 
   case "$enc" in
     utf-8|us-ascii)
       # Déjà bon — on vérifie juste un éventuel BOM UTF-8 à retirer
-      if [[ $(head -c3 "$file" | xxd -p) == "efbbbf" ]]; then
+      if [[ $(head -c3 "$file" | od -An -tx1 | tr -d ' \n') == "efbbbf" ]]; then
         $DRY_RUN && { echo "BOM   $file"; continue; }
         tail -c +4 "$file" > "$file.tmp" && mv "$file.tmp" "$file"
         echo "BOM retiré : $file"
-        ((converted++))
+        ((converted++)) || true
       else
-        ((skipped++))
+        ((skipped++)) || true
       fi
       ;;
     binary)
-      ((skipped++))
-      ;;
-    *)
-      # Encodage à convertir (utf-16le, utf-16be, iso-8859-1, etc.)
-      $DRY_RUN && { echo "$enc -> utf-8 : $file"; ((converted++)); continue; }
-      if iconv -f "$enc" -t UTF-8 "$file" -o "$file.tmp" 2>/dev/null; then
-        mv "$file.tmp" "$file"
-        echo "Converti ($enc -> utf-8) : $file"
-        ((converted++))
+      # file classe aussi l'UTF-16 comme "binary" — on sonde le BOM
+      bom=$(head -c2 "$file" | od -An -tx1 | tr -d ' \n')
+      if [[ "$bom" == "fffe" ]]; then
+        convert_file UTF-16LE
+      elif [[ "$bom" == "feff" ]]; then
+        convert_file UTF-16BE
       else
-        rm -f "$file.tmp"
-        echo "ÉCHEC ($enc) : $file" >&2
-        ((skipped++))
+        ((skipped++)) || true   # vrai binaire, on ne touche pas
       fi
       ;;
+    *)
+      # Autres encodages texte (iso-8859-1, etc.)
+      convert_file "$enc"
+      ;;
   esac
-done < <(find . \( "${prune_expr[@]}" -type f \( "${name_expr[@]}" \) -print0 \))
+done < <(find . "${prune_expr[@]}" -type f \( "${name_expr[@]}" \) -print0)
 
 echo "---"
 $DRY_RUN && echo "[DRY-RUN] $converted fichier(s) seraient modifiés, $skipped ignorés." \
