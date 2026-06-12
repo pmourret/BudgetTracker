@@ -89,13 +89,14 @@ analytics · audit · accounts
 | `abonnements` | Modèle `Abonnement` récurrent + détection de divergence |
 | `alertes` | Alertes auto (budget, solde bas, retard abonnement, divergence, écart solde, **valorisation à faire**) + acquittement |
 | `patrimoine` | `Actif` estimatif + `HistoriqueValorisation` (granularité fine) + service de valorisation + rappels de re-valorisation |
-| `analytics` | Service `dashboard.py` (agrégats) + `DashboardView` (APIView) + serializer + 14 tests. Inclut `_calculer_depenses_par_categorie(mois)` : agrégation SQL par catégorie majeure (mineures regroupées sous leur parent, triées par montant décroissant). Champ `depenses_par_categorie` ajouté au `DashboardSerializer`. Filtre `est_ajustement=False` appliqué sur tous les agrégats (revenus, dépenses, catégories). |
+| `analytics` | Service `dashboard.py` (agrégats) + `DashboardView` (APIView) + serializer + 14 tests. Inclut `_calculer_depenses_par_categorie(mois)` : agrégation SQL par catégorie majeure (mineures regroupées sous leur parent, triées par montant décroissant). Champ `depenses_par_categorie` ajouté au `DashboardSerializer`. Filtre `est_ajustement=False` appliqué sur tous les agrégats (revenus, dépenses, catégories). **Phase 10-A (prévisionnel)** : services `projection.py` (`calculer_solde_projete`, `calculer_capacite_restante`, `calculer_previsionnel` + helpers échéances abonnements / couverture budgétaire) et `trajectoire.py` (`calculer_trajectoire`), `PrevisionnelView` (APIView) + `PrevisionnelSerializer`, **21 tests** (suite globale à **253 OK**). Lecture seule stricte, aucun modèle persisté, aucune migration. |
 
 **Endpoints clés :**
 - CRUD ressources : `/api/v1/comptes/`, `/categories/`, `/flux/`, `/transferts/`, `/budgets/`, `/budget-templates/`, `/abonnements/`, `/alertes/`, `/patrimoine/`
 - Référentiels (lecture seule sauf Titulaire et Etablissement) : `/api/v1/referentiels/...`
 - Patrimoine : `/patrimoine/total/`, `/patrimoine/historique/?nb_mois=12`, `/patrimoine/verifier-rappels/` (POST)
 - Dashboard : `/api/v1/analytics/dashboard/?nb_mois=6`
+- Prévisionnel (10-A) : `/api/v1/analytics/previsionnel/?nb_mois=6` (3 blocs `solde_projete`, `capacite_restante`, `trajectoire`, chacun avec `fiabilite` + `definition`)
 - Actions custom : `/abonnements/{id}/verifier-divergence/`, `/patrimoine/{id}/valoriser/`, `/alertes/{id}/acquitter/`, `/alertes/acquitter-tout/`, `/budget-templates/reconduire/` (POST, body `{"mois": "YYYY-MM-DD"}`)
 
 ### ✅ Frontend — Phase 9 COMPLÈTE
@@ -112,12 +113,14 @@ Toutes les pages sont en Tailwind v4 + dark mode complet :
 | Alertes | `/alertes` | ✅ filtres chips + acquittement |
 | Patrimoine | `/patrimoine` | ✅ CRUD complet : `ActifFormModal` étendu (création + édition), boutons Éditer/Supprimer sur chaque `ActifCard`, toggle « actif » en édition |
 | Catégories | `/categories` | ✅ CRUD complet : `CategorieFormModal` (majeure ou mineure selon `parentId`), accordéon (majeures → clic → mineures). Boutons Éditer/Supprimer ; si 409 (flux liés) → propose de désactiver. Accessible depuis Sidebar + menu Plus. |
-| Plus | `/plus` | ✅ menu mobile (accès Comptes/Abonnements/Patrimoine/Catégories) + toggle thème |
+| Prévisionnel | `/previsionnel` | ✅ **Phase 10-A front** : 3 cartes (solde projeté fin de mois avec décomposition en briques réel/engagé/estimé/récurrent ; capacité à dépenser restante + jauge ; trajectoire d'épargne `LineChart`, sélecteur 3/6/12M). `FiabiliteBadge` (elevee=vert, moyenne=ambre, faible=gris) mappé sur la valeur API. Fiabilité dégressive de la trajectoire rendue par coupure plein/pointillés gris dérivée du champ `fiabilite` de chaque point (aucun seuil front). États skeleton/ErrorState (pas d'early return)/EmptyState. Accessible Sidebar (icône `TrendingUp`) + menu Plus. Wording « projeté », jamais vérité comptable. |
+| Plus | `/plus` | ✅ menu mobile (accès Prévisionnel/Comptes/Abonnements/Patrimoine/Catégories) + toggle thème |
 
-**Composants UI** (`src/components/ui/`) : `Button`, `Card`, `Input`, `Select` (prop `groups` pour `<optgroup>` natifs), `Modal`, `States` (Loading/Error/Empty), `Badge`, `IconBadge`.
+**Composants UI** (`src/components/ui/`) : `Button`, `Card`, `Input`, `Select` (prop `groups` pour `<optgroup>` natifs), `Modal`, `States` (Loading/Error/Empty), `Badge`, `IconBadge`, `PeriodSelector` (sélecteur 3/6/12M partagé, extrait du Dashboard et réutilisé par Dashboard + Prévisionnel).
 **Charts** (`src/components/charts/`) : `chartSetup.js` (palette `CAT_PALETTE` 12 couleurs dans DashboardPage), `LineChart`, `BarChart`, `DoughnutChart`.
-**Layout** (`src/components/layout/`) : `Layout`, `Sidebar` (desktop, inclut Catégories), `BottomNav` (mobile <640px), `ThemeToggle` (variants `dark`/`light`).
+**Layout** (`src/components/layout/`) : `Layout`, `Sidebar` (desktop, inclut Catégories + Prévisionnel), `BottomNav` (mobile <640px), `ThemeToggle` (variants `dark`/`light`).
 **Composants Catégories** (`src/components/categories/`) : `CategorieFormModal` (prop `parentId` = création mineure ; prop `categorie` = édition).
+**Composants Prévisionnel** (`src/components/previsionnel/`) : `FiabiliteBadge` (mappe `elevee`/`moyenne`/`faible` → variantes Badge `success`/`avertissement`/`neutre`). Hook dédié `usePrevisionnel.js` (query key `['analytics', 'previsionnel', nbMois]`, couverte par l'invalidation préfixe `'analytics'`).
 
 **Dark mode :** variables CSS sémantiques dans `index.css` (`@theme` clair + bloc `.dark`) : `--color-surface`, `--color-surface-2/3`, `--color-border-app`, `--color-content`, `--color-content-2/3`, `--icon-badge-bg/fg`. Store Zustand `themeStore.js` (modes `system`/`light`/`dark`, persistance `localStorage`, écoute `prefers-color-scheme`). Les couleurs métier (rouge/vert/ambre/violet) restent identiques dans les deux thèmes ; seules surfaces et textes changent.
 
@@ -132,13 +135,14 @@ Toutes les pages sont en Tailwind v4 + dark mode complet :
   transferts:         ['comptes', 'flux', 'analytics'],
   budgets:            ['analytics'],
   'budget-templates': ['budgets', 'analytics'],
+  abonnements:        ['analytics'],
   comptes:            ['flux', 'analytics'],
   patrimoine:         ['analytics'],
   alertes:            ['analytics'],
   categories:         ['flux', 'budgets', 'abonnements', 'budget-templates'],
 }
 ```
-La clé `'analytics'` couvre toutes les variantes du dashboard (`['analytics', 'dashboard', nbMois]`) via le prefix-matching de React Query.
+La clé `'analytics'` couvre toutes les variantes du dashboard (`['analytics', 'dashboard', nbMois]`) **et du prévisionnel** (`['analytics', 'previsionnel', nbMois]`) via le prefix-matching de React Query. `abonnements` a été ajouté en phase 10-A (les échéances d'abonnement nourrissent le prévisionnel).
 
 **Sélecteur de catégories groupé :** dans `FluxFormModal`, `AbonnementFormModal`, les catégories sont affichées hiérarchiquement via la prop `groups` de `Select` : majeures sans enfants en options directes, majeures avec enfants en `<optgroup>` contenant leurs mineures. **Dans `BudgetFormModal` et `BudgetTemplateFormModal`**, la majeure elle-même est ajoutée comme **première option sélectionnable dans son propre `<optgroup>`** (label `Nom — budget global`), car on veut pouvoir la sélectionner pour créer un budget d'ensemble.
 
@@ -223,9 +227,11 @@ Exploration complète backend + frontend, corrections de cohérence, **19 tests 
 - `BudgetsPage.jsx` : onglets **"Ce mois"** / **"Modèles"** (TabBtn). Onglet Modèles : liste des templates (`TemplateCard` avec CRUD), bouton **"Reconduire sur Mois"** → `POST /budget-templates/reconduire/` → affiche un message de confirmation + bascule sur l'onglet Ce mois. Bouton Reconduire aussi dans l'EmptyState du mois si des templates existent.
 - `useResource.js` : `'budget-templates': ['budgets', 'analytics']` ajouté dans `RESOURCE_DEPENDENCIES`. `categories` invalide aussi `'budget-templates'` (changement de mineures impacte l'auto-détection).
 
-### ⏳ Phase 10 — Prévisionnel financier (APRÈS la 11) — SPEC CADRÉE
+### 🟢 Phase 10 — Prévisionnel financier — 10-A LIVRÉE (back + front)
 
-> Pièce maîtresse. **Spec détaillée ci-dessous, cadrée en session de réflexion dédiée (mode Projet).** Découpée en deux sous-phases : **10-A** (socle lecture seule, mono-mois) puis **10-B** (projection longue + scénarios). Exécution en Claude Code.
+> Pièce maîtresse. **Spec détaillée ci-dessous, cadrée en session de réflexion dédiée (mode Projet).** Découpée en deux sous-phases : **10-A** (socle lecture seule) **✅ TERMINÉE** puis **10-B** (scénarios de simulation + fourchettes) **⏳ à venir**.
+>
+> ⚠️ **L'implémentation 10-A livrée s'écarte volontairement de la spec ci-dessous** (validé par l'utilisateur en session). Lire l'encadré « CE QUI A ÉTÉ RÉELLEMENT LIVRÉ » juste sous le titre 10-A avant de toucher au code : la spec d'origine reste affichée comme contexte historique, mais c'est l'encadré qui fait foi.
 
 **Principe directeur (à ne jamais perdre de vue) :** le prévisionnel est **purement consultatif** (lecture seule). Il lit budgets + flux + abonnements, ne modifie **rien**, ne génère **aucune** alerte. Une projection n'est **jamais** une vérité comptable (toujours étiquetée « projeté »). Le solde réel reste la seule vérité.
 
@@ -237,125 +243,38 @@ Exploration complète backend + frontend, corrections de cohérence, **19 tests 
 | **Récurrent** | Échéance connue, pas encore matérialisée | Abonnements à échoir | Forte |
 | **Estimé** | Extrapolation d'un budget | Reste-à-dépenser budgété | Faible/moyenne |
 
-#### Phase 10-A — Socle lecture seule (mono-mois) — À FAIRE EN PREMIER
+#### Phase 10-A — Socle lecture seule — ✅ TERMINÉE (back + front, 12/06/2026)
 
-> Donne 80 % de la valeur pour 40 % de l'effort : savoir si on finit le mois dans le vert, et combien il reste à dépenser.
+> **CE QUI A ÉTÉ RÉELLEMENT LIVRÉ — référence canonique de la phase 10-A.** (La spec détaillée d'origine, qui décrivait une app `previsions`, 3 endpoints, `ParametrePrevision` et des drapeaux de tension, a été retirée car caduque. Le tableau ci-dessous fait foi.)
+>
+> | Sujet | Spec d'origine | Livré (validé en session) |
+> |---|---|---|
+> | App | App `previsions` dédiée | **Étendu `analytics`** (scénario A pragmatique) — services `analytics/services/projection.py` + `trajectoire.py` |
+> | Endpoints | 3 endpoints séparés | **1 seul** : `GET /api/v1/analytics/previsionnel/?nb_mois=6`, réponse en 3 blocs (`solde_projete`, `capacite_restante`, `trajectoire`), chacun avec `fiabilite` + `definition` |
+> | Trajectoire | Repoussée en 10-B | **Incluse en 10-A** (3 indicateurs livrés). Seuls les **scénarios de simulation** restent en 10-B |
+> | `ParametrePrevision` | Référentiel singleton (seuils) | **Non créé** — aucun seuil de tension en 10-A, donc aucun paramètre à administrer pour l'instant |
+> | Drapeaux de tension + couverture budgétaire | Indicateur 3 avec drapeaux | **Non livrés** (dépendaient de `ParametrePrevision`). Helpers de couverture existent dans `projection.py` mais ne sont pas exposés en drapeaux |
+> | Base de la formule | Partir du `solde_reel` | **Partir de `solde_actuel = Σ solde_theorique − Σ flux futurs`** : le `solde_theorique` inclut déjà les flux futurs datés, on les retire puis on réintroduit chaque brique séparément (même objectif anti-double-comptage) |
+> | Source dépenses variables (mois futurs trajectoire) | — | **Abonnements + `BudgetTemplate` actifs** (`montant_defaut` comme estimation), complément `max(0, montant_defaut − part déjà couverte)` anti-double-comptage |
+> | Modèle persisté / migration | Aucun (10-A) | **Aucun** ✅ — calcul à la volée, lecture seule stricte |
+>
+> **Détails d'implémentation livrés** (à respecter en 10-B) : échéances d'abonnement dérivées exclusivement de `Frequence.nb_jours` (≥ 28 j → pas calendaires mensuels en `base + pas × n`, `jour_echeance` cale le jour) ; déduplication des abonnements déjà matérialisés en flux futur sur la clé `(categorie_id, montant, mois)` (un flux neutralise une échéance) ; abonnements budgétés exclus (déjà dans le reste-à-dépenser), abonnements non budgétés ajoutés ; transferts et `est_ajustement` exclus partout ; fiabilité dégressive par point (`elevee` M0, `moyenne` M+1→M+3, `faible` au-delà) ; tous les services acceptent `aujourd_hui` injectable pour des tests déterministes ; **21 tests** (suite à **253 OK**). Front : `PrevisionnelPage`, `usePrevisionnel`, `FiabiliteBadge`, `PeriodSelector` partagé, `abonnements: ['analytics']` ajouté à `RESOURCE_DEPENDENCIES`, vérifié Playwright de bout en bout.
+>
+> **Reste ouvert pour 10-B / plus tard** : `ParametrePrevision` + drapeaux de tension + indicateur de couverture budgétaire (gelés faute de besoin éprouvé), puis scénarios de simulation et fourchettes pessimiste/optimiste.
 
-**DÉCISIONS MÉTIER ACTÉES (ne pas re-débattre, implémenter directement) :**
+#### Phase 10-B — Scénarios + fourchettes — APRÈS 10-A
 
-| Sujet | Décision actée |
-|---|---|
-| Source des dépenses variables futures | **Les budgets** (prolongement phase 11b). Pas l'historique en 10-A. |
-| Flux futurs « certains » | **Statut PREVISIONNEL + `date_flux` future** (les deux conditions). On s'appuie sur le sens métier du statut. |
-| Abonnements vs budgets | Abonnements **inclus** dans les budgets → **déduits** pour éviter le double comptage. |
-| Abonnement non budgété | Si sa catégorie n'a **pas** de budget actif (ni majeure ni mineure) → ajouté séparément comme dépense future autonome. |
-| Tension budgétaire | Si un abonnement à échoir **couvert** par un budget pèse ≥ seuil du reste-à-dépenser de sa catégorie → **drapeau** (consultatif, pas d'alerte générée). |
-| Seuil de tension | Référentiel `ParametrePrevision.seuil_tension_abonnement_pct`, **défaut 70 %**. |
-| Couverture budgétaire | Indicateur qui qualifie la fiabilité : % des dépenses historiques réelles tombant dans des catégories budgétées. |
-| Fenêtre de couverture | `ParametrePrevision.fenetre_couverture_mois`, **défaut 3 mois**. |
-| Niveau d'éval. couverture | **Majeure**. Une majeure est « couverte » s'il existe un budget sur elle **OU** sur une de ses mineures. |
-| Nombre d'endpoints | **Trois endpoints séparés** (granularité, états de chargement indépendants). |
-
-**Formule de référence du solde projeté (DÉCOMPOSITION TRAÇABLE obligatoire) :**
-
-> ⚠️ Cohérence avec la stratégie de solde actuelle (règles 5/6) : le `solde_theorique` inclut DÉJÀ tous les flux (y compris prévisionnels). **Ne pas ré-additionner les flux prévisionnels au `solde_theorique`** ou on les compte deux fois. Partir du `solde_reel` (= flux définitifs uniquement) pour une projection propre :
-
-```
-Solde projeté fin de mois =
-    solde_reel_actuel                            (RÉEL — flux définitifs : solde_initial + Σ flux statut.est_definitif=True)
-  + Σ flux PREVISIONNELS du mois (date ≤ fin mois) (ENGAGÉ — hors transferts, hors est_ajustement)
-  − reste_à_dépenser_budgété                       (ESTIMÉ — Σ max(0, montant_prevu − montant_consomme), inclut abos budgétés)
-  − Σ abonnements à échoir SANS budget             (RÉCURRENT non couvert)
-```
-
-Chaque brique est **exposée séparément** dans la réponse API (le front affiche le total ET son détail).
-
-**Les trois indicateurs du 10-A :**
-
-| # | Indicateur | Formule | Fiabilité |
-|---|---|---|---|
-| 1 | Solde projeté fin de mois | voir décomposition ci-dessus | projeté |
-| 2 | Capacité à dépenser restante | `Σ budgets − Σ consommé − Σ abonnements restants non couverts` | projeté |
-| 3 | Couverture budgétaire (+ drapeaux tension) | `dépenses hist. dans catégories budgétées / dépenses hist. totales` | réel (qualifie la projection) |
-
-**Règle de tension (indicateur 3, drapeaux) :**
-```
-part = abonnement_à_échoir / reste_à_dépenser_catégorie
-reste ≤ 0           → drapeau ROUGE (budget épuisé)
-part ≥ seuil (70%)  → drapeau AMBRE (l'abonnement mange l'essentiel du reste)
-sinon               → pas de drapeau
-```
-Message factuel, non culpabilisant (règle 13). Ex : « L'abonnement Spotify (25 €) représente 83 % de ton reste-à-dépenser Loisirs (30 €). »
-
-**ARCHITECTURE TECHNIQUE 10-A :**
-
-```
-backend/previsions/
-├── models.py          # ParametrePrevision (référentiel singleton) — AUCUN modèle de projection
-├── serializers.py     # sérialiseurs de sortie (lecture seule)
-├── views.py           # 3 APIView : SoldeProjeteView, CapaciteView, CouvertureView
-├── urls.py            # 3 routes (hors router, comme analytics)
-├── services/
-│   ├── __init__.py
-│   ├── parametres.py     # get_parametres() → singleton get_or_create avec défauts
-│   ├── solde_projete.py  # calculer_solde_projete(nb_mois_horizon=1) → dict décomposé + drapeaux_tension
-│   ├── capacite.py       # calculer_capacite_depenser()
-│   └── couverture.py     # calculer_couverture_budgetaire()
-└── tests.py
-```
-
-**Modèle `ParametrePrevision`** (singleton, app `previsions`) :
-- `seuil_tension_abonnement_pct` : Decimal, défaut `70.00`.
-- `fenetre_couverture_mois` : PositiveSmallInteger, défaut `3`.
-- Hérite de `BaseModel`. Accès via `services/parametres.py::get_parametres()` (get_or_create avec défauts — soigner l'implémentation singleton, ex. `pk` fixe ou manager dédié).
-- ⚠️ Jamais de seuil codé en dur ailleurs (règle 1).
-
-**Endpoints (3 séparés) :**
-```
-GET /api/v1/previsions/solde-projete/?horizon=1
-GET /api/v1/previsions/capacite/
-GET /api/v1/previsions/couverture/
-```
-Chacune une `APIView` (pas un ViewSet — ce ne sont pas des ressources de modèle), déclarées dans `config/urls.py` AVANT le router (comme `analytics/dashboard/`).
-
-**Structure de retour `solde-projete` :**
-```json
-{
-  "solde_reel_actuel": "...", "flux_previsionnels": "...",
-  "reste_a_depenser_budgete": "...", "abonnements_non_budgetes": "...",
-  "solde_projete": "...", "fiabilite": "projete",
-  "drapeaux_tension": [ { "abonnement": "...", "categorie": "...", "part_pct": "...", "niveau": "ROUGE|AMBRE", "message": "..." } ]
-}
-```
-
-**Branchements :**
-- `seed_demo` : créer la ligne `ParametrePrevision` par défaut (idempotent).
-- Front `RESOURCE_DEPENDENCIES` : ajouter `'previsions'` comme dépendance de `flux`, `budgets`, `abonnements`, `comptes`. Les 3 query keys (`['previsions','solde-projete']`, etc.) partagent le préfixe `'previsions'` → une invalidation les rafraîchit toutes (prefix-matching React Query).
-- Front : 3 `useQuery` distincts, une page `PrevisionsPage` avec 3 blocs (chacun son état de chargement). Bloc solde projeté = afficher le total + sa décomposition en briques étiquetées (réel/engagé/estimé/récurrent). Bandeau de couverture honnête (« la projection couvre X % de tes dépenses habituelles »).
-
-**Tests obligatoires (10-A) :** une brique du solde projeté par test + cas double-comptage abonnement (budgété → déduit, non budgété → ajouté) + couverture (majeure couverte via mineure) + drapeau tension (rouge si reste ≤ 0, ambre si part ≥ seuil) + exclusion transferts et `est_ajustement`.
-
-#### Phase 10-B — Projection longue + scénarios — APRÈS 10-A
-
-> À ne PAS commencer tant que 10-A n'est pas vécu en usage réel (l'usage nourrit la spec).
+> À ne PAS commencer tant que 10-A n'est pas vécu en usage réel (l'usage nourrit la spec). La trajectoire d'épargne multi-mois est **déjà livrée en 10-A** ; 10-B n'ajoute que ce qui suit.
 
 | Indicateur | Formule | Fiabilité |
 |---|---|---|
-| Trajectoire d'épargne | par mois futur : `revenus_attendus − dépenses_attendues`, cumulé | projeté (dégressive avec l'horizon) |
 | Scénarios de simulation | ajustement d'un paramètre (revenu / catégorie) → impact recalculé à la volée | projeté (hypothétique) |
-| Fourchette pessimiste/optimiste | solde projeté ± montant non capturé (issu de la couverture) | projeté |
+| Fourchette pessimiste/optimiste | solde projeté ± montant non capturé (issu de l'indicateur de couverture, lui aussi à construire) | projeté |
+| Drapeaux de tension + couverture budgétaire | abonnement couvert pesant ≥ seuil du reste-à-dépenser ; % des dépenses historiques tombant dans des catégories budgétées | consultatif / réel |
 
-**Principe de fiabilité dégressive (affichage) :**
+**Architecture 10-B :** service additionnel `scenario.py` (simulation à la volée) dans `analytics/services/`. Si les drapeaux de tension / la couverture budgétaire sont retenus, introduire alors le référentiel `ParametrePrevision` (seuils administrables — ex. `seuil_tension_abonnement_pct`, `fenetre_couverture_mois`) : **aucun seuil codé en dur** (règle 1). Modèle `HypotheseProjection` **seulement si** l'utilisateur veut sauvegarder des scénarios (par défaut : jetables, calcul à la volée).
 
-| Horizon | Composantes dominantes | Fiabilité affichée |
-|---|---|---|
-| Fin du mois courant | Flux réels + abonnements + budgets restants | Élevée |
-| 1–3 mois | Abonnements + budgets reconduits (templates phase 11c) | Moyenne |
-| 3–12 mois | Tendance historique extrapolée | Faible (indicative) |
-
-**Architecture 10-B :** services additionnels `trajectoire.py` (épargne multi-mois) et `scenario.py` (simulation à la volée). Modèle `HypotheseProjection` **seulement si** l'utilisateur veut sauvegarder des scénarios (arbitrage à trancher : simulations jetables vs mémorisées — par défaut jetables, calcul à la volée). La reconduction des budgets via `BudgetTemplate` (phase 11c) alimente naturellement la projection multi-mois.
-
-**Règles à respecter (10-A et 10-B) :** projection toujours étiquetée « projeté » ; transferts et flux `est_ajustement` exclus ; aucune donnée de marché dans le solde projeté ; le solde réel reste la seule vérité ; aucun seuil codé en dur (tout via `ParametrePrevision`).
+**Règles à respecter (rappel) :** projection toujours étiquetée « projeté » ; transferts et flux `est_ajustement` exclus ; aucune donnée de marché dans le solde projeté ; le solde réel reste la seule vérité ; tout seuil éventuel via référentiel, jamais en dur.
 
 ### ⏳ Phase 12 — Budgets dynamiques (expertise financière requise) — GELÉE
 
@@ -371,7 +290,7 @@ Chacune une `APIView` (pas un ViewSet — ce ne sont pas des ressources de modè
 
 ⚠️ **GELÉE jusqu'à usage réel du prévisionnel 10-A.** Raison : les budgets dynamiques sont une **automatisation** ; on n'automatise bien que ce qu'on a d'abord fait à la main et compris. Le prévisionnel (notamment l'indicateur de couverture et l'écart budget/tendance historique) va révéler empiriquement quels budgets sont irréalistes et quels rééquilibrages l'utilisateur fait spontanément — ces observations deviendront la **spec naturelle** de la phase 12.
 
-⚠️ **Nécessite un cadrage métier dédié** (règles précises à définir avec l'utilisateur). À traiter en session de réflexion (mode Projet). Ne PAS coder sans spec claire. Arbitrage de fond déjà identifié : un rééquilibrage automatique est-il souhaitable, ou risque-t-il de masquer un dépassement ? Faire appel à l'expertise financière (méthodes type budget base zéro, enveloppes, % de revenu, lissage de tendance) — toujours en restant pédagogique, sans conseil réglementé. Le lissage de tendance (mécanique C) pourra réutiliser la fenêtre historique de `ParametrePrevision`.
+⚠️ **Nécessite un cadrage métier dédié** (règles précises à définir avec l'utilisateur). À traiter en session de réflexion (mode Projet). Ne PAS coder sans spec claire. Arbitrage de fond déjà identifié : un rééquilibrage automatique est-il souhaitable, ou risque-t-il de masquer un dépassement ? Faire appel à l'expertise financière (méthodes type budget base zéro, enveloppes, % de revenu, lissage de tendance) — toujours en restant pédagogique, sans conseil réglementé. Le lissage de tendance (mécanique C) pourra réutiliser la fenêtre historique paramétrable (`ParametrePrevision`, à introduire en 10-B/12 si retenu — pas encore créé).
 
 ### ⏳ Phases ultérieures (non détaillées)
 
@@ -409,6 +328,9 @@ Chacune une `APIView` (pas un ViewSet — ce ne sont pas des ressources de modè
 - **Alertes budget majeur** : le signal flux détecte les alertes pour le budget direct ET les budgets majeurs incluant la catégorie du flux.
 - **`categories_incluses` validées** : chaque mineure incluse doit être une sous-catégorie directe de la catégorie du budget/template (400 sinon) ; sur un budget non majeur, la liste est forcée à vide.
 - **`template_id` côté API budgets** : le serializer expose `template_id` (pas `template`) — `BudgetCard` doit tester `budget.template_id`.
+- **HMR Vite en conteneur Docker ne voit pas les nouveaux fichiers/routes (phase 10-A front)** : après création d'un fichier React (nouvelle page, nouveau composant) ou ajout d'une route depuis Windows, le watcher Vite dans le conteneur ne recharge pas → symptôme « No routes matched location », page blanche sans erreur console. Remède : `docker compose restart frontend` (puis vérifier que la route répond). Piste de fond si ça récidive : `server.watch.usePolling: true` dans `vite.config`. Toujours valider une nouvelle page par un rendu réel (pas seulement le build).
+- **Solde projeté — ne pas repartir du `solde_theorique` brut (phase 10-A)** : `solde_theorique` inclut DÉJÀ les flux datés dans le futur. La projection part de `solde_actuel = Σ solde_theorique − Σ flux futurs (tous, transferts inclus)`, puis réintroduit chaque brique séparément (flux futurs du mois hors transferts/ajustements, abonnements à échoir non budgétés, reste-à-dépenser budgété). Réintroduire un flux futur sans l'avoir d'abord retiré du `solde_theorique` le compte deux fois. Les transferts futurs ne sont pas réintroduits (effet net nul sur le solde global). Voir `analytics/services/projection.py::calculer_solde_projete`.
+- **Anti-double-comptage abonnement dans le prévisionnel (phase 10-A)** : un abonnement-dépense est compté UNE seule fois. S'il est déjà matérialisé en flux futur daté → dédupliqué sur `(categorie_id, montant, mois)`. S'il est couvert par un budget (direct ou via une mineure d'un budget majeur) → laissé dans le reste-à-dépenser budgété, jamais ajouté en plus. Seuls les abonnements-dépenses NON budgétés et non encore datés sont ajoutés comme dépense future autonome. Les abonnements-recettes (salaire) sont toujours comptés. Toute évolution de `projection.py`/`trajectoire.py` doit préserver ces trois cas (tests dédiés dans `analytics/tests.py`).
 
 ---
 

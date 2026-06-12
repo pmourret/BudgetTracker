@@ -32,7 +32,7 @@ from referentiels.views import (
     DeviseViewSet, FiscaliteViewSet, StatutFluxViewSet
 )
 
-from analytics.views import DashboardView
+from analytics.views import DashboardView, PrevisionnelView
 
 router = DefaultRouter()
 
@@ -61,5 +61,6 @@ router.register(r"referentiels/statuts-flux", StatutFluxViewSet, basename="statu
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/v1/analytics/dashboard/", DashboardView.as_view(), name="dashboard"),
+    path("api/v1/analytics/previsionnel/", PrevisionnelView.as_view(), name="previsionnel"),
     path("api/v1/", include(router.urls)),
 ]

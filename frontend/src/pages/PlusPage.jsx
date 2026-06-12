@@ -1,10 +1,11 @@
 import { Link } from 'react-router-dom'
-import { CreditCard, RefreshCw, Landmark, Tag, ChevronRight } from 'lucide-react'
+import { CreditCard, TrendingUp, RefreshCw, Landmark, Tag, ChevronRight } from 'lucide-react'
 import Card from '../components/ui/Card'
 import IconBadge from '../components/ui/IconBadge'
 import ThemeToggle from '../components/layout/ThemeToggle'
 
 const liens = [
+  { to: '/previsionnel', label: 'Prévisionnel', desc: 'Solde projeté et trajectoire d\'épargne', Icon: TrendingUp },
   { to: '/comptes',     label: 'Comptes',     desc: 'Soldes et écarts',         Icon: CreditCard },
   { to: '/abonnements', label: 'Abonnements', desc: 'Récurrences et échéances', Icon: RefreshCw },
   { to: '/patrimoine',  label: 'Patrimoine',  desc: 'Actifs et valorisation',   Icon: Landmark },

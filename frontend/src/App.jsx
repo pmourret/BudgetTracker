@@ -7,6 +7,7 @@ import AbonnementsPage from './pages/AbonnementsPage'
 import AlertesPage from './pages/AlertesPage'
 import PatrimoinePage from './pages/PatrimoinePage'
 import DashboardPage from './pages/DashboardPage'
+import PrevisionnelPage from './pages/PrevisionnelPage'
 import CategoriesPage from './pages/CategoriesPage'
 import PlusPage from './pages/PlusPage'
 
@@ -19,6 +20,7 @@ export default function App() {
         <Route path="comptes" element={<ComptesPage />} />
         <Route path="flux" element={<FluxPage />} />
         <Route path="budgets" element={<BudgetsPage />} />
+        <Route path="previsionnel" element={<PrevisionnelPage />} />
         <Route path="abonnements" element={<AbonnementsPage />} />
         <Route path="alertes" element={<AlertesPage />} />
         <Route path="patrimoine" element={<PatrimoinePage />} />

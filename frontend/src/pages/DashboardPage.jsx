@@ -5,6 +5,7 @@ import apiClient from '../api/client'
 import { formatEuro, formatDate, formatMonth, formatPercent } from '../utils/format'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
+import PeriodSelector from '../components/ui/PeriodSelector'
 import { Loading, ErrorState } from '../components/ui/States'
 import LineChart from '../components/charts/LineChart'
 import DoughnutChart from '../components/charts/DoughnutChart'
@@ -90,24 +91,7 @@ export default function DashboardPage() {
 
       <Card
         title="Évolution du solde"
-        action={
-          <div className="flex gap-1">
-            {[3, 6, 12].map((n) => (
-              <button
-                key={n}
-                onClick={() => setNbMois(n)}
-                className={[
-                  'h-7 px-2.5 rounded-md text-xs cursor-pointer',
-                  nbMois === n
-                    ? 'bg-purple-50 text-purple-800 font-medium'
-                    : 'bg-transparent text-content-2 hover:bg-surface-3',
-                ].join(' ')}
-              >
-                {n}M
-              </button>
-            ))}
-          </div>
-        }
+        action={<PeriodSelector value={nbMois} onChange={setNbMois} />}
       >
         <LineChart
           labels={evolutionLabels}

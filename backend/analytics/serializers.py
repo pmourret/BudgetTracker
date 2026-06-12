@@ -20,3 +20,16 @@ class DashboardSerializer(serializers.Serializer):
     derniers_flux = serializers.ListField()
     alertes = serializers.ListField()
     patrimoine = serializers.DictField()
+
+
+class PrevisionnelSerializer(serializers.Serializer):
+    """
+    Serializer de sortie pour le prévisionnel (phase 10-A).
+    Lecture seule : chaque bloc porte 'fiabilite' et 'definition' —
+    une projection n'est jamais une vérité comptable.
+    """
+    date_calcul = serializers.CharField()
+    mois_courant = serializers.CharField()
+    solde_projete = serializers.DictField()
+    capacite_restante = serializers.DictField()
+    trajectoire = serializers.DictField()

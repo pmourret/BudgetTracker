@@ -10,6 +10,7 @@ const RESOURCE_DEPENDENCIES = {
   transferts:         ['comptes', 'flux', 'analytics'],
   budgets:            ['analytics'],
   'budget-templates': ['budgets', 'analytics'],
+  abonnements:        ['analytics'],
   comptes:            ['flux', 'analytics'],
   patrimoine:         ['analytics'],
   alertes:            ['analytics'],
