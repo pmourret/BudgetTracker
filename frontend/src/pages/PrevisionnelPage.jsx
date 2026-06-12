@@ -2,6 +2,8 @@ import { useState } from 'react'
 import usePrevisionnel from '../hooks/usePrevisionnel'
 import { formatEuro, formatMonth } from '../utils/format'
 import Card from '../components/ui/Card'
+import Tooltip from '../components/ui/Tooltip'
+import { DEFINITIONS } from '../constants/definitions'
 import PeriodSelector from '../components/ui/PeriodSelector'
 import FiabiliteBadge from '../components/previsionnel/FiabiliteBadge'
 import { ErrorState, EmptyState } from '../components/ui/States'
@@ -78,15 +80,20 @@ function PrevisionnelContenu({ data, nbMois, onNbMoisChange }) {
 function SoldeProjeteCard({ bloc, moisCourant }) {
   const c = bloc.composantes
   const briques = [
-    { label: 'Solde actuel', value: Number(c.solde_actuel) },
-    { label: 'Flux futurs datés du mois', value: Number(c.flux_futurs_mois) },
-    { label: 'Abonnements à échoir (non budgétés)', value: Number(c.abonnements_a_echoir_non_budgetes) },
-    { label: 'Reste à dépenser budgété', value: -Number(c.reste_a_depenser_budgete) || 0 },
+    { label: 'Solde actuel', value: Number(c.solde_actuel), def: DEFINITIONS.prev_solde_actuel },
+    { label: 'Flux futurs datés du mois', value: Number(c.flux_futurs_mois), def: DEFINITIONS.prev_flux_futurs },
+    { label: 'Abonnements à échoir (non budgétés)', value: Number(c.abonnements_a_echoir_non_budgetes), def: DEFINITIONS.prev_abonnements },
+    { label: 'Reste à dépenser budgété', value: -Number(c.reste_a_depenser_budgete) || 0, def: DEFINITIONS.prev_reste_budgete },
   ]
 
   return (
     <Card
-      title="Solde projeté fin de mois"
+      title={
+        <span className="inline-flex items-center gap-1">
+          Solde projeté fin de mois
+          <Tooltip {...DEFINITIONS.prev_solde_projete} align="left" />
+        </span>
+      }
       action={<FiabiliteBadge fiabilite={bloc.fiabilite} />}
     >
       <div className="flex flex-col gap-3">
@@ -100,9 +107,12 @@ function SoldeProjeteCard({ bloc, moisCourant }) {
         </div>
 
         <div className="flex flex-col gap-1.5 border-t border-border-app pt-3">
-          {briques.map(({ label, value }) => (
+          {briques.map(({ label, value, def }) => (
             <div key={label} className="flex justify-between items-baseline gap-2">
-              <span className="text-xs text-content-2">{label}</span>
+              <span className="text-xs text-content-2 flex items-center gap-1">
+                {label}
+                {def && <Tooltip {...def} align="left" size={12} />}
+              </span>
               <span
                 className={[
                   'text-xs tabular-nums',
@@ -130,7 +140,12 @@ function CapaciteCard({ bloc }) {
 
   return (
     <Card
-      title="Capacité à dépenser restante"
+      title={
+        <span className="inline-flex items-center gap-1">
+          Capacité à dépenser restante
+          <Tooltip {...DEFINITIONS.prev_capacite} align="left" />
+        </span>
+      }
       action={<FiabiliteBadge fiabilite={bloc.fiabilite} />}
     >
       <div className="flex flex-col gap-3">

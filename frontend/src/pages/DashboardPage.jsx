@@ -5,6 +5,8 @@ import apiClient from '../api/client'
 import { formatEuro, formatDate, formatMonth, formatPercent } from '../utils/format'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
+import Tooltip from '../components/ui/Tooltip'
+import { DEFINITIONS } from '../constants/definitions'
 import PeriodSelector from '../components/ui/PeriodSelector'
 import { Loading, ErrorState } from '../components/ui/States'
 import LineChart from '../components/charts/LineChart'
@@ -70,22 +72,26 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
-        <MetricCard label="Solde total" value={formatEuro(m.solde_total)} />
+        <MetricCard label="Solde total" value={formatEuro(m.solde_total)} def={DEFINITIONS.solde_total} />
         <MetricCard
           label="Dépenses du mois"
           value={`−${formatEuro(m.depenses_mois)}`}
           valueClass="text-red-600"
+          def={DEFINITIONS.depenses_mois}
         />
         <MetricCard
           label="Revenus du mois"
           value={`+${formatEuro(m.revenus_mois)}`}
           valueClass="text-teal-600"
+          def={DEFINITIONS.revenus_mois}
         />
         <MetricCard
           label="Épargne nette"
           value={formatEuro(m.epargne_nette)}
           valueClass={Number(m.epargne_nette) >= 0 ? 'text-purple-400' : 'text-red-600'}
           sub={`${formatPercent(m.taux_epargne)} du revenu`}
+          def={DEFINITIONS.epargne_nette}
+          defAlign="right"
         />
       </div>
 
@@ -102,7 +108,14 @@ export default function DashboardPage() {
         />
       </Card>
 
-      <Card title="Dépenses par catégorie">
+      <Card
+        title={
+          <span className="inline-flex items-center gap-1">
+            Dépenses par catégorie
+            <Tooltip {...DEFINITIONS.depenses_par_categorie} align="left" />
+          </span>
+        }
+      >
         <DepensesCategories data={data.depenses_par_categorie} />
       </Card>
 
@@ -154,7 +167,14 @@ export default function DashboardPage() {
           )}
         </Card>
 
-        <Card title="Patrimoine estimé">
+        <Card
+          title={
+            <span className="inline-flex items-center gap-1">
+              Patrimoine estimé
+              <Tooltip {...DEFINITIONS.patrimoine_estime} align="right" />
+            </span>
+          }
+        >
           <div className="flex flex-col items-center justify-center py-3">
             <div className="text-3xl font-medium text-content">
               {formatEuro(data.patrimoine.total_estime)}
@@ -173,10 +193,13 @@ export default function DashboardPage() {
   )
 }
 
-function MetricCard({ label, value, valueClass = 'text-content', sub }) {
+function MetricCard({ label, value, valueClass = 'text-content', sub, def, defAlign = 'left' }) {
   return (
     <div className="bg-surface border border-border-app rounded-xl px-4 py-3.5">
-      <div className="text-xs text-content-2 mb-1">{label}</div>
+      <div className="text-xs text-content-2 mb-1 flex items-center gap-1">
+        {label}
+        {def && <Tooltip {...def} align={defAlign} />}
+      </div>
       <div className={`text-xl font-medium ${valueClass}`}>{value}</div>
       {sub && <div className="text-[11px] text-teal-600 mt-0.5">{sub}</div>}
     </div>

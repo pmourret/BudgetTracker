@@ -92,7 +92,9 @@ Toutes les pages en Tailwind v4 + dark mode complet. CRUD complet sur toutes les
 
 **Dashboard** : carte « Dépenses par catégorie » avec `DoughnutChart` (donut) par majeure + légende expandable (clic → affiche les mineures avec montant et %). Palette 12 couleurs. Sélecteur de période extrait en composant partagé `PeriodSelector` (réutilisé par Prévisionnel).
 
-**Composants UI** : `Select` étendu avec prop `groups` → rendu `<optgroup>` natifs. Sélecteurs groupés dans Flux, Abonnements, Budgets, Templates.
+**Composants UI** : `Select` étendu avec prop `groups` → rendu `<optgroup>` natifs. Sélecteurs groupés dans Flux, Abonnements, Budgets, Templates. `Tooltip` (info-bulle d'aide, juin 2026) : icône « i » ouverte au **survol ET au clic/tap** (utilisable en tactile), ferme au clic extérieur / Échap, prop `align` contre les débordements de bord, dark mode via variables sémantiques.
+
+**Infos-bulles d'aide (passe transversale, juin 2026)** : chaque indicateur calculé porte une bulle expliquant **ce qu'il représente** ET **comment il est calculé** (formule). Textes **centralisés** dans `src/constants/definitions.js` (objet `DEFINITIONS`, `{ titre, texte, formule }`), jamais en dur au point d'usage : `<Tooltip {...DEFINITIONS.solde_total} align="left" />`. Couverture : Dashboard, Comptes (métriques + cartes), Budgets, Patrimoine, Abonnements, Prévisionnel. Toute nouvelle métrique ajoute son entrée dans `definitions.js`, avec fiabilité (réel/estimatif/projeté) précisée si pertinent.
 
 **`RESOURCE_DEPENDENCIES`** (état actuel) :
 ```js
@@ -242,6 +244,7 @@ Règles de budget selon les revenus, recalcul auto selon mois précédents, ré�
 - **HMR Vite en conteneur Docker ne voit pas les nouveaux fichiers/routes (phase 10-A front)** : créer une page/composant React ou ajouter une route depuis Windows ne déclenche pas le reload du watcher Vite → « No routes matched location », page blanche sans erreur console. Remède : `docker compose restart frontend`. Piste de fond : `server.watch.usePolling: true` dans `vite.config`. Toujours valider une nouvelle page par un rendu réel, pas seulement le build.
 - **Solde projeté — ne pas repartir du `solde_theorique` brut (phase 10-A)** : `solde_theorique` inclut DÉJÀ les flux datés dans le futur. La projection part de `solde_actuel = Σ solde_theorique − Σ flux futurs`, puis réintroduit chaque brique séparément, sinon les flux futurs sont comptés deux fois. Voir `analytics/services/projection.py::calculer_solde_projete`.
 - **Anti-double-comptage abonnement dans le prévisionnel (phase 10-A)** : un abonnement-dépense est compté une seule fois — dédupliqué sur `(categorie_id, montant, mois)` s'il est déjà en flux futur daté ; laissé dans le reste-à-dépenser budgété s'il est couvert par un budget (direct ou mineure d'un majeur) ; ajouté en dépense autonome seulement s'il n'est ni daté ni budgété. Les abonnements-recettes (salaire) sont toujours comptés. Tests dédiés dans `analytics/tests.py`.
+- **Infos-bulles d'aide : textes centralisés, jamais en dur** : les explications des indicateurs vivent dans `src/constants/definitions.js` (`DEFINITIONS`, `{ titre, texte, formule }`), rendues via `<Tooltip {...DEFINITIONS.xxx} />`. Le `Tooltip` s'ouvre au **survol ET au clic/tap** (`:hover` seul inutilisable en tactile) — ne pas le remplacer par un `title=` HTML natif. Pas de moteur de placement : gérer le débordement de bord via la prop `align` (`right` en bord droit, `left` par défaut). Toute nouvelle métrique calculée ajoute son entrée dans `definitions.js`, fiabilité (réel/estimatif/projeté) précisée si pertinent.
 
 ---
 

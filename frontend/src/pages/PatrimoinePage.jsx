@@ -7,6 +7,8 @@ import { Landmark, Pencil, Trash2 } from 'lucide-react'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
+import Tooltip from '../components/ui/Tooltip'
+import { DEFINITIONS } from '../constants/definitions'
 import Modal from '../components/ui/Modal'
 import Input from '../components/ui/Input'
 import { Loading, ErrorState, EmptyState } from '../components/ui/States'
@@ -112,6 +114,7 @@ export default function PatrimoinePage() {
             <MetricCard
               label="Patrimoine total estimé"
               value={formatEuro(total?.total_estime ?? 0)}
+              def={DEFINITIONS.patrimoine_total}
             />
             <MetricCard
               label="Plus-value latente estimée"
@@ -125,6 +128,7 @@ export default function PatrimoinePage() {
                   ? 'text-teal-600'
                   : 'text-red-600'
               }
+              def={DEFINITIONS.plus_value_latente}
             />
             <MetricCard label="Nombre d'actifs" value={String(actifs.length)} />
           </div>
@@ -167,10 +171,13 @@ export default function PatrimoinePage() {
   )
 }
 
-function MetricCard({ label, value, valueClass = 'text-content' }) {
+function MetricCard({ label, value, valueClass = 'text-content', def, defAlign = 'left' }) {
   return (
     <div className="bg-surface-3 rounded-lg px-4 py-3.5">
-      <div className="text-xs text-content-2 mb-1">{label}</div>
+      <div className="text-xs text-content-2 mb-1 flex items-center gap-1">
+        {label}
+        {def && <Tooltip {...def} align={defAlign} />}
+      </div>
       <div className={`text-xl font-medium ${valueClass}`}>{value}</div>
     </div>
   )
@@ -220,9 +227,12 @@ function ActifCard({ actif, onEdit, onValoriser }) {
       </div>
 
       {pv != null && (
-        <div className={`text-xs mt-1 ${Number(pv) >= 0 ? 'text-teal-600' : 'text-red-600'}`}>
-          Plus-value latente : {formatEuro(pv)}
-          {tauxPv != null && ` (${tauxPv.toFixed(1).replace('.', ',')} %)`}
+        <div className={`text-xs mt-1 flex items-center gap-1 ${Number(pv) >= 0 ? 'text-teal-600' : 'text-red-600'}`}>
+          <span>
+            Plus-value latente : {formatEuro(pv)}
+            {tauxPv != null && ` (${tauxPv.toFixed(1).replace('.', ',')} %)`}
+          </span>
+          <Tooltip {...DEFINITIONS.plus_value_latente} align="left" size={12} />
         </div>
       )}
 

@@ -5,6 +5,8 @@ import { Pencil, Trash2, RefreshCw } from 'lucide-react'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
+import Tooltip from '../components/ui/Tooltip'
+import { DEFINITIONS } from '../constants/definitions'
 import { Loading, ErrorState, EmptyState } from '../components/ui/States'
 import BudgetFormModal from '../components/budgets/BudgetFormModal'
 import BudgetTemplateFormModal from '../components/budgets/BudgetTemplateFormModal'
@@ -138,16 +140,19 @@ export default function BudgetsPage() {
             <>
               {budgets.length > 0 && (
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                  <MetricCard label="Total prévu" value={formatEuro(totalPrevu)} />
+                  <MetricCard label="Total prévu" value={formatEuro(totalPrevu)} def={DEFINITIONS.budget_total_prevu} />
                   <MetricCard
                     label="Total consommé"
                     value={formatEuro(totalConsomme)}
                     valueClass={totalConsomme > totalPrevu ? 'text-red-600' : 'text-content'}
+                    def={DEFINITIONS.budget_total_consomme}
                   />
                   <MetricCard
                     label="Reste disponible"
                     value={formatEuro(reste)}
                     valueClass={reste < 0 ? 'text-red-600' : 'text-teal-600'}
+                    def={DEFINITIONS.budget_reste}
+                    defAlign="right"
                   />
                 </div>
               )}
@@ -266,10 +271,13 @@ function TabBtn({ active, onClick, children }) {
   )
 }
 
-function MetricCard({ label, value, valueClass = 'text-content' }) {
+function MetricCard({ label, value, valueClass = 'text-content', def, defAlign = 'left' }) {
   return (
     <div className="bg-surface-3 rounded-lg px-4 py-3.5">
-      <div className="text-xs text-content-2 mb-1">{label}</div>
+      <div className="text-xs text-content-2 mb-1 flex items-center gap-1">
+        {label}
+        {def && <Tooltip {...def} align={defAlign} />}
+      </div>
       <div className={`text-xl font-medium ${valueClass}`}>{value}</div>
     </div>
   )
@@ -344,8 +352,9 @@ function BudgetCard({ budget, onEdit }) {
         <span>
           Prévu : <strong className="text-content font-medium">{formatEuro(budget.montant_prevu)}</strong>
         </span>
-        <span className={`font-medium ${statut.pct}`}>
+        <span className={`font-medium flex items-center gap-1 ${statut.pct}`}>
           {Number(budget.taux_consommation).toFixed(0)} %
+          <Tooltip {...DEFINITIONS.budget_taux} align="right" size={12} />
         </span>
       </div>
     </Card>
@@ -373,7 +382,10 @@ function TemplateCard({ template, onEdit }) {
                 <Badge variant="neutre">Inactif</Badge>
               )}
               {template.est_budget_majeur && (
-                <Badge variant="purple">Global</Badge>
+                <span className="inline-flex items-center gap-1">
+                  <Badge variant="purple">Global</Badge>
+                  <Tooltip {...DEFINITIONS.budget_majeur} align="left" size={12} />
+                </span>
               )}
             </div>
             {template.est_budget_majeur && template.categories_incluses_detail?.length > 0 && (

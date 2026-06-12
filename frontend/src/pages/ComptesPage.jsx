@@ -3,6 +3,8 @@ import { useResourceList, useDeleteResource, useUpdateResource } from '../hooks/
 import { formatEuro } from '../utils/format'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
+import Tooltip from '../components/ui/Tooltip'
+import { DEFINITIONS } from '../constants/definitions'
 import { Loading, ErrorState, EmptyState } from '../components/ui/States'
 import IconBadge from '../components/ui/IconBadge'
 import { Landmark, Pencil, Trash2 } from 'lucide-react'
@@ -46,12 +48,14 @@ export default function ComptesPage() {
       ) : (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-            <MetricCard label="Solde théorique" value={formatEuro(totalTheorique)} />
-            <MetricCard label="Solde confirmé" value={formatEuro(totalReel)} />
+            <MetricCard label="Solde théorique" value={formatEuro(totalTheorique)} def={DEFINITIONS.solde_theorique} />
+            <MetricCard label="Solde confirmé" value={formatEuro(totalReel)} def={DEFINITIONS.solde_reel} />
             <MetricCard
               label="En attente"
               value={formatEuro(ecartTotal)}
               valueClass={ecartTotal === 0 ? 'text-teal-600' : ecartTotal > 0 ? 'text-amber-600' : 'text-teal-600'}
+              def={DEFINITIONS.ecart_solde}
+              defAlign="right"
             />
           </div>
 
@@ -76,10 +80,13 @@ export default function ComptesPage() {
   )
 }
 
-function MetricCard({ label, value, valueClass = 'text-content' }) {
+function MetricCard({ label, value, valueClass = 'text-content', def, defAlign = 'left' }) {
   return (
     <div className="bg-surface-3 rounded-lg px-4 py-3.5">
-      <div className="text-xs text-content-2 mb-1">{label}</div>
+      <div className="text-xs text-content-2 mb-1 flex items-center gap-1">
+        {label}
+        {def && <Tooltip {...def} align={defAlign} />}
+      </div>
       <div className={`text-xl font-medium ${valueClass}`}>{value}</div>
     </div>
   )
@@ -156,15 +163,24 @@ function CompteCard({ compte, onEdit }) {
       <div className="text-2xl font-medium text-content">
         {formatEuro(compte.solde_theorique)}
       </div>
-      <div className="text-[11px] text-content-2">Solde théorique (avec prévisionnels)</div>
+      <div className="text-[11px] text-content-2 flex items-center gap-1">
+        Solde théorique (avec prévisionnels)
+        <Tooltip {...DEFINITIONS.solde_theorique} align="left" size={12} />
+      </div>
 
       <div className="flex justify-between mt-4 pt-3.5 border-t border-border-app">
         <div>
-          <div className="text-[11px] text-content-2">Solde confirmé</div>
+          <div className="text-[11px] text-content-2 flex items-center gap-1">
+            Solde confirmé
+            <Tooltip {...DEFINITIONS.solde_reel} align="left" size={12} />
+          </div>
           <div className="text-sm font-medium text-content">{formatEuro(compte.solde_reel)}</div>
         </div>
         <div className="text-right">
-          <div className="text-[11px] text-content-2">En attente</div>
+          <div className="text-[11px] text-content-2 flex items-center gap-1 justify-end">
+            En attente
+            <Tooltip {...DEFINITIONS.ecart_solde} align="right" size={12} />
+          </div>
           <div className={`text-sm font-medium ${
             ecart === 0 ? 'text-teal-600' : ecart > 0 ? 'text-amber-600' : 'text-teal-600'
           }`}>

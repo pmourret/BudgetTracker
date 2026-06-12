@@ -5,6 +5,8 @@ import { RefreshCw, Pencil, Trash2 } from 'lucide-react'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
+import Tooltip from '../components/ui/Tooltip'
+import { DEFINITIONS } from '../constants/definitions'
 import Modal from '../components/ui/Modal'
 import Input from '../components/ui/Input'
 import { Loading, ErrorState, EmptyState } from '../components/ui/States'
@@ -53,12 +55,14 @@ export default function AbonnementsPage() {
         <>
           {abonnements.length > 0 && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              <MetricCard label="Total mensuel estimé" value={formatEuro(-totalMensuel)} />
+              <MetricCard label="Total mensuel estimé" value={formatEuro(-totalMensuel)} def={DEFINITIONS.abo_total_mensuel} />
               <MetricCard label="Abonnements actifs" value={String(actifs.length)} />
               <MetricCard
                 label="En retard"
                 value={String(enRetard)}
                 valueClass={enRetard > 0 ? 'text-amber-600' : 'text-content'}
+                def={DEFINITIONS.abo_en_retard}
+                defAlign="right"
               />
             </div>
           )}
@@ -94,10 +98,13 @@ export default function AbonnementsPage() {
   )
 }
 
-function MetricCard({ label, value, valueClass = 'text-content' }) {
+function MetricCard({ label, value, valueClass = 'text-content', def, defAlign = 'left' }) {
   return (
     <div className="bg-surface-3 rounded-lg px-4 py-3.5">
-      <div className="text-xs text-content-2 mb-1">{label}</div>
+      <div className="text-xs text-content-2 mb-1 flex items-center gap-1">
+        {label}
+        {def && <Tooltip {...def} align={defAlign} />}
+      </div>
       <div className={`text-xl font-medium ${valueClass}`}>{value}</div>
     </div>
   )
@@ -210,7 +217,10 @@ function DivergenceModal({ abonnement, onClose }) {
         <div className="text-sm text-content-2">
           Montant attendu : <strong className="text-content">{formatEuro(abonnement.montant_attendu)}</strong>
           <br />
-          Seuil de divergence : <strong className="text-content">{abonnement.seuil_divergence_pct} %</strong>
+          <span className="inline-flex items-center gap-1">
+            Seuil de divergence : <strong className="text-content">{abonnement.seuil_divergence_pct} %</strong>
+            <Tooltip {...DEFINITIONS.abo_seuil_divergence} align="left" size={12} />
+          </span>
         </div>
 
         <Input
