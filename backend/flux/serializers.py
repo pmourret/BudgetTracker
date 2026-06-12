@@ -51,13 +51,44 @@ class FluxSerializer(serializers.ModelSerializer):
     def validate(self, data):
         """
         Un flux non-transfert doit avoir une catégorie.
-        Un flux de transfert ne doit pas être créé directement via ce serializer
-        — il passe par le service TransfertSerializer.
+        Les flux de transfert sont gérés exclusivement via /api/v1/transferts/
+        (paire débit/crédit atomique) : ni création directe, ni modification ici.
+        Les flux d'ajustement (générés par la réconciliation) sont figés.
         """
-        est_transfert = data.get("est_transfert", False)
-        categorie = data.get("categorie", None)
+        if self.instance is not None:
+            if self.instance.est_transfert:
+                raise serializers.ValidationError(
+                    {
+                        "detail": (
+                            "Ce flux fait partie d'un transfert interne. "
+                            "Supprimez le transfert et recréez-le via /api/v1/transferts/."
+                        )
+                    }
+                )
+            if self.instance.est_ajustement:
+                raise serializers.ValidationError(
+                    {
+                        "detail": (
+                            "Ce flux est un ajustement généré par la réconciliation. "
+                            "Il ne peut pas être modifié."
+                        )
+                    }
+                )
 
-        if not est_transfert and categorie is None:
+        if data.get("est_transfert", False):
+            raise serializers.ValidationError(
+                {
+                    "est_transfert": (
+                        "Un flux de transfert ne se crée pas directement. "
+                        "Utilisez /api/v1/transferts/ pour garantir la paire débit/crédit."
+                    )
+                }
+            )
+
+        categorie = data.get(
+            "categorie", getattr(self.instance, "categorie", None)
+        )
+        if categorie is None:
             raise serializers.ValidationError(
                 {"categorie": "Une catégorie est obligatoire pour un flux non-transfert."}
             )

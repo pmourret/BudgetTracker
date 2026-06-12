@@ -70,6 +70,20 @@ class CompteSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
 
+    def validate_code(self, code):
+        """
+        Unicité du code y compris contre les comptes soft-deletés
+        (la contrainte en base les compte aussi → éviter un 500 IntegrityError).
+        """
+        qs = Compte.objects.all_with_deleted().filter(code=code)
+        if self.instance:
+            qs = qs.exclude(id=self.instance.id)
+        if qs.exists():
+            raise serializers.ValidationError(
+                "Ce code est déjà utilisé (éventuellement par un compte supprimé)."
+            )
+        return code
+
     def validate(self, data):
         champs_interdits = {"solde_theorique", "solde_reel", "ecart_solde"}
         tentatives = champs_interdits & set(self.initial_data.keys())

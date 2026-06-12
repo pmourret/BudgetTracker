@@ -309,3 +309,209 @@ class FluxAPITest(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["count"], 1)
+
+class FluxChangementRecalculTest(APITestCase):
+    """
+    Régression : quand un flux change de compte, de catégorie ou de mois,
+    l'ANCIEN compte et les ANCIENS budgets doivent aussi être recalculés.
+    """
+
+    def setUp(self):
+        type_compte = TypeCompte.objects.create(code="COURANT4", libelle="Courant")
+        titulaire = Titulaire.objects.create(code="PIERRE4", libelle="Pierre")
+        etablissement = Etablissement.objects.create(code="BNP4", libelle="BNP")
+        self.devise = Devise.objects.create(
+            code="EUR4", libelle="Euro", symbole="€", est_defaut=False
+        )
+        self.type_flux = TypeFlux.objects.create(code="DEBIT4", libelle="Débit")
+        self.statut = StatutFlux.objects.create(
+            code="VALIDE4", libelle="Validé", est_definitif=True
+        )
+        self.compte1 = Compte.objects.create(
+            code="CPT-CH01", nom="Compte 1",
+            type_compte=type_compte, titulaire=titulaire,
+            etablissement=etablissement, devise=self.devise,
+            solde_initial=Decimal("1000.00"),
+        )
+        self.compte2 = Compte.objects.create(
+            code="CPT-CH02", nom="Compte 2",
+            type_compte=type_compte, titulaire=titulaire,
+            etablissement=etablissement, devise=self.devise,
+            solde_initial=Decimal("500.00"),
+        )
+        self.cat1 = Categorie.objects.create(code="CAT_CH1", nom="Courses CH")
+        self.cat2 = Categorie.objects.create(code="CAT_CH2", nom="Loisirs CH")
+
+        from budgets.models import Budget
+        self.budget_cat1_mars = Budget.objects.create(
+            categorie=self.cat1, mois=datetime.date(2024, 3, 1),
+            montant_prevu=Decimal("400.00"),
+        )
+        self.budget_cat2_mars = Budget.objects.create(
+            categorie=self.cat2, mois=datetime.date(2024, 3, 1),
+            montant_prevu=Decimal("400.00"),
+        )
+        self.budget_cat1_avril = Budget.objects.create(
+            categorie=self.cat1, mois=datetime.date(2024, 4, 1),
+            montant_prevu=Decimal("400.00"),
+        )
+        self.flux = Flux.objects.create(
+            compte=self.compte1,
+            categorie=self.cat1,
+            type_flux=self.type_flux,
+            statut=self.statut,
+            devise=self.devise,
+            montant=Decimal("-100.00"),
+            date_flux=datetime.date(2024, 3, 15),
+        )
+
+    def test_changement_compte_recalcule_ancien_compte(self):
+        """Déplacer un flux vers un autre compte recalcule les deux soldes."""
+        self.compte1.refresh_from_db()
+        self.assertEqual(self.compte1.solde_theorique, Decimal("900.00"))
+
+        response = self.client.patch(
+            reverse("flux-detail", args=[self.flux.id]),
+            {"compte": str(self.compte2.id)},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.compte1.refresh_from_db()
+        self.compte2.refresh_from_db()
+        self.assertEqual(self.compte1.solde_theorique, Decimal("1000.00"))
+        self.assertEqual(self.compte2.solde_theorique, Decimal("400.00"))
+
+    def test_changement_categorie_recalcule_ancien_budget(self):
+        """Déplacer un flux vers une autre catégorie recalcule les deux budgets."""
+        self.budget_cat1_mars.refresh_from_db()
+        self.assertEqual(self.budget_cat1_mars.montant_consomme, Decimal("100.00"))
+
+        response = self.client.patch(
+            reverse("flux-detail", args=[self.flux.id]),
+            {"categorie": str(self.cat2.id)},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.budget_cat1_mars.refresh_from_db()
+        self.budget_cat2_mars.refresh_from_db()
+        self.assertEqual(self.budget_cat1_mars.montant_consomme, Decimal("0.00"))
+        self.assertEqual(self.budget_cat2_mars.montant_consomme, Decimal("100.00"))
+
+    def test_changement_mois_recalcule_ancien_budget(self):
+        """Déplacer un flux sur un autre mois recalcule les budgets des deux mois."""
+        response = self.client.patch(
+            reverse("flux-detail", args=[self.flux.id]),
+            {"date_flux": "2024-04-10"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.budget_cat1_mars.refresh_from_db()
+        self.budget_cat1_avril.refresh_from_db()
+        self.assertEqual(self.budget_cat1_mars.montant_consomme, Decimal("0.00"))
+        self.assertEqual(self.budget_cat1_avril.montant_consomme, Decimal("100.00"))
+
+    def test_patch_partiel_sans_categorie_accepte(self):
+        """Un PATCH partiel (montant seul) ne doit pas exiger la catégorie."""
+        response = self.client.patch(
+            reverse("flux-detail", args=[self.flux.id]),
+            {"montant": "-150.00"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.compte1.refresh_from_db()
+        self.assertEqual(self.compte1.solde_theorique, Decimal("850.00"))
+
+
+class FluxProtectionAPITest(APITestCase):
+    """
+    Les flux de transfert et d'ajustement sont protégés :
+    pas de création directe, pas de modification, pas de suppression unitaire.
+    """
+
+    def setUp(self):
+        type_compte = TypeCompte.objects.create(code="COURANT5", libelle="Courant")
+        titulaire = Titulaire.objects.create(code="PIERRE5", libelle="Pierre")
+        etablissement = Etablissement.objects.create(code="BNP5", libelle="BNP")
+        self.devise = Devise.objects.create(
+            code="EUR5", libelle="Euro", symbole="€", est_defaut=False
+        )
+        self.type_flux = TypeFlux.objects.create(code="DEBIT5", libelle="Débit")
+        self.statut = StatutFlux.objects.create(
+            code="VALIDE5", libelle="Validé", est_definitif=True
+        )
+        self.categorie = Categorie.objects.create(code="CAT_PR5", nom="Courses PR")
+        self.compte = Compte.objects.create(
+            code="CPT-PR01", nom="Compte protection",
+            type_compte=type_compte, titulaire=titulaire,
+            etablissement=etablissement, devise=self.devise,
+            solde_initial=Decimal("1000.00"),
+        )
+        self.flux_transfert = Flux.objects.create(
+            compte=self.compte,
+            categorie=None,
+            type_flux=self.type_flux,
+            statut=self.statut,
+            devise=self.devise,
+            montant=Decimal("-200.00"),
+            date_flux=datetime.date(2024, 3, 15),
+            est_transfert=True,
+        )
+        self.flux_ajustement = Flux.objects.create(
+            compte=self.compte,
+            categorie=None,
+            type_flux=self.type_flux,
+            statut=self.statut,
+            devise=self.devise,
+            montant=Decimal("-50.00"),
+            date_flux=datetime.date(2024, 3, 15),
+            est_ajustement=True,
+        )
+
+    def test_creation_directe_flux_transfert_refusee(self):
+        """POST avec est_transfert=True → 400 (passer par /transferts/)."""
+        response = self.client.post(reverse("flux-list"), {
+            "compte": str(self.compte.id),
+            "type_flux": str(self.type_flux.id),
+            "statut": str(self.statut.id),
+            "devise": str(self.devise.id),
+            "montant": "-100.00",
+            "date_flux": "2024-03-15",
+            "est_transfert": True,
+        }, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("est_transfert", response.data)
+
+    def test_modification_flux_transfert_refusee(self):
+        response = self.client.patch(
+            reverse("flux-detail", args=[self.flux_transfert.id]),
+            {"montant": "-999.00"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.flux_transfert.refresh_from_db()
+        self.assertEqual(self.flux_transfert.montant, Decimal("-200.00"))
+
+    def test_suppression_flux_transfert_refusee(self):
+        response = self.client.delete(
+            reverse("flux-detail", args=[self.flux_transfert.id])
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertTrue(Flux.objects.filter(id=self.flux_transfert.id).exists())
+
+    def test_modification_flux_ajustement_refusee(self):
+        response = self.client.patch(
+            reverse("flux-detail", args=[self.flux_ajustement.id]),
+            {"montant": "-999.00"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_suppression_flux_ajustement_refusee(self):
+        response = self.client.delete(
+            reverse("flux-detail", args=[self.flux_ajustement.id])
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertTrue(Flux.objects.filter(id=self.flux_ajustement.id).exists())

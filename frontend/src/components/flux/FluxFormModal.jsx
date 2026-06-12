@@ -92,7 +92,7 @@ export default function FluxFormModal({ isOpen, onClose, flux = null }) {
     if (!montantNum || montantNum <= 0) e.montant = 'Montant requis (> 0).'
     if (!libelle.trim()) e.libelle = 'Libellé requis.'
     if (!compte) e.compte = 'Compte requis.'
-    if (sens === 'depense' && !categorie) e.categorie = 'Catégorie requise pour une dépense.'
+    if (!categorie) e.categorie = 'Catégorie requise.'
     if (!statut) e.statut = 'Statut requis.'
     setErrors(e)
     return Object.keys(e).length === 0
@@ -235,7 +235,7 @@ export default function FluxFormModal({ isOpen, onClose, flux = null }) {
           label="Catégorie" value={categorie} onChange={setCategorie}
           options={categoriesOpts} groups={categoriesGroups}
           error={errors.categorie}
-          required={sens === 'depense'}
+          required
         />
 
         {/* Date */}

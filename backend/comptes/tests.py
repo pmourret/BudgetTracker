@@ -169,3 +169,38 @@ class CompteAPITest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         liste = self.client.get(reverse("compte-list"))
         self.assertEqual(liste.data["count"], 0)
+
+
+class CompteCodeSoftDeleteTest(APITestCase):
+    """
+    Régression : recréer un compte avec le code d'un compte soft-deleté
+    doit renvoyer un 400 propre (avant : IntegrityError 500, car la
+    contrainte d'unicité en base compte aussi les lignes supprimées).
+    """
+
+    def setUp(self):
+        self.type_compte = TypeCompte.objects.create(code="COURANT_SD", libelle="Courant")
+        self.titulaire = Titulaire.objects.create(code="PIERRE_SD", libelle="Pierre")
+        self.etablissement = Etablissement.objects.create(code="BNP_SD", libelle="BNP")
+        self.devise = Devise.objects.create(
+            code="EUR_SD", libelle="Euro", symbole="€", est_defaut=False
+        )
+        self.payload = {
+            "code": "CPT-SD01",
+            "nom": "Compte soft delete",
+            "type_compte": str(self.type_compte.id),
+            "titulaire": str(self.titulaire.id),
+            "etablissement": str(self.etablissement.id),
+            "devise": str(self.devise.id),
+            "solde_initial": "100.00",
+        }
+
+    def test_code_compte_supprime_refuse_proprement(self):
+        create = self.client.post(reverse("compte-list"), self.payload, format="json")
+        self.assertEqual(create.status_code, status.HTTP_201_CREATED)
+        delete = self.client.delete(reverse("compte-detail", args=[create.data["id"]]))
+        self.assertEqual(delete.status_code, status.HTTP_204_NO_CONTENT)
+
+        recreate = self.client.post(reverse("compte-list"), self.payload, format="json")
+        self.assertEqual(recreate.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("code", recreate.data)

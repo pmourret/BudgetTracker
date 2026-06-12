@@ -11,6 +11,18 @@ def _auto_detect_est_budget_majeur(categorie):
     )
 
 
+def _valider_appartenance_mineures(categorie, categories_incluses):
+    """Chaque catégorie incluse doit être une sous-catégorie directe de la majeure."""
+    for mineure in categories_incluses:
+        if mineure.parent_id != categorie.id:
+            raise serializers.ValidationError({
+                "categories_incluses": (
+                    f"« {mineure.nom} » n'est pas une sous-catégorie "
+                    f"de « {categorie.nom} »."
+                )
+            })
+
+
 class BudgetTemplateSerializer(serializers.ModelSerializer):
     categorie_nom = serializers.CharField(source="categorie.nom", read_only=True)
     categories_incluses = serializers.PrimaryKeyRelatedField(
@@ -91,6 +103,10 @@ class BudgetTemplateSerializer(serializers.ModelSerializer):
                         "Un modèle de catégorie majeure doit inclure au moins une sous-catégorie."
                     )
                 })
+            _valider_appartenance_mineures(categorie, categories_incluses)
+        else:
+            # Pas de mineures incluses sur un modèle non majeur
+            data["categories_incluses"] = []
 
         return data
 
@@ -238,6 +254,7 @@ class BudgetSerializer(serializers.ModelSerializer):
                         "Un budget de catégorie majeure doit inclure au moins une sous-catégorie."
                     )
                 })
+            _valider_appartenance_mineures(categorie, categories_incluses)
             for mineure in categories_incluses:
                 qs_conflict = Budget.objects.filter(categorie=mineure, mois=mois_normalise)
                 if self.instance:
@@ -264,6 +281,8 @@ class BudgetSerializer(serializers.ModelSerializer):
                         "majeure pour ce mois."
                     )
                 })
+            # Pas de mineures incluses sur un budget non majeur
+            data["categories_incluses"] = []
 
         return data
 

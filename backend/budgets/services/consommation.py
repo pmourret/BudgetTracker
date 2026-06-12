@@ -78,25 +78,32 @@ def calculer_consommation_pour_flux(flux) -> None:
     Point d'entrée appelé par le signal sur Flux.
     Recalcule le/les budget(s) correspondant(s) si ils existent.
     """
-    from budgets.models import Budget
-
-    if flux.est_transfert or flux.categorie is None:
+    if flux.est_transfert or flux.categorie_id is None:
         return
 
-    # Budget direct sur la catégorie du flux (mineure ou majeure ciblée directement)
-    try:
-        budget = Budget.objects.get(
-            categorie=flux.categorie,
-            mois=flux.mois,
-        )
-        calculer_consommation(budget)
-    except Budget.DoesNotExist:
-        pass
+    recalculer_budgets_pour(flux.categorie_id, flux.mois)
 
-    # Budgets majeures qui incluent cette catégorie dans leurs mineures
+
+def recalculer_budgets_pour(categorie_id, mois) -> None:
+    """
+    Recalcule tous les budgets concernés par une (catégorie, mois) :
+    - le budget direct sur la catégorie (mineure ou majeure ciblée directement) ;
+    - les budgets majeurs qui incluent cette catégorie dans leurs mineures.
+
+    Utilisé par le signal Flux, y compris pour l'ancienne (catégorie, mois)
+    quand un flux change de catégorie ou de date.
+    """
+    from budgets.models import Budget
+
+    if categorie_id is None or mois is None:
+        return
+
+    for budget in Budget.objects.filter(categorie_id=categorie_id, mois=mois):
+        calculer_consommation(budget)
+
     for budget_majeur in Budget.objects.filter(
-        mois=flux.mois,
+        mois=mois,
         est_budget_majeur=True,
-        categories_incluses=flux.categorie,
+        categories_incluses=categorie_id,
     ):
         calculer_consommation(budget_majeur)

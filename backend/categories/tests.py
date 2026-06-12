@@ -184,3 +184,40 @@ class CategorieAPITest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["count"], 1)
         self.assertEqual(response.data["results"][0]["code"], "CARBURANT")
+
+class CategorieCodeSoftDeleteTest(APITestCase):
+    """
+    Régression : le code auto-généré doit éviter les collisions avec les
+    catégories soft-deletées (la contrainte d'unicité en base les compte aussi).
+    """
+
+    def test_auto_code_evite_collision_avec_supprimee(self):
+        create = self.client.post(
+            reverse("categorie-list"), {"nom": "Vacances"}, format="json"
+        )
+        self.assertEqual(create.status_code, status.HTTP_201_CREATED)
+        code_initial = create.data["code"]
+
+        delete = self.client.delete(
+            reverse("categorie-detail", args=[create.data["id"]])
+        )
+        self.assertEqual(delete.status_code, status.HTTP_204_NO_CONTENT)
+
+        recreate = self.client.post(
+            reverse("categorie-list"), {"nom": "Vacances"}, format="json"
+        )
+        self.assertEqual(recreate.status_code, status.HTTP_201_CREATED)
+        self.assertNotEqual(recreate.data["code"], code_initial)
+
+    def test_code_manuel_en_collision_avec_supprimee_refuse(self):
+        create = self.client.post(
+            reverse("categorie-list"), {"nom": "Sport", "code": "SPORT"}, format="json"
+        )
+        self.assertEqual(create.status_code, status.HTTP_201_CREATED)
+        self.client.delete(reverse("categorie-detail", args=[create.data["id"]]))
+
+        recreate = self.client.post(
+            reverse("categorie-list"), {"nom": "Sport", "code": "SPORT"}, format="json"
+        )
+        self.assertEqual(recreate.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("code", recreate.data)

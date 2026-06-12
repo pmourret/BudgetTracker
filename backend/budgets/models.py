@@ -47,6 +47,7 @@ class BudgetTemplate(BaseModel):
         constraints = [
             models.UniqueConstraint(
                 fields=["categorie"],
+                condition=models.Q(is_deleted=False),
                 name="budgettemplate_unique_categorie"
             )
         ]
@@ -124,6 +125,7 @@ class Budget(BaseModel):
         constraints = [
             models.UniqueConstraint(
                 fields=["categorie", "mois"],
+                condition=models.Q(is_deleted=False),
                 name="budget_unique_categorie_mois"
             )
         ]

@@ -633,3 +633,162 @@ class ReconduireAPITest(APITestCase):
             format="json",
         )
         self.assertEqual(response.status_code, drf_status.HTTP_400_BAD_REQUEST)
+
+
+class SoftDeleteUniciteTest(APITestCase):
+    """
+    Régression : la contrainte d'unicité ne doit porter que sur les lignes
+    non soft-deletées. Supprimer un budget/template puis le recréer sur la
+    même (catégorie, mois) doit fonctionner (avant : IntegrityError 500).
+    """
+
+    def setUp(self):
+        self.categorie = Categorie.objects.create(code="UNIC_SD", nom="Loisirs SD")
+        self.payload_budget = {
+            "categorie": str(self.categorie.id),
+            "mois": "2024-03-01",
+            "montant_prevu": "120.00",
+        }
+
+    def test_recreation_budget_apres_suppression(self):
+        create = self.client.post(reverse("budget-list"), self.payload_budget, format="json")
+        self.assertEqual(create.status_code, drf_status.HTTP_201_CREATED)
+        delete = self.client.delete(reverse("budget-detail", args=[create.data["id"]]))
+        self.assertEqual(delete.status_code, drf_status.HTTP_204_NO_CONTENT)
+
+        recreate = self.client.post(reverse("budget-list"), self.payload_budget, format="json")
+        self.assertEqual(recreate.status_code, drf_status.HTTP_201_CREATED)
+
+    def test_reconduction_apres_suppression_budget(self):
+        """Supprimer le budget du mois puis reconduire doit le recréer."""
+        BudgetTemplate.objects.create(
+            categorie=self.categorie, montant_defaut=Decimal("120.00")
+        )
+        reconduire_vers_mois(datetime.date(2024, 5, 1))
+        budget = Budget.objects.get(categorie=self.categorie, mois=datetime.date(2024, 5, 1))
+        budget.delete()
+
+        result = reconduire_vers_mois(datetime.date(2024, 5, 1))
+        self.assertEqual(result["crees"], 1)
+        self.assertTrue(
+            Budget.objects.filter(
+                categorie=self.categorie, mois=datetime.date(2024, 5, 1)
+            ).exists()
+        )
+
+    def test_recreation_template_apres_suppression(self):
+        payload = {"categorie": str(self.categorie.id), "montant_defaut": "120.00"}
+        create = self.client.post(reverse("budget-template-list"), payload, format="json")
+        self.assertEqual(create.status_code, drf_status.HTTP_201_CREATED)
+        delete = self.client.delete(
+            reverse("budget-template-detail", args=[create.data["id"]])
+        )
+        self.assertEqual(delete.status_code, drf_status.HTTP_204_NO_CONTENT)
+
+        recreate = self.client.post(reverse("budget-template-list"), payload, format="json")
+        self.assertEqual(recreate.status_code, drf_status.HTTP_201_CREATED)
+
+
+class CategoriesInclusesValidationTest(APITestCase):
+    """Les categories_incluses doivent être des sous-catégories de la majeure."""
+
+    def setUp(self):
+        self.majeure_a = Categorie.objects.create(code="MAJ_A", nom="Maison")
+        self.mineure_a = Categorie.objects.create(
+            code="MIN_A", nom="Entretien", parent=self.majeure_a
+        )
+        self.majeure_b = Categorie.objects.create(code="MAJ_B", nom="Transport B")
+        self.mineure_b = Categorie.objects.create(
+            code="MIN_B", nom="Carburant", parent=self.majeure_b
+        )
+
+    def test_budget_mineure_etrangere_refusee(self):
+        """Inclure une mineure d'une autre majeure dans un budget → 400."""
+        response = self.client.post(reverse("budget-list"), {
+            "categorie": str(self.majeure_a.id),
+            "mois": "2024-03-01",
+            "montant_prevu": "300.00",
+            "categories_incluses": [str(self.mineure_b.id)],
+        }, format="json")
+        self.assertEqual(response.status_code, drf_status.HTTP_400_BAD_REQUEST)
+        self.assertIn("categories_incluses", response.data)
+
+    def test_template_mineure_etrangere_refusee(self):
+        """Inclure une mineure d'une autre majeure dans un template → 400."""
+        response = self.client.post(reverse("budget-template-list"), {
+            "categorie": str(self.majeure_a.id),
+            "montant_defaut": "300.00",
+            "categories_incluses": [str(self.mineure_b.id)],
+        }, format="json")
+        self.assertEqual(response.status_code, drf_status.HTTP_400_BAD_REQUEST)
+        self.assertIn("categories_incluses", response.data)
+
+    def test_budget_non_majeur_ignore_categories_incluses(self):
+        """Sur une catégorie sans mineures, categories_incluses est forcé à vide."""
+        cat_simple = Categorie.objects.create(code="SIMPLE_CI", nom="Divers CI")
+        response = self.client.post(reverse("budget-list"), {
+            "categorie": str(cat_simple.id),
+            "mois": "2024-03-01",
+            "montant_prevu": "100.00",
+            "categories_incluses": [str(self.mineure_b.id)],
+        }, format="json")
+        self.assertEqual(response.status_code, drf_status.HTTP_201_CREATED)
+        self.assertEqual(response.data["categories_incluses"], [])
+
+
+class AlerteBudgetMajeurTest(TestCase):
+    """Un flux sur une mineure incluse doit déclencher l'alerte du budget majeur."""
+
+    def setUp(self):
+        type_compte = TypeCompte.objects.create(code="COURANT_AM", libelle="Courant")
+        titulaire = Titulaire.objects.create(code="PIERRE_AM", libelle="Pierre")
+        etablissement = Etablissement.objects.create(code="BNP_AM", libelle="BNP")
+        self.devise = Devise.objects.create(
+            code="EUR_AM", libelle="Euro", symbole="€", est_defaut=False
+        )
+        self.type_flux = TypeFlux.objects.create(code="DEBIT_AM", libelle="Débit")
+        self.statut = StatutFlux.objects.create(
+            code="VALIDE_AM", libelle="Validé", est_definitif=True
+        )
+        self.compte = Compte.objects.create(
+            code="CPT-AM01",
+            nom="Compte alertes majeures",
+            type_compte=type_compte,
+            titulaire=titulaire,
+            etablissement=etablissement,
+            devise=self.devise,
+            solde_initial=Decimal("1000.00"),
+        )
+        self.majeure = Categorie.objects.create(code="ALIM_AM", nom="Alimentation AM")
+        self.mineure = Categorie.objects.create(
+            code="COURSES_AM", nom="Courses AM", parent=self.majeure
+        )
+        self.budget_majeur = Budget.objects.create(
+            categorie=self.majeure,
+            mois=datetime.date(2024, 3, 1),
+            montant_prevu=Decimal("100.00"),
+            est_budget_majeur=True,
+        )
+        self.budget_majeur.categories_incluses.set([self.mineure])
+
+    def test_alerte_creee_pour_budget_majeur(self):
+        """Flux mineure à 90 % du budget majeur → alerte BUDGET_ALERTE créée."""
+        from alertes.models import Alerte, TypeAlerte
+
+        Flux.objects.create(
+            compte=self.compte,
+            categorie=self.mineure,
+            type_flux=self.type_flux,
+            statut=self.statut,
+            devise=self.devise,
+            montant=Decimal("-90.00"),
+            date_flux=datetime.date(2024, 3, 10),
+        )
+        self.budget_majeur.refresh_from_db()
+        self.assertEqual(self.budget_majeur.montant_consomme, Decimal("90.00"))
+        self.assertTrue(
+            Alerte.objects.filter(
+                type_alerte=TypeAlerte.BUDGET_ALERTE,
+                budget=self.budget_majeur,
+            ).exists()
+        )

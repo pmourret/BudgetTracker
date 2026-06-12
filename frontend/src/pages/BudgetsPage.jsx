@@ -303,7 +303,7 @@ function BudgetCard({ budget, onEdit }) {
       <div className="flex justify-between items-center mb-2.5">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-content">{budget.categorie_nom}</span>
-          {budget.template && (
+          {budget.template_id && (
             <span title="Créé depuis un modèle" className="text-content-3">
               <RefreshCw size={11} />
             </span>

@@ -55,11 +55,14 @@ export default function BudgetFormModal({ isOpen, onClose, moisDefaut, budget = 
   // Mineures actives de la majeure sélectionnée (déjà calculé dans mineuresActives)
   const mineuresDisponibles = estMajeure ? mineuresActives : []
 
-  // Quand on change de catégorie vers une majeure → cocher toutes les mineures actives
+  // Quand on change de catégorie → resynchroniser les mineures cochées.
+  // En édition, revenir à la catégorie d'origine restaure la sélection sauvegardée.
   useEffect(() => {
-    if (!isEdit && estMajeure) {
+    if (isEdit && budget && categorie === String(budget.categorie)) {
+      setCategoriesIncluses((budget.categories_incluses ?? []).map((id) => String(id)))
+    } else if (estMajeure) {
       setCategoriesIncluses(mineuresDisponibles.map((m) => String(m.id)))
-    } else if (!isEdit) {
+    } else {
       setCategoriesIncluses([])
     }
   }, [categorie]) // eslint-disable-line react-hooks/exhaustive-deps

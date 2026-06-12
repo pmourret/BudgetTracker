@@ -7,14 +7,18 @@ from .models import (
 
 
 def _auto_code(libelle, prefix, model_class):
-    """Génère un code unique à partir du libellé (ex: 'BNP Paribas' → 'ETA-BNP-PARIBAS')."""
+    """
+    Génère un code unique à partir du libellé (ex: 'BNP Paribas' → 'ETA-BNP-PARIBAS').
+    Vérifie aussi les lignes soft-deletées : la contrainte d'unicité en base
+    porte sur toutes les lignes, supprimées comprises.
+    """
     slug = re.sub(r'[^A-Z0-9]', '-', libelle.upper().strip())
     slug = re.sub(r'-+', '-', slug).strip('-')[:20]
     base = f"{prefix}-{slug}"[:50]
-    if not model_class.objects.filter(code=base).exists():
+    if not model_class.objects.all_with_deleted().filter(code=base).exists():
         return base
     i = 2
-    while model_class.objects.filter(code=f"{base}-{i}"[:50]).exists():
+    while model_class.objects.all_with_deleted().filter(code=f"{base}-{i}"[:50]).exists():
         i += 1
     return f"{base}-{i}"[:50]
 

@@ -7,13 +7,17 @@ from .models import Categorie
 
 
 def _auto_code(nom, exclude_id=None):
-    """Génère un code unique en slug depuis un nom."""
+    """
+    Génère un code unique en slug depuis un nom.
+    Vérifie aussi les catégories soft-deletées : la contrainte d'unicité
+    en base porte sur toutes les lignes, supprimées comprises.
+    """
     slug = unicodedata.normalize("NFD", nom).encode("ascii", "ignore").decode()
     slug = re.sub(r"[^a-zA-Z0-9]", "", slug).upper()[:10] or "CAT"
     code = slug
     suffix = 1
     while True:
-        qs = Categorie.objects.filter(code=code)
+        qs = Categorie.objects.all_with_deleted().filter(code=code)
         if exclude_id:
             qs = qs.exclude(id=exclude_id)
         if not qs.exists():
@@ -53,6 +57,22 @@ class CategorieSerializer(serializers.ModelSerializer):
         if obj.est_racine:
             return obj.sous_categories.count()
         return 0
+
+    def validate_code(self, code):
+        """
+        Unicité du code y compris contre les catégories soft-deletées
+        (la contrainte en base les compte aussi → éviter un 500 IntegrityError).
+        """
+        if not code:
+            return code
+        qs = Categorie.objects.all_with_deleted().filter(code=code)
+        if self.instance:
+            qs = qs.exclude(id=self.instance.id)
+        if qs.exists():
+            raise serializers.ValidationError(
+                "Ce code est déjà utilisé (éventuellement par une catégorie supprimée)."
+            )
+        return code
 
     def validate_parent(self, parent):
         """

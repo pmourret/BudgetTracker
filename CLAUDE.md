@@ -146,6 +146,29 @@ La clé `'analytics'` couvre toutes les variantes du dashboard (`['analytics', '
 
 ---
 
+### ✅ Audit de sécurisation (juin 2026) — TERMINÉ
+
+Exploration complète backend + frontend, corrections de cohérence, **19 tests de régression ajoutés** (suite complète : **232 tests OK**). Migration budgets `0004` (contraintes d'unicité conditionnées au soft delete).
+
+**Corrigé (backend) :**
+- **Signal flux** : `pre_save` mémorise l'état précédent (compte/catégorie/mois) ; en cas de changement, `post_save` recalcule AUSSI l'ancien compte (solde) et les anciens budgets via `recalculer_budgets_pour(categorie_id, mois)` (`budgets/services/consommation.py`). Avant : solde/consommation périmés sur l'ancien compte/budget.
+- **Contraintes d'unicité vs soft delete** : `Budget(categorie, mois)` et `BudgetTemplate(categorie)` conditionnées à `is_deleted=False` → supprimer puis recréer/reconduire sur la même clé fonctionne (avant : IntegrityError 500).
+- **Codes uniques vs soft delete** : les `_auto_code` (catégories, référentiels) vérifient `all_with_deleted()` ; `validate_code` sur `CompteSerializer` et `CategorieSerializer` → 400 propre en cas de collision avec une ligne supprimée (avant : 500).
+- **Flux transfert/ajustement protégés** : création directe `est_transfert=True` → 400 (passer par `/transferts/`) ; PATCH/DELETE d'un flux transfert ou ajustement → 400. Le PATCH partiel d'un flux normal (montant seul) ne réclame plus la catégorie à tort.
+- **Alertes budgets majeurs** : le signal flux détecte les alertes pour le budget direct ET les budgets majeurs incluant la catégorie du flux (avant : jamais d'alerte sur les majeurs).
+- **`categories_incluses` validées** : chaque mineure incluse doit être une fille directe de la catégorie du budget/template ; liste forcée à vide sur un budget non majeur.
+
+**Corrigé (frontend) :**
+- `BudgetsPage` : `BudgetCard` teste `budget.template_id` (et non `budget.template`) — l'icône « issu d'un modèle » ne s'affichait jamais.
+- `FluxPage` : bouton Supprimer masqué sur les flux de transfert (comme les ajustements).
+- `BudgetFormModal` : en édition, changer de catégorie resynchronise les mineures cochées (revenir à la catégorie d'origine restaure la sélection sauvegardée).
+- `FluxFormModal` : catégorie exigée aussi pour les recettes (le backend l'a toujours refusée).
+
+**Relevé, NON corrigé (à arbitrer) :**
+- **Pagination DRF (`PAGE_SIZE: 50`)** : les selects des modaux (`useResourceList`) ne chargent que la première page — au-delà de 50 catégories/comptes, des options manqueront. Piste : `page_size_query_param` dans les settings + param dans les hooks.
+- **Catégorie sans flux mais liée à des budgets/abonnements/templates** : encore supprimable (soft delete), ce qui laisse des références vers une catégorie supprimée. Piste : étendre la protection 409 de `Categorie.delete()`.
+- **Dashboard `solde_total`** : basé sur `solde_theorique` mais étiqueté fiabilité « reel » — arbitrage sémantique du foyer à confirmer (théorique = inclut le prévisionnel).
+
 ## 6. RESTE À FAIRE — ROADMAP
 
 > **Scénario retenu : A (pragmatique).** Stabiliser l'app (CRUD + hiérarchie catégories + budgets répétables) AVANT le prévisionnel. Les budgets dynamiques sont repoussés en phase 12 (nécessitent un cadrage métier dédié).
@@ -380,6 +403,12 @@ Chacune une `APIView` (pas un ViewSet — ce ne sont pas des ressources de modè
 - **`test_ecart_solde_recalcule` (flux/tests.py)** : ce test avait un bug — le `setUp` partage un statut `est_definitif=True` entre tous les tests de la classe, mais ce test supposait un statut non-définitif pour obtenir un écart de 100. Corrigé en créant un `StatutFlux` `est_definitif=False` localement dans le test. La logique de production (`solde.py`) était correcte.
 - **Volumes Docker vidés (`docker compose down -v`)** : après un `docker compose up -d`, la BDD est vide (pas de tables). Séquence obligatoire : `manage.py migrate` → `manage.py seed_demo`. Sans les migrations, toutes les requêtes API échouent en 500, ce qui peut masquer les pages (si early return sur `isError`).
 - **Early return sur `isError` dans les pages** : pattern à éviter — il remplace toute la page (header compris) par le composant d'erreur, supprimant les boutons d'action. Préférer le pattern `{isLoading && <Loading />}` / `{isError && <ErrorState />}` / `{!isLoading && !isError && (...)}` pour conserver le header. `ComptesPage` a été corrigé en ce sens.
+- **Soft delete vs contraintes d'unicité** (audit de sécurisation) : les `UniqueConstraint` de `Budget(categorie, mois)` et `BudgetTemplate(categorie)` portent désormais une condition `is_deleted=False` (migration budgets `0004`) — supprimer puis recréer/reconduire sur la même clé fonctionne. Pour les champs `code` `unique=True` (Compte, Categorie, référentiels), la contrainte en base compte AUSSI les lignes soft-deletées : les `_auto_code` cherchent dans `all_with_deleted()` et `validate_code` (Compte, Categorie) renvoie un 400 propre au lieu d'un IntegrityError 500. Toute nouvelle contrainte d'unicité sur un `BaseModel` doit prévoir ce cas.
+- **Flux de transfert et d'ajustement protégés côté backend** : `FluxSerializer` refuse `est_transfert=True` en création directe (passer par `/transferts/`) et refuse toute modification d'un flux `est_transfert` ou `est_ajustement` ; `FluxViewSet.destroy()` renvoie 400 sur ces deux types (un transfert s'annule via DELETE `/transferts/{id}/` qui soft-delete la paire). Côté front, `FluxPage` masque le bouton Supprimer pour les deux.
+- **Changement de compte/catégorie/date d'un flux** : le signal `pre_save` mémorise l'état précédent (`flux/signals.py`) et `post_save` recalcule AUSSI l'ancien compte (solde) et les anciens budgets (`recalculer_budgets_pour(categorie_id, mois)` dans `budgets/services/consommation.py`). Ne pas court-circuiter ce mécanisme avec des `update()` de queryset (ils ne déclenchent pas les signaux).
+- **Alertes budget majeur** : le signal flux détecte les alertes pour le budget direct ET les budgets majeurs incluant la catégorie du flux.
+- **`categories_incluses` validées** : chaque mineure incluse doit être une sous-catégorie directe de la catégorie du budget/template (400 sinon) ; sur un budget non majeur, la liste est forcée à vide.
+- **`template_id` côté API budgets** : le serializer expose `template_id` (pas `template`) — `BudgetCard` doit tester `budget.template_id`.
 
 ---
 

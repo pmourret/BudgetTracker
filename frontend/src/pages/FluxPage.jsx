@@ -86,7 +86,9 @@ function FluxRowActions({ flux, onEdit }) {
     deleteFlux.mutate(flux.id)
   }
 
-  if (flux.est_ajustement) {
+  // Un flux de transfert ne se supprime jamais seul (paire débit/crédit) :
+  // le modal d'édition redirige vers la page Transferts.
+  if (flux.est_ajustement || flux.est_transfert) {
     return (
       <button
         onClick={() => onEdit(flux)}
@@ -167,7 +169,9 @@ function FluxCardActions({ flux, onEdit }) {
     deleteFlux.mutate(flux.id)
   }
 
-  if (flux.est_ajustement) {
+  // Un flux de transfert ne se supprime jamais seul (paire débit/crédit) :
+  // le modal d'édition redirige vers la page Transferts.
+  if (flux.est_ajustement || flux.est_transfert) {
     return (
       <div className="flex gap-1 shrink-0">
         <button
