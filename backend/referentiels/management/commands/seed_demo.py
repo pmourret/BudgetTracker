@@ -1,100 +1,38 @@
 from decimal import Decimal
+from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from referentiels.models import (
-    TypeCompte, TypeFlux, Titulaire, ModePaiement,
-    Frequence, Etablissement, Devise, Fiscalite, StatutFlux
+    TypeCompte, Titulaire, Etablissement, Devise
 )
 from comptes.models import Compte
 from categories.models import Categorie
 
 
 class Command(BaseCommand):
-    help = "Crée un jeu de données de démonstration (référentiels, compte, catégories)."
+    help = (
+        "Crée un jeu de données de DÉMONSTRATION (référentiels + compte + "
+        "catégories). Outil de DEV uniquement — ne jamais lancer en prod. "
+        "Les référentiels structurels sont délégués à `seed_referentiels` "
+        "(pas de duplication)."
+    )
 
     @transaction.atomic
     def handle(self, *args, **options):
-        self.stdout.write("Création des référentiels...")
+        # Référentiels structurels (idempotent, source unique de vérité)
+        call_command("seed_referentiels")
 
-        # --- Devise (défaut) ---
-        eur, _ = Devise.objects.get_or_create(
-            code="EUR",
-            defaults={"libelle": "Euro", "symbole": "€", "est_defaut": True, "ordre": 1},
-        )
+        # Objets nécessaires à la construction des données de démo
+        eur = Devise.objects.get(code="EUR")
+        courant = TypeCompte.objects.get(code="COURANT")
+        pierre = Titulaire.objects.get(code="PIERRE")
+        bourso = Etablissement.objects.get(code="BOURSOBANK")
 
-        # --- Types de compte ---
-        courant, _ = TypeCompte.objects.get_or_create(
-            code="COURANT", defaults={"libelle": "Compte courant", "ordre": 1}
-        )
-        TypeCompte.objects.get_or_create(
-            code="EPARGNE", defaults={"libelle": "Compte épargne", "ordre": 2}
-        )
-
-        # --- Titulaires ---
-        pierre, _ = Titulaire.objects.get_or_create(
-            code="PIERRE", defaults={"libelle": "Pierre", "ordre": 1}
-        )
-
-        # --- Établissements ---
-        bourso, _ = Etablissement.objects.get_or_create(
-            code="BOURSOBANK", defaults={"libelle": "BoursoBank", "ordre": 1}
-        )
-
-        # --- Types de flux ---
-        TypeFlux.objects.get_or_create(
-            code="DEBIT", defaults={"libelle": "Débit", "ordre": 1}
-        )
-        TypeFlux.objects.get_or_create(
-            code="CREDIT", defaults={"libelle": "Crédit", "ordre": 2}
-        )
-
-        # --- Modes de paiement ---
-        for i, (code, lib) in enumerate([
-            ("CB", "Carte bancaire"),
-            ("VIREMENT", "Virement"),
-            ("PRELEVEMENT", "Prélèvement"),
-            ("ESPECES", "Espèces"),
-        ], start=1):
-            ModePaiement.objects.get_or_create(
-                code=code, defaults={"libelle": lib, "ordre": i}
-            )
-
-        # --- Statuts de flux ---
-        StatutFlux.objects.get_or_create(
-            code="VALIDE",
-            defaults={"libelle": "Validé", "est_definitif": True, "ordre": 1},
-        )
-        StatutFlux.objects.get_or_create(
-            code="PREVISIONNEL",
-            defaults={"libelle": "Prévisionnel", "est_definitif": False, "ordre": 2},
-        )
-
-        # --- Fréquences ---
-        for i, (code, lib, jours) in enumerate([
-            ("MENSUEL", "Mensuel", 30),
-            ("TRIMESTRIEL", "Trimestriel", 90),
-            ("ANNUEL", "Annuel", 365),
-            ("HEBDOMADAIRE", "Hebdomadaire", 7),
-        ], start=1):
-            Frequence.objects.get_or_create(
-                code=code, defaults={"libelle": lib, "nb_jours": jours, "ordre": i}
-            )
-
-        # --- Fiscalités ---
-        for i, (code, lib) in enumerate([
-            ("PEA", "PEA"),
-            ("CTO", "Compte-titres ordinaire"),
-            ("AV", "Assurance-vie"),
-        ], start=1):
-            Fiscalite.objects.get_or_create(
-                code=code, defaults={"libelle": lib, "ordre": i}
-            )
-
-        self.stdout.write("Création du compte...")
+        self.stdout.write("Création du compte de démo...")
 
         # --- Compte principal ---
-        compte, created = Compte.objects.get_or_create(
+        Compte.objects.get_or_create(
             code="CPT-0001",
             defaults={
                 "nom": "Compte principal",
@@ -107,7 +45,7 @@ class Command(BaseCommand):
             },
         )
 
-        self.stdout.write("Création des catégories...")
+        self.stdout.write("Création des catégories de démo...")
 
         # --- Catégories parentes + quelques sous-catégories ---
         categories = {

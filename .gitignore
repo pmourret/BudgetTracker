@@ -57,7 +57,8 @@ postgres_data/
 .env
 .env.local
 .env.*.local
-# Ne PAS ignorer : .env.example (template versionné intentionnellement)
+.env.prod
+# Ne PAS ignorer : .env.example / .env.prod.example (templates versionnés intentionnellement)
 
 # ============================================================
 # IDE — VS Code

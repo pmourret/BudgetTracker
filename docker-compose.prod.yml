@@ -1,0 +1,60 @@
+services:
+
+    db:
+        image: postgres:16
+        container_name: budgets-db
+        restart: unless-stopped
+        environment:
+            POSTGRES_DB: ${POSTGRES_DB}
+            POSTGRES_USER: ${POSTGRES_USER}
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+        volumes:
+            - /var/lib/docker/hiatus/budgets/pgdata:/var/lib/postgresql/data
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+        networks:
+            - backend
+
+    backend:
+        build:
+            context: ./backend
+            dockerfile: Dockerfile.prod
+        container_name: budgets-backend
+        restart: unless-stopped
+        env_file: .env.prod
+        depends_on:
+            db:
+                condition: service_healthy
+        volumes:
+            - /var/lib/docker/hiatus/budgets/static:/app/staticfiles
+        networks:
+            - backend
+
+    frontend:
+        build:
+            context: ./frontend
+            dockerfile: Dockerfile.prod
+            args:
+                VITE_API_URL: http://budgets.core.home.arpa/api/v1
+        container_name: budgets-frontend
+        restart: unless-stopped
+        volumes:
+            - /var/lib/docker/hiatus/budgets/static:/usr/share/nginx/static:ro
+        networks:
+            - proxy
+            - backend
+        labels:
+            - traefik.enable=true
+            - traefik.docker.network=proxy
+            - traefik.http.routers.budgets.rule=Host(`budgets.core.home.arpa`)
+            - traefik.http.routers.budgets.entrypoints=web
+            - traefik.http.services.budgets.loadbalancer.server.port=80
+
+networks:
+    proxy:
+        external: true
+    backend:
+        external: true

@@ -3,7 +3,16 @@ from decouple import config
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-SECRET_KEY = config("SECRET_KEY")
+# SECRET_KEY : prod via DJANGO_SECRET_KEY (env_file .env.prod).
+# Fallback sur SECRET_KEY (convention dev existante), puis clé de dev non
+# sécurisée en tout dernier recours pour ne pas bloquer un poste de dev.
+SECRET_KEY = config(
+    "DJANGO_SECRET_KEY",
+    default=config(
+        "SECRET_KEY",
+        default="django-insecure-dev-only-change-me-in-prod",
+    ),
+)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -65,12 +74,15 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
+# Connexion DB lue depuis l'environnement.
+# Prod : POSTGRES_* (alignés sur l'image postgres et le compose).
+# Dev  : fallback sur les conventions DB_* existantes (.env).
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": config("DB_NAME"),
-        "USER": config("DB_USER"),
-        "PASSWORD": config("DB_PASSWORD"),
+        "NAME": config("POSTGRES_DB", default=config("DB_NAME", default="budgetfamilial")),
+        "USER": config("POSTGRES_USER", default=config("DB_USER", default="budget")),
+        "PASSWORD": config("POSTGRES_PASSWORD", default=config("DB_PASSWORD", default="")),
         "HOST": config("DB_HOST", default="db"),
         "PORT": config("DB_PORT", default="5432"),
     }
