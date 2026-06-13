@@ -221,3 +221,76 @@ class CategorieCodeSoftDeleteTest(APITestCase):
         )
         self.assertEqual(recreate.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("code", recreate.data)
+
+
+# ---------------------------------------------------------------------------
+# Tests réordonnancement (glisser-déposer)
+# ---------------------------------------------------------------------------
+
+class ReordonnerServiceTest(TestCase):
+
+    def setUp(self):
+        self.a = Categorie.objects.create(code="A", nom="Alimentation")
+        self.b = Categorie.objects.create(code="B", nom="Banque")
+        self.c = Categorie.objects.create(code="C", nom="Carburant")
+
+    def test_assigne_ordre_1_based(self):
+        from categories.services.reordonner import reordonner_categories
+
+        nb = reordonner_categories([self.c.id, self.a.id, self.b.id])
+        self.assertEqual(nb, 3)
+        self.c.refresh_from_db()
+        self.a.refresh_from_db()
+        self.b.refresh_from_db()
+        self.assertEqual(self.c.ordre, 1)
+        self.assertEqual(self.a.ordre, 2)
+        self.assertEqual(self.b.ordre, 3)
+
+    def test_id_inconnu_leve_valueerror(self):
+        from categories.services.reordonner import reordonner_categories
+
+        with self.assertRaises(ValueError):
+            reordonner_categories([self.a.id, "00000000-0000-0000-0000-000000000000"])
+
+    def test_liste_vide_ne_fait_rien(self):
+        from categories.services.reordonner import reordonner_categories
+
+        self.assertEqual(reordonner_categories([]), 0)
+
+
+class ReordonnerAPITest(APITestCase):
+
+    def setUp(self):
+        self.a = Categorie.objects.create(code="A", nom="Alimentation")
+        self.b = Categorie.objects.create(code="B", nom="Banque")
+
+    def test_reordonner_persiste_lordre(self):
+        response = self.client.post(
+            reverse("categorie-reordonner"),
+            {"ids": [str(self.b.id), str(self.a.id)]},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.b.refresh_from_db()
+        self.a.refresh_from_db()
+        self.assertEqual(self.b.ordre, 1)
+        self.assertEqual(self.a.ordre, 2)
+
+        # La liste reflète le nouvel ordre (ordering = ["ordre", "nom"]).
+        liste = self.client.get(reverse("categorie-list"))
+        noms = [c["nom"] for c in liste.data["results"]]
+        self.assertEqual(noms, ["Banque", "Alimentation"])
+
+    def test_reordonner_sans_ids_renvoie_400(self):
+        response = self.client.post(
+            reverse("categorie-reordonner"), {}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_reordonner_id_inconnu_renvoie_400(self):
+        response = self.client.post(
+            reverse("categorie-reordonner"),
+            {"ids": [str(self.a.id), "00000000-0000-0000-0000-000000000000"]},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

@@ -1,5 +1,16 @@
-import { useState } from 'react'
-import { ChevronRight, ChevronDown, Pencil, Trash2, Plus, Tag } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import {
+  ChevronRight, ChevronDown, Pencil, Trash2, Plus, Tag, GripVertical,
+} from 'lucide-react'
+import {
+  DndContext, closestCenter, KeyboardSensor, PointerSensor,
+  useSensor, useSensors,
+} from '@dnd-kit/core'
+import {
+  arrayMove, SortableContext, sortableKeyboardCoordinates,
+  verticalListSortingStrategy, useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { useResourceList, useDeleteResource, useResourceAction } from '../hooks/useResource'
 import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
@@ -11,11 +22,32 @@ export default function CategoriesPage() {
   const [expanded, setExpanded] = useState(new Set())
   const [modal, setModal] = useState({ open: false, categorie: null, parentId: null, parentNom: null })
 
-  const { data, isLoading, isError, refetch } = useResourceList('categories')
-  const categories = data?.results ?? []
+  // Ordre local (optimiste) pendant le glisser-déposer, resynchronisé depuis l'API.
+  const [majeures, setMajeures] = useState([])
+  const [mineuresByParent, setMineuresByParent] = useState({})
 
-  const majeures = categories.filter((c) => c.est_racine)
-  const mineures = categories.filter((c) => !c.est_racine)
+  const { data, isLoading, isError, refetch } = useResourceList('categories')
+  const reorder = useResourceAction('categories')
+
+  useEffect(() => {
+    const cats = data?.results ?? []
+    setMajeures(cats.filter((c) => c.est_racine))
+    const map = {}
+    cats
+      .filter((c) => !c.est_racine)
+      .forEach((m) => {
+        const pid = String(m.parent)
+        ;(map[pid] ??= []).push(m)
+      })
+    setMineuresByParent(map)
+  }, [data])
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+
+  const nbMineures = Object.values(mineuresByParent).reduce((n, arr) => n + arr.length, 0)
 
   const toggle = (id) =>
     setExpanded((prev) => {
@@ -35,6 +67,26 @@ export default function CategoriesPage() {
   const closeModal = () =>
     setModal({ open: false, categorie: null, parentId: null, parentNom: null })
 
+  const handleMajeureDragEnd = ({ active, over }) => {
+    if (!over || active.id === over.id) return
+    setMajeures((prev) => {
+      const oldIndex = prev.findIndex((c) => c.id === active.id)
+      const newIndex = prev.findIndex((c) => c.id === over.id)
+      const next = arrayMove(prev, oldIndex, newIndex)
+      reorder.mutate({ action: 'reordonner', payload: { ids: next.map((c) => c.id) } })
+      return next
+    })
+  }
+
+  const handleMineuresReorder = (parentId, ids) => {
+    const pid = String(parentId)
+    setMineuresByParent((prev) => {
+      const byId = Object.fromEntries((prev[pid] || []).map((m) => [m.id, m]))
+      return { ...prev, [pid]: ids.map((id) => byId[id]) }
+    })
+    reorder.mutate({ action: 'reordonner', payload: { ids } })
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex justify-between items-center">
@@ -43,7 +95,7 @@ export default function CategoriesPage() {
           <p className="text-sm text-content-2 mt-0.5">
             {majeures.length} principale{majeures.length !== 1 ? 's' : ''}
             {' · '}
-            {mineures.length} sous-catégorie{mineures.length !== 1 ? 's' : ''}
+            {nbMineures} sous-catégorie{nbMineures !== 1 ? 's' : ''}
           </p>
         </div>
         <Button variant="primary" onClick={openCreateMajeure}>+ Nouvelle catégorie</Button>
@@ -65,20 +117,37 @@ export default function CategoriesPage() {
       )}
 
       {!isLoading && !isError && majeures.length > 0 && (
-        <div className="flex flex-col gap-2">
-          {majeures.map((maj) => (
-            <MajeureBlock
-              key={maj.id}
-              majeure={maj}
-              mineures={mineures.filter((m) => String(m.parent) === String(maj.id))}
-              isExpanded={expanded.has(maj.id)}
-              onToggle={() => toggle(maj.id)}
-              onEdit={() => openEdit(maj)}
-              onAddMineure={() => openCreateMineure(maj)}
-              onEditMineure={(m) => openEdit(m)}
-            />
-          ))}
-        </div>
+        <>
+          <p className="text-xs text-content-3 -mt-1">
+            Glissez les poignées <GripVertical size={12} className="inline align-text-bottom" /> pour réordonner. Tri par défaut : alphabétique.
+          </p>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleMajeureDragEnd}
+          >
+            <SortableContext
+              items={majeures.map((m) => m.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="flex flex-col gap-2">
+                {majeures.map((maj) => (
+                  <SortableMajeure
+                    key={maj.id}
+                    majeure={maj}
+                    mineures={mineuresByParent[String(maj.id)] || []}
+                    isExpanded={expanded.has(maj.id)}
+                    onToggle={() => toggle(maj.id)}
+                    onEdit={() => openEdit(maj)}
+                    onAddMineure={() => openCreateMineure(maj)}
+                    onEditMineure={(m) => openEdit(m)}
+                    onReorderMineures={(ids) => handleMineuresReorder(maj.id, ids)}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+        </>
       )}
 
       <CategorieFormModal
@@ -92,9 +161,51 @@ export default function CategoriesPage() {
   )
 }
 
-function MajeureBlock({ majeure, mineures, isExpanded, onToggle, onEdit, onAddMineure, onEditMineure }) {
+function DragHandle({ attributes, listeners, className = '' }) {
+  return (
+    <button
+      type="button"
+      {...attributes}
+      {...listeners}
+      title="Glisser pour réordonner"
+      style={{ touchAction: 'none' }}
+      className={[
+        'p-1 rounded-md text-content-3 hover:text-content-2 hover:bg-surface-3',
+        'cursor-grab active:cursor-grabbing shrink-0',
+        className,
+      ].join(' ')}
+    >
+      <GripVertical size={14} />
+    </button>
+  )
+}
+
+function SortableMajeure(props) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: props.majeure.id })
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 10 : undefined,
+  }
+  return (
+    <div ref={setNodeRef} style={style} className={isDragging ? 'opacity-60' : ''}>
+      <MajeureBlock {...props} dragHandle={{ attributes, listeners }} />
+    </div>
+  )
+}
+
+function MajeureBlock({
+  majeure, mineures, isExpanded, onToggle, onEdit, onAddMineure, onEditMineure,
+  onReorderMineures, dragHandle,
+}) {
   const deleteCategorie = useDeleteResource('categories')
   const desactiverAction = useResourceAction('categories')
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
 
   const handleDelete = (cat) => {
     if (!window.confirm(`Supprimer « ${cat.nom} » ?`)) return
@@ -108,10 +219,18 @@ function MajeureBlock({ majeure, mineures, isExpanded, onToggle, onEdit, onAddMi
     })
   }
 
+  const handleMineureDragEnd = ({ active, over }) => {
+    if (!over || active.id === over.id) return
+    const oldIndex = mineures.findIndex((c) => c.id === active.id)
+    const newIndex = mineures.findIndex((c) => c.id === over.id)
+    onReorderMineures(arrayMove(mineures, oldIndex, newIndex).map((c) => c.id))
+  }
+
   return (
     <div className="rounded-xl border border-border-app overflow-hidden bg-surface">
       {/* En-tête de la catégorie principale */}
-      <div className="flex items-center gap-2 px-4 py-3 hover:bg-surface-3 transition-colors">
+      <div className="flex items-center gap-1 px-3 py-3 hover:bg-surface-3 transition-colors">
+        <DragHandle {...dragHandle} />
         <button
           onClick={onToggle}
           className="flex items-center gap-2.5 flex-1 min-w-0 cursor-pointer"
@@ -166,16 +285,27 @@ function MajeureBlock({ majeure, mineures, isExpanded, onToggle, onEdit, onAddMi
               </button>
             </div>
           ) : (
-            mineures.map((m, i) => (
-              <MineureRow
-                key={m.id}
-                mineure={m}
-                isLast={i === mineures.length - 1}
-                onEdit={() => onEditMineure(m)}
-                onDelete={() => handleDelete(m)}
-                isPending={deleteCategorie.isPending}
-              />
-            ))
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleMineureDragEnd}
+            >
+              <SortableContext
+                items={mineures.map((m) => m.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                {mineures.map((m, i) => (
+                  <SortableMineure
+                    key={m.id}
+                    mineure={m}
+                    isLast={i === mineures.length - 1}
+                    onEdit={() => onEditMineure(m)}
+                    onDelete={() => handleDelete(m)}
+                    isPending={deleteCategorie.isPending}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
           )}
         </div>
       )}
@@ -183,15 +313,26 @@ function MajeureBlock({ majeure, mineures, isExpanded, onToggle, onEdit, onAddMi
   )
 }
 
-function MineureRow({ mineure, isLast, onEdit, onDelete, isPending }) {
+function SortableMineure({ mineure, isLast, onEdit, onDelete, isPending }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: mineure.id })
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 10 : undefined,
+  }
+
   return (
     <div
+      ref={setNodeRef}
+      style={style}
       className={[
-        'flex items-center gap-3 px-4 py-2.5',
+        'flex items-center gap-2 px-3 py-2.5 bg-surface-2',
         !isLast ? 'border-b border-border-app' : '',
+        isDragging ? 'opacity-60' : '',
       ].join(' ')}
     >
-      <div className="w-5 shrink-0" />
+      <DragHandle attributes={attributes} listeners={listeners} />
       <div className="w-1.5 h-1.5 rounded-full bg-content-3 shrink-0" />
       <span className="text-sm text-content flex-1 truncate">{mineure.nom}</span>
       {!mineure.actif && <Badge variant="neutre">Inactif</Badge>}

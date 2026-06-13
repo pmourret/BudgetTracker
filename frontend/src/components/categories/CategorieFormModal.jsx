@@ -17,7 +17,6 @@ export default function CategorieFormModal({
   const [nom, setNom] = useState('')
   const [code, setCode] = useState('')
   const [description, setDescription] = useState('')
-  const [ordre, setOrdre] = useState('')
   const [actif, setActif] = useState(true)
   const [errors, setErrors] = useState({})
 
@@ -30,10 +29,9 @@ export default function CategorieFormModal({
       setNom(categorie.nom ?? '')
       setCode(categorie.code ?? '')
       setDescription(categorie.description ?? '')
-      setOrdre(categorie.ordre != null ? String(categorie.ordre) : '')
       setActif(categorie.actif ?? true)
     } else {
-      setNom(''); setCode(''); setDescription(''); setOrdre(''); setActif(true)
+      setNom(''); setCode(''); setDescription(''); setActif(true)
     }
     setErrors({})
   }, [isOpen, isEdit, categorie])
@@ -50,7 +48,6 @@ export default function CategorieFormModal({
 
     const payload = { nom: nom.trim(), description: description.trim() }
     if (code.trim()) payload.code = code.trim()
-    if (ordre !== '') payload.ordre = parseInt(ordre, 10)
     if (!isEdit && isMineureCreate) payload.parent = parentId
     if (isEdit) payload.actif = actif
 
@@ -132,15 +129,6 @@ export default function CategorieFormModal({
             className="w-full px-3 py-2 rounded-lg border border-border-app bg-surface text-sm text-content outline-none focus:border-purple-600 resize-none"
           />
         </div>
-
-        <Input
-          label="Ordre d'affichage"
-          type="number"
-          value={ordre}
-          onChange={setOrdre}
-          placeholder="0"
-          error={errors.ordre}
-        />
 
         {isEdit && (
           <label className="flex items-center gap-2 cursor-pointer">

@@ -14,6 +14,7 @@ class CategorieViewSet(viewsets.ModelViewSet):
     Actions supplémentaires :
     - GET /categories/{id}/sous-categories/ — liste les enfants d'une racine
     - POST /categories/{id}/desactiver/     — désactive sans supprimer
+    - POST /categories/reordonner/          — réordonne un groupe de sœurs
     """
     serializer_class = CategorieSerializer
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter, filters.SearchFilter]
@@ -69,3 +70,28 @@ class CategorieViewSet(viewsets.ModelViewSet):
             {"detail": f"Catégorie '{categorie.nom}' désactivée."},
             status=status.HTTP_200_OK
         )
+
+    @action(detail=False, methods=["post"], url_path="reordonner")
+    def reordonner(self, request):
+        """
+        Réordonne un groupe de catégories sœurs (glisser-déposer).
+
+        Body : {"ids": ["uuid1", "uuid2", ...]} dans l'ordre voulu.
+        Persiste la position dans le champ `ordre` (1-based).
+        """
+        from .services.reordonner import reordonner_categories
+
+        ids = request.data.get("ids")
+        if not isinstance(ids, list) or not ids:
+            return Response(
+                {"detail": "Le champ 'ids' (liste non vide) est requis."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            nb = reordonner_categories(ids)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({"detail": f"{nb} catégorie(s) réordonnée(s)."},
+                        status=status.HTTP_200_OK)
