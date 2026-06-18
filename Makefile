@@ -128,3 +128,43 @@ dev-logs: ## Logs de la stack de dev
 help: ## Affiche cette aide
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
 		| awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
+
+# ==========================================================
+# MISE À JOUR / DÉPLOIEMENT
+# ==========================================================
+
+.PHONY: pull
+pull: ## Récupère les derniers commits (git pull)
+	git pull --ff-only
+
+.PHONY: deploy
+deploy: ## Montée de version standard : pull + build + up + migrate + collectstatic
+	$(MAKE) backup
+	git pull --ff-only
+	$(COMPOSE_PROD) build
+	$(COMPOSE_PROD) up -d
+	@echo "Attente du backend..."
+	@sleep 5
+	$(BACKEND_PROD) migrate
+	$(BACKEND_PROD) collectstatic --noinput
+	$(BACKEND_PROD) check
+	@echo "Déploiement terminé."
+
+.PHONY: deploy-front
+deploy-front: ## Montée de version frontend uniquement (rebuild image front + nginx)
+	git pull --ff-only
+	$(COMPOSE_PROD) build frontend
+	$(COMPOSE_PROD) up -d frontend
+
+.PHONY: backup
+backup: ## Dump SQL horodaté de la base (avant migration)
+	@mkdir -p backups
+	$(COMPOSE_PROD) exec -T db pg_dump -U $${POSTGRES_USER:-budget} $${POSTGRES_DB:-budgettracker} \
+		> backups/budgettracker_$$(date +%Y%m%d_%H%M%S).sql
+	@echo "Backup créé dans ./backups/"
+
+.PHONY: restore
+restore: ## Restaure un dump : make restore file=backups/xxx.sql
+	@test -n "$(file)" || { echo "Usage : make restore file=backups/xxx.sql"; exit 1; }
+	cat $(file) | $(COMPOSE_PROD) exec -T db psql -U $${POSTGRES_USER:-budget} $${POSTGRES_DB:-budgettracker}
+	@echo "Restauration depuis $(file) terminée."
