@@ -224,6 +224,46 @@ class CategorieCodeSoftDeleteTest(APITestCase):
 
 
 # ---------------------------------------------------------------------------
+# Tests pagination (?page_size) — régression bug prod « catégorie > 50 invisible »
+# ---------------------------------------------------------------------------
+
+class CategoriePaginationTest(APITestCase):
+    """
+    Régression : au-delà de PAGE_SIZE (50), les catégories tombaient en page 2,
+    jamais chargée par l'UI. Le front demande maintenant ?page_size=1000 pour
+    récupérer tout le référentiel en une page (garde-fou max_page_size=1000).
+    """
+
+    def setUp(self):
+        Categorie.objects.bulk_create(
+            [Categorie(code=f"CAT-{i:03d}", nom=f"Categorie {i:03d}") for i in range(60)]
+        )
+
+    def test_page_size_eleve_renvoie_tout(self):
+        response = self.client.get(reverse("categorie-list"), {"page_size": 1000})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 60)
+        self.assertEqual(len(response.data["results"]), 60)
+
+    def test_sans_param_reste_plafonne_a_50(self):
+        """Comportement par défaut des autres endpoints inchangé."""
+        response = self.client.get(reverse("categorie-list"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 60)
+        self.assertEqual(len(response.data["results"]), 50)
+
+    def test_max_page_size_borne_la_demande(self):
+        """?page_size=5000 est plafonné à max_page_size (1000) par la classe."""
+        from rest_framework.test import APIRequestFactory
+        from core.pagination import StandardPagination
+
+        request = APIRequestFactory().get("/api/v1/categories/", {"page_size": 5000})
+        from rest_framework.request import Request
+        taille = StandardPagination().get_page_size(Request(request))
+        self.assertEqual(taille, 1000)
+
+
+# ---------------------------------------------------------------------------
 # Tests réordonnancement (glisser-déposer)
 # ---------------------------------------------------------------------------
 

@@ -323,6 +323,16 @@ GET|PUT|PATCH   /referentiels/etablissements/{id}/
 GET             /analytics/dashboard/?nb_mois=6
 ```
 
+### Pagination
+
+Les listes sont paginées (`PageNumberPagination`, 50 résultats par page par défaut). Le client peut demander une page plus grande via `?page_size=N`, plafonnée à `max_page_size=1000` (classe `core.pagination.StandardPagination`) :
+
+```
+GET             /categories/?page_size=1000    # tout le référentiel en une page
+```
+
+> Utile pour les référentiels à volume borné consommés en entier par l'UI (catégories : accordéon majeures/mineures, `<optgroup>` des selects). Sans le paramètre, le comportement par défaut (50/page) reste inchangé pour tous les endpoints. Côté frontend, le hook dédié `useCategories()` ajoute automatiquement `?page_size=1000`.
+
 ---
 
 ## Structure du projet

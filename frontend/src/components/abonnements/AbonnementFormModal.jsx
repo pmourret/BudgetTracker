@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useCreateResource, useUpdateResource, useResourceList } from '../../hooks/useResource'
+import { useCreateResource, useUpdateResource, useResourceList, useCategories } from '../../hooks/useResource'
 import { useTypesFlux, useModesPaiement, useFrequences } from '../../hooks/useReferentiels'
 import Modal from '../ui/Modal'
 import Input from '../ui/Input'
@@ -31,7 +31,7 @@ export default function AbonnementFormModal({ isOpen, onClose, abonnement = null
   const createAbonnement = useCreateResource('abonnements')
   const updateAbonnement = useUpdateResource('abonnements')
   const { data: comptesData } = useResourceList('comptes')
-  const { data: categoriesData } = useResourceList('categories')
+  const { data: categoriesData } = useCategories()
   const { options: frequencesOpts } = useFrequences()
   const { options: typesFluxOpts } = useTypesFlux()
   const { options: modesPaiementOpts } = useModesPaiement()

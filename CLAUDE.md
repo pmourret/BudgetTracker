@@ -171,7 +171,7 @@ Exploration complète backend + frontend, corrections de cohérence, **19 tests 
 - `FluxFormModal` : catégorie exigée aussi pour les recettes (le backend l'a toujours refusée).
 
 **Relevé, NON corrigé (à arbitrer) :**
-- **Pagination DRF (`PAGE_SIZE: 50`)** : les selects des modaux (`useResourceList`) ne chargent que la première page — au-delà de 50 catégories/comptes, des options manqueront. Piste : `page_size_query_param` dans les settings + param dans les hooks.
+- ~~**Pagination DRF (`PAGE_SIZE: 50`)**~~ : ✅ **CORRIGÉ (juin 2026)** pour les catégories. Classe `core/pagination.py::StandardPagination` (`page_size=50`, `page_size_query_param="page_size"`, `max_page_size=1000`) référencée dans `REST_FRAMEWORK['DEFAULT_PAGINATION_CLASS']` — comportement par défaut des autres endpoints inchangé. Hook front dédié `useCategories()` (dans `useResource.js`) qui demande `?page_size=1000` et déballe `results` défensivement ; **tous** les consommateurs de `/categories/` passent par lui (CategoriesPage, FluxFormModal, BudgetFormModal, AbonnementFormModal, BudgetTemplateFormModal). 3 tests de régression (`CategoriePaginationTest`). **Reste à étendre aux comptes** si un foyer dépasse 50 comptes (peu probable) : réutiliser `?page_size` via un hook analogue.
 - **Catégorie sans flux mais liée à des budgets/abonnements/templates** : encore supprimable (soft delete), ce qui laisse des références vers une catégorie supprimée. Piste : étendre la protection 409 de `Categorie.delete()`.
 - **Dashboard `solde_total`** : basé sur `solde_theorique` mais étiqueté fiabilité « reel » — arbitrage sémantique du foyer à confirmer (théorique = inclut le prévisionnel).
 

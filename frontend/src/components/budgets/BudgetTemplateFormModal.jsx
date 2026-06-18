@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useCreateResource, useUpdateResource, useResourceList } from '../../hooks/useResource'
+import { useCreateResource, useUpdateResource, useCategories } from '../../hooks/useResource'
 import Modal from '../ui/Modal'
 import Input from '../ui/Input'
 import Select from '../ui/Select'
@@ -17,7 +17,7 @@ export default function BudgetTemplateFormModal({ isOpen, onClose, template = nu
 
   const createTemplate = useCreateResource('budget-templates')
   const updateTemplate = useUpdateResource('budget-templates')
-  const { data: categoriesData } = useResourceList('categories')
+  const { data: categoriesData } = useCategories()
 
   const allCats = categoriesData?.results ?? []
   const majCats = allCats.filter((c) => c.est_racine)

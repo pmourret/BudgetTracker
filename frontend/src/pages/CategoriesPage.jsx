@@ -11,7 +11,7 @@ import {
   verticalListSortingStrategy, useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { useResourceList, useDeleteResource, useResourceAction } from '../hooks/useResource'
+import { useCategories, useDeleteResource, useResourceAction } from '../hooks/useResource'
 import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
 import IconBadge from '../components/ui/IconBadge'
@@ -26,7 +26,7 @@ export default function CategoriesPage() {
   const [majeures, setMajeures] = useState([])
   const [mineuresByParent, setMineuresByParent] = useState({})
 
-  const { data, isLoading, isError, refetch } = useResourceList('categories')
+  const { data, isLoading, isError, refetch } = useCategories()
   const reorder = useResourceAction('categories')
 
   useEffect(() => {

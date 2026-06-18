@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useCreateResource, useUpdateResource, useResourceList } from '../../hooks/useResource'
+import { useCreateResource, useUpdateResource, useResourceList, useCategories } from '../../hooks/useResource'
 import {
   useTypesFlux, useModesPaiement, useStatutsFlux, useDevises,
 } from '../../hooks/useReferentiels'
@@ -34,7 +34,7 @@ export default function FluxFormModal({ isOpen, onClose, flux = null }) {
   const createFlux = useCreateResource('flux')
   const updateFlux = useUpdateResource('flux')
   const { data: comptesData } = useResourceList('comptes')
-  const { data: categoriesData } = useResourceList('categories')
+  const { data: categoriesData } = useCategories()
   const { data: typesFluxData } = useTypesFlux()
   const { options: modesPaiementOpts } = useModesPaiement()
   const { options: statutsOpts } = useStatutsFlux()

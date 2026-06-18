@@ -35,6 +35,25 @@ export function useResourceList(resource, params = {}) {
   })
 }
 
+// Les catégories forment un référentiel à volume borné, consommé en entier
+// par l'UI (accordéon majeures/mineures, optgroups des selects). On demande
+// toutes les lignes en une page via ?page_size (garde-fou max_page_size=1000
+// côté backend) pour éviter qu'une catégorie au-delà de la 50e « disparaisse »
+// dans une page 2 jamais chargée. TOUS les consommateurs de /categories/
+// doivent passer par ce hook.
+export function useCategories(params = {}) {
+  const merged = { page_size: 1000, ...params }
+  return useQuery({
+    queryKey: ['categories', 'list', merged],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/categories/', { params: merged })
+      // Déballage défensif : compat si la pagination était un jour désactivée.
+      const results = data?.results ?? data ?? []
+      return Array.isArray(data) ? { results } : { ...data, results }
+    },
+  })
+}
+
 export function useResourceDetail(resource, id) {
   return useQuery({
     queryKey: [resource, 'detail', id],
