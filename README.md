@@ -51,7 +51,7 @@ L'application tourne entièrement dans Docker Compose (backend Django, frontend 
 |---|---|
 | **Comptes bancaires** | CRUD complet, solde théorique calculé automatiquement, réconciliation avec flux d'ajustement, indicateur **compte commun** (badge dédié) |
 | **Flux** | Journal central signé (−dépense / +revenu), soft delete, recalcul de solde par signal |
-| **Transferts** | Paire débit/crédit atomique, jamais comptés dans les dépenses/revenus |
+| **Transferts** | Virements entre comptes (ex. alimenter un compte d'épargne) créables depuis l'UI : paire débit/crédit atomique, jamais comptés dans les dépenses/revenus |
 | **Budgets** | Par catégorie et par mois, taux de consommation calculé en temps réel |
 | **Abonnements** | Récurrents avec détection de divergence de montant |
 | **Catégories** | Hiérarchie 2 niveaux (majeure / mineure), soft delete protégé si flux liés |
@@ -257,6 +257,7 @@ VITE_API_BASE_URL=http://localhost:8000/api/v1
 | Dashboard | `/` → redirige `/dashboard` | Métriques, courbe solde, dépenses par catégorie, budgets, alertes, patrimoine |
 | Comptes | `/comptes` | CRUD comptes bancaires, réconciliation de solde |
 | Flux | `/flux` | Journal des mouvements, filtres, badges ajustement |
+| Transferts | `/transferts` | Virements entre comptes (ex. courant → épargne), création + annulation |
 | Budgets | `/budgets` | Suivi budgétaire par catégorie/mois |
 | Abonnements | `/abonnements` | Récurrents, toggle actif, détection divergence |
 | Alertes | `/alertes` | Filtres par type, acquittement individuel et global |

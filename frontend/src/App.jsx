@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/layout/Layout'
 import ComptesPage from './pages/ComptesPage'
 import FluxPage from './pages/FluxPage'
+import TransfertsPage from './pages/TransfertsPage'
 import BudgetsPage from './pages/BudgetsPage'
 import AbonnementsPage from './pages/AbonnementsPage'
 import AlertesPage from './pages/AlertesPage'
@@ -19,6 +20,7 @@ export default function App() {
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="comptes" element={<ComptesPage />} />
         <Route path="flux" element={<FluxPage />} />
+        <Route path="transferts" element={<TransfertsPage />} />
         <Route path="budgets" element={<BudgetsPage />} />
         <Route path="previsionnel" element={<PrevisionnelPage />} />
         <Route path="abonnements" element={<AbonnementsPage />} />

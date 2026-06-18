@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { CreditCard, TrendingUp, RefreshCw, Landmark, Tag, ChevronRight } from 'lucide-react'
+import { CreditCard, Repeat, TrendingUp, RefreshCw, Landmark, Tag, ChevronRight } from 'lucide-react'
 import Card from '../components/ui/Card'
 import IconBadge from '../components/ui/IconBadge'
 import ThemeToggle from '../components/layout/ThemeToggle'
@@ -7,6 +7,7 @@ import ThemeToggle from '../components/layout/ThemeToggle'
 const liens = [
   { to: '/previsionnel', label: 'Prévisionnel', desc: 'Solde projeté et trajectoire d\'épargne', Icon: TrendingUp },
   { to: '/comptes',     label: 'Comptes',     desc: 'Soldes et écarts',         Icon: CreditCard },
+  { to: '/transferts',  label: 'Transferts',  desc: 'Virements entre comptes (ex. épargne)', Icon: Repeat },
   { to: '/abonnements', label: 'Abonnements', desc: 'Récurrences et échéances', Icon: RefreshCw },
   { to: '/patrimoine',  label: 'Patrimoine',  desc: 'Actifs et valorisation',   Icon: Landmark },
   { to: '/categories',  label: 'Catégories',  desc: 'Majeures et sous-catégories', Icon: Tag },
