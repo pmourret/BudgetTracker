@@ -1,6 +1,7 @@
 from decimal import Decimal
+from django.conf import settings
 from django.core.management import call_command
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from referentiels.models import (
@@ -18,8 +19,24 @@ class Command(BaseCommand):
         "(pas de duplication)."
     )
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--force",
+            action="store_true",
+            help="Autorise l'exécution même hors DEBUG (déconseillé en prod).",
+        )
+
     @transaction.atomic
     def handle(self, *args, **options):
+        # Garde-fou : données de DÉMO interdites en prod (DEBUG=False) sauf --force.
+        if not settings.DEBUG and not options["force"]:
+            raise CommandError(
+                "seed_demo est un outil de DEV : il crée un compte et des "
+                "catégories de démonstration. Refusé car DEBUG=False (prod). "
+                "Pour seulement les référentiels structurels, utilise "
+                "`seed_referentiels`. Pour forcer malgré tout : --force."
+            )
+
         # Référentiels structurels (idempotent, source unique de vérité)
         call_command("seed_referentiels")
 

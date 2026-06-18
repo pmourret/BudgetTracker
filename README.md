@@ -23,6 +23,7 @@ Application web de suivi budgétaire familial — transformation d'un classeur E
 - [API REST](#api-rest)
 - [Structure du projet](#structure-du-projet)
 - [Commandes utiles](#commandes-utiles)
+- [Déploiement et Makefile](#déploiement-et-makefile)
 - [Règles métier clés](#règles-métier-clés)
 - [Roadmap](#roadmap)
 
@@ -48,7 +49,7 @@ L'application tourne entièrement dans Docker Compose (backend Django, frontend 
 
 | Fonctionnalité | Détail |
 |---|---|
-| **Comptes bancaires** | CRUD complet, solde théorique calculé automatiquement, réconciliation avec flux d'ajustement |
+| **Comptes bancaires** | CRUD complet, solde théorique calculé automatiquement, réconciliation avec flux d'ajustement, indicateur **compte commun** (badge dédié) |
 | **Flux** | Journal central signé (−dépense / +revenu), soft delete, recalcul de solde par signal |
 | **Transferts** | Paire débit/crédit atomique, jamais comptés dans les dépenses/revenus |
 | **Budgets** | Par catégorie et par mois, taux de consommation calculé en temps réel |
@@ -211,7 +212,7 @@ docker compose exec backend python manage.py migrate
 docker compose exec backend python manage.py seed_demo
 ```
 
-La commande est **idempotente** : elle peut être relancée sans créer de doublons.
+La commande est **idempotente** : elle peut être relancée sans créer de doublons. Elle est réservée au **développement** : elle crée un compte et des catégories de démonstration et **refuse de s'exécuter si `DEBUG=False`** (prod). En production, seuls les référentiels structurels sont chargés (`seed_referentiels`), l'application démarre vierge de données métier.
 
 ### 6. Accéder à l'application
 
@@ -387,7 +388,9 @@ BudgetTracker/
 │   ├── vite.config.js
 │   └── Dockerfile
 │
-├── docker-compose.yml
+├── docker-compose.yml         # Stack de développement
+├── docker-compose.prod.yml    # Stack de production (Nginx + Traefik)
+├── Makefile                   # Cibles dev/prod (up, deploy, migrate, seed…)
 ├── .env.example
 ├── .gitignore
 ├── CLAUDE.md                  # Instructions pour Claude Code
@@ -425,8 +428,11 @@ docker compose exec backend python manage.py migrate
 docker compose exec backend python manage.py test            # tous
 docker compose exec backend python manage.py test analytics  # une app
 
-# Données de démonstration
+# Données de démonstration (dev uniquement — voir aussi `make dev-seed`)
 docker compose exec backend python manage.py seed_demo
+
+# Référentiels structurels seuls (sûr en prod, idempotent)
+docker compose exec backend python manage.py seed_referentiels
 
 # Shell Django
 docker compose exec backend python manage.py shell
@@ -449,6 +455,60 @@ docker compose logs -f backend
 docker compose logs -f frontend
 docker compose logs -f db
 ```
+
+---
+
+## Déploiement et Makefile
+
+Un `Makefile` (à la racine) encapsule les commandes Docker Compose pour les deux environnements. Il s'appuie sur deux fichiers compose distincts :
+
+| Environnement | Fichier compose | Fichier d'env | Frontend |
+|---|---|---|---|
+| **Développement** | `docker-compose.yml` | `.env` | Vite en HMR (`npm run dev`, `:5173`) |
+| **Production** | `docker-compose.prod.yml` | `.env.prod` | build statique servi par Nginx, exposé via Traefik |
+
+> Les cibles **par défaut** (`up`, `migrate`, `seed`, `deploy`…) visent la **production**. Les cibles de développement sont préfixées par `dev-`.
+
+```bash
+make            # ou : make help — affiche toutes les cibles disponibles
+```
+
+### Production
+
+| Cible | Action |
+|---|---|
+| `make up` / `make down` | Démarre / arrête la stack prod (les volumes sont conservés) |
+| `make build` / `make rebuild` | Rebuild des images (`rebuild` = sans cache puis `up`) |
+| `make migrate` | Applique les migrations |
+| `make seed` | Charge les **référentiels structurels** (idempotent, **pas** de données de démo) |
+| `make check` | `manage.py check` |
+| `make test [app=...]` | Lance les tests (ciblables : `make test app=analytics`) |
+| `make logs` / `make logs-backend` / `make logs-db` | Suit les logs |
+| `make shell` / `make bash` | Shell Django / bash dans le conteneur backend |
+| `make superuser` | Crée un superutilisateur Django |
+| `make init` | Première mise en route : `up` + `migrate` + `seed_referentiels` (vierge de données métier) |
+| `make backup` | Dump SQL horodaté de la base dans `./backups/` |
+| `make restore file=backups/xxx.sql` | Restaure un dump |
+| `make reset-db` | ⚠️ **DÉTRUIT** le volume `pgdata` puis réinitialise — demande une confirmation explicite (`CONFIRMER`) |
+
+### Mise à jour de la production
+
+```bash
+make deploy        # backup → git pull → build → up → migrate → collectstatic → check
+make deploy-front  # rebuild + redéploiement du frontend uniquement
+```
+
+`make deploy` effectue un **backup automatique** avant toute migration. Les migrations de schéma sont appliquées automatiquement.
+
+### Développement
+
+| Cible | Action |
+|---|---|
+| `make dev-up` / `make dev-down` | Démarre / arrête la stack de dev |
+| `make dev-logs` | Suit les logs de la stack de dev |
+| `make dev-seed` | Charge les **données de démonstration** (compte + catégories) — **dev uniquement** |
+
+> **Garde-fous de sécurité.** `seed_demo` refuse de s'exécuter hors `DEBUG` (donc en prod) — utiliser `make dev-seed` en local. `make reset-db` exige une confirmation avant de détruire les données. En prod, `make init` / `make seed` ne chargent que les référentiels structurels, jamais de données de démo.
 
 ---
 

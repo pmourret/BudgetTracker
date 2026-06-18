@@ -55,6 +55,7 @@ class CompteSerializer(serializers.ModelSerializer):
             "solde_theorique",   # read_only
             "ecart_solde",       # read_only
             "actif",
+            "est_commun",
             "date_ouverture",
             "date_fermeture",
             "notes",

@@ -38,7 +38,7 @@ export default function AbonnementFormModal({ isOpen, onClose, abonnement = null
 
   const comptesOpts = (comptesData?.results ?? []).map((c) => ({
     value: c.id,
-    label: c.etablissement_libelle ? `${c.nom} — ${c.etablissement_libelle}` : c.nom,
+    label: (c.etablissement_libelle ? `${c.nom} — ${c.etablissement_libelle}` : c.nom) + (c.est_commun ? ' · Commun' : ''),
   }))
 
   const allCats = categoriesData?.results ?? []

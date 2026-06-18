@@ -80,6 +80,7 @@ export default function CompteFormModal({ isOpen, onClose, compte = null }) {
   const [devise, setDevise] = useState('')
   const [soldeInitial, setSoldeInitial] = useState('0')
   const [actif, setActif] = useState(true)
+  const [estCommun, setEstCommun] = useState(false)
   const [dateOuverture, setDateOuverture] = useState('')
   const [notes, setNotes] = useState('')
   const [errors, setErrors] = useState({})
@@ -107,6 +108,7 @@ export default function CompteFormModal({ isOpen, onClose, compte = null }) {
       setDevise(compte.devise ?? '')
       setSoldeInitial(String(compte.solde_initial ?? '0'))
       setActif(compte.actif ?? true)
+      setEstCommun(compte.est_commun ?? false)
       setDateOuverture(compte.date_ouverture ?? '')
       setNotes(compte.notes ?? '')
     } else {
@@ -118,6 +120,7 @@ export default function CompteFormModal({ isOpen, onClose, compte = null }) {
       setDevise('')
       setSoldeInitial('0')
       setActif(true)
+      setEstCommun(false)
       setDateOuverture('')
       setNotes('')
     }
@@ -151,6 +154,7 @@ export default function CompteFormModal({ isOpen, onClose, compte = null }) {
       devise,
       solde_initial: parseDecimal(soldeInitial).toFixed(2),
       actif,
+      est_commun: estCommun,
       date_ouverture: dateOuverture || null,
       notes,
     }
@@ -283,6 +287,16 @@ export default function CompteFormModal({ isOpen, onClose, compte = null }) {
             className="w-full px-3 py-2 rounded-lg border border-border-app bg-surface text-sm text-content outline-none focus:border-purple-600 resize-none"
           />
         </div>
+
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={estCommun}
+            onChange={(e) => setEstCommun(e.target.checked)}
+            className="w-4 h-4 accent-purple-600"
+          />
+          <span className="text-sm text-content">Compte commun (partagé du foyer)</span>
+        </label>
 
         {isEdit && (
           <label className="flex items-center gap-2 cursor-pointer">

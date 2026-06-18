@@ -67,8 +67,8 @@ check: ## manage.py check
 	$(BACKEND_PROD) check
 
 .PHONY: seed
-seed: ## Charge les données de démo
-	$(BACKEND_PROD) seed_demo
+seed: ## Charge les référentiels structurels (prod, idempotent — PAS de données de démo)
+	$(BACKEND_PROD) seed_referentiels
 
 .PHONY: test
 test: ## Lance les tests (make test app=analytics pour cibler)
@@ -91,15 +91,17 @@ bash: ## Ouvre un bash dans le conteneur backend
 # ==========================================================
 
 .PHONY: init
-init: up ## Première mise en route : up + migrate + seed
+init: up ## Première mise en route : up + migrate + référentiels structurels (PAS de démo)
 	@echo "Attente de la base..."
 	@sleep 5
 	$(BACKEND_PROD) migrate
-	$(BACKEND_PROD) seed_demo
+	$(BACKEND_PROD) seed_referentiels
 	@echo "Initialisation terminée."
 
 .PHONY: reset-db
 reset-db: ## ⚠️  DÉTRUIT la base (volume pgdata) puis réinitialise
+	@echo "⚠️  Cette opération DÉTRUIT TOUTES les données (volume pgdata)."
+	@read -p "Taper 'CONFIRMER' pour continuer : " ans; [ "$$ans" = "CONFIRMER" ] || { echo "Annulé."; exit 1; }
 	$(COMPOSE_PROD) down
 	sudo rm -rf /var/lib/docker/hiatus/budgets/pgdata
 	$(MAKE) init
@@ -119,6 +121,10 @@ dev-down: ## Stoppe la stack de dev
 .PHONY: dev-logs
 dev-logs: ## Logs de la stack de dev
 	$(COMPOSE_DEV) logs -f
+
+.PHONY: dev-seed
+dev-seed: ## Charge les données de démo (DEV uniquement — compte + catégories de démo)
+	$(BACKEND_DEV) seed_demo
 
 # ==========================================================
 # AIDE

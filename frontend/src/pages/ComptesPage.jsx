@@ -7,7 +7,8 @@ import Tooltip from '../components/ui/Tooltip'
 import { DEFINITIONS } from '../constants/definitions'
 import { Loading, ErrorState, EmptyState } from '../components/ui/States'
 import IconBadge from '../components/ui/IconBadge'
-import { Landmark, Pencil, Trash2 } from 'lucide-react'
+import Badge from '../components/ui/Badge'
+import { Landmark, Pencil, Trash2, Users } from 'lucide-react'
 import CompteFormModal from '../components/comptes/CompteFormModal'
 
 export default function ComptesPage() {
@@ -121,8 +122,15 @@ function CompteCard({ compte, onEdit }) {
         <div className="flex items-center gap-2.5">
           <IconBadge Icon={Landmark} size={18} className="w-10 h-10" />
           <div>
-            <div className="text-sm font-medium text-content">
+            <div className="text-sm font-medium text-content flex items-center gap-1.5">
               {compte.etablissement_libelle || compte.nom}
+              {compte.est_commun && (
+                <Badge variant="purple">
+                  <span className="flex items-center gap-1">
+                    <Users size={11} /> Commun
+                  </span>
+                </Badge>
+              )}
             </div>
             <div className="text-xs text-content-2">
               {compte.titulaire_libelle} · {compte.type_compte_libelle}

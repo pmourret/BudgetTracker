@@ -74,6 +74,10 @@ class Compte(BaseModel):
 
     # Metadata
     actif = models.BooleanField(default=True)
+    est_commun = models.BooleanField(
+        default=False,
+        help_text="Compte partagé du foyer (joint) — affiché avec un indicateur dédié."
+    )
     date_ouverture = models.DateField(null=True, blank=True)
     date_fermeture = models.DateField(null=True, blank=True)
     notes = models.TextField(blank=True)
