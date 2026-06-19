@@ -17,11 +17,11 @@ export default function Modal({ isOpen, onClose, title, children, footer }) {
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 bg-slate-900/60 flex justify-center items-stretch sm:items-center p-0 sm:p-4"
+      className="fixed inset-0 z-[60] bg-slate-900/60 flex justify-center items-stretch sm:items-center p-0 sm:p-4"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-surface flex flex-col overflow-hidden w-full h-full rounded-none sm:w-[480px] sm:max-w-full sm:h-auto sm:max-h-[90vh] sm:rounded-xl"
+        className="bg-surface flex flex-col overflow-hidden w-full h-dvh rounded-none sm:w-[480px] sm:max-w-full sm:h-auto sm:max-h-[90dvh] sm:rounded-xl"
       >
         <div className="flex justify-between items-center px-5 py-4 border-b border-border-app shrink-0">
           <span className="text-base font-medium text-content">{title}</span>
@@ -35,7 +35,9 @@ export default function Modal({ isOpen, onClose, title, children, footer }) {
         </div>
         <div className="p-5 overflow-y-auto flex-1">{children}</div>
         {footer && (
-          <div className="flex gap-3 justify-end px-5 py-4 border-t border-border-app shrink-0">
+          <div
+            className="flex gap-3 justify-end px-5 py-4 border-t border-border-app shrink-0 pb-[max(1rem,env(safe-area-inset-bottom))]"
+          >
             {footer}
           </div>
         )}
