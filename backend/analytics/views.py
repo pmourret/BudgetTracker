@@ -3,8 +3,13 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from .services.dashboard import calculer_dashboard
+from .services.compte_dashboard import calculer_compte_dashboard
 from .services.projection import calculer_previsionnel
-from .serializers import DashboardSerializer, PrevisionnelSerializer
+from .serializers import (
+    DashboardSerializer,
+    CompteDashboardSerializer,
+    PrevisionnelSerializer,
+)
 
 
 class DashboardView(APIView):
@@ -26,6 +31,31 @@ class DashboardView(APIView):
 
         data = calculer_dashboard(nb_mois=nb_mois)
         serializer = DashboardSerializer(data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class CompteDashboardView(APIView):
+    """
+    Dashboard d'un compte unique (lecture seule, fiabilité RÉELLE).
+
+    GET /api/v1/analytics/compte/<uuid:compte_id>/
+
+    Agrégats du mois courant scopés au compte : soldes, dépenses/revenus,
+    ventilation par catégorie, top dépenses. Transferts et ajustements exclus.
+    """
+
+    def get(self, request, compte_id):
+        from comptes.models import Compte
+
+        try:
+            data = calculer_compte_dashboard(compte_id)
+        except Compte.DoesNotExist:
+            return Response(
+                {"detail": "Compte introuvable."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = CompteDashboardSerializer(data)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 

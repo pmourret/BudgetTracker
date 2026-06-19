@@ -113,7 +113,7 @@ def calculer_dashboard(nb_mois: int = 6) -> dict:
             "fiabilite": "reel",
         },
         "evolution_solde": evolution,
-        "depenses_par_categorie": _calculer_depenses_par_categorie(mois_courant),
+        "depenses_par_categorie": _calculer_depenses_par_categorie(mois_courant, compte_id=None),
         "budgets": budgets_data,
         "derniers_flux": flux_data,
         "alertes": alertes_data,
@@ -121,22 +121,29 @@ def calculer_dashboard(nb_mois: int = 6) -> dict:
     }
 
 
-def _calculer_depenses_par_categorie(mois: datetime.date) -> list:
+def _calculer_depenses_par_categorie(mois: datetime.date, compte_id=None) -> list:
     """
     Dépenses du mois regroupées par catégorie principale.
     Chaque majeure contient ses sous-catégories avec leurs montants.
     Transferts exclus. Fiabilité : réelle.
+
+    Si `compte_id` est fourni, l'agrégation est restreinte à ce compte
+    (utilisé par le dashboard par compte) ; sinon tous les comptes (dashboard global).
     """
     from flux.models import Flux
 
+    filtres = dict(
+        mois=mois,
+        montant__lt=0,
+        est_transfert=False,
+        est_ajustement=False,
+        categorie__isnull=False,
+    )
+    if compte_id is not None:
+        filtres["compte_id"] = compte_id
+
     par_cat = (
-        Flux.objects.filter(
-            mois=mois,
-            montant__lt=0,
-            est_transfert=False,
-            est_ajustement=False,
-            categorie__isnull=False,
-        )
+        Flux.objects.filter(**filtres)
         .values(
             "categorie",
             "categorie__nom",

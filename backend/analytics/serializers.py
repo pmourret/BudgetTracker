@@ -22,6 +22,18 @@ class DashboardSerializer(serializers.Serializer):
     patrimoine = serializers.DictField()
 
 
+class CompteDashboardSerializer(serializers.Serializer):
+    """
+    Serializer de sortie pour le dashboard d'un compte unique.
+    Lecture seule, fiabilité RÉELLE (agrégats du mois courant scopés au compte).
+    """
+    mois_courant = serializers.CharField()
+    compte = serializers.DictField()
+    metriques = serializers.DictField()
+    depenses_par_categorie = serializers.ListField()
+    top_depenses = serializers.ListField()
+
+
 class PrevisionnelSerializer(serializers.Serializer):
     """
     Serializer de sortie pour le prévisionnel (phase 10-A).

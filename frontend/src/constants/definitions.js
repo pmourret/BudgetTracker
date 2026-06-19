@@ -73,6 +73,20 @@ export const DEFINITIONS = {
     formule: 'Σ des dépenses du mois, groupées par catégorie majeure.',
   },
 
+  // ---- Dashboard par compte ----
+  compte_nb_flux: {
+    titre: 'Mouvements du mois',
+    texte:
+      'Nombre de flux saisis ce mois sur ce compte (hors transferts et ajustements).',
+    formule: 'Nombre de flux du mois rattachés au compte.',
+  },
+  compte_top_depenses: {
+    titre: 'Top dépenses du mois',
+    texte:
+      "Les plus grosses sorties d'argent du mois sur ce compte, de la plus élevée à la plus faible. Transferts et ajustements exclus.",
+    formule: 'Les 5 flux négatifs du mois les plus élevés, par montant décroissant.',
+  },
+
   // ---- Budgets ----
   budget_total_prevu: {
     titre: 'Total prévu',

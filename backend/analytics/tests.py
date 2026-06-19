@@ -12,6 +12,7 @@ from flux.models import Flux
 from budgets.models import Budget, BudgetTemplate
 from abonnements.models import Abonnement
 from analytics.services.dashboard import calculer_dashboard
+from analytics.services.compte_dashboard import calculer_compte_dashboard
 from analytics.services.projection import (
     calculer_solde_projete, calculer_capacite_restante
 )
@@ -467,3 +468,143 @@ class PrevisionnelAPITest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["trajectoire"]["nb_mois"], 3)
         self.assertEqual(len(response.data["trajectoire"]["points"]), 3)
+
+class CompteDashboardServiceTest(TestCase):
+    """Dashboard scopé à un compte unique (agrégats du mois courant)."""
+
+    def setUp(self):
+        self.type_compte = TypeCompte.objects.create(code="COURANT", libelle="Courant")
+        self.titulaire = Titulaire.objects.create(code="PIERRE", libelle="Pierre")
+        self.etablissement = Etablissement.objects.create(code="BNP", libelle="BNP")
+        self.devise = Devise.objects.create(
+            code="EUR", libelle="Euro", symbole="€", est_defaut=True
+        )
+        self.type_flux = TypeFlux.objects.create(code="DEBIT", libelle="Débit")
+        self.statut = StatutFlux.objects.create(
+            code="VALIDE", libelle="Validé", est_definitif=True
+        )
+        # Catégorie majeure + mineure pour tester le regroupement
+        self.cat_majeure = Categorie.objects.create(code="ALIM", nom="Alimentation")
+        self.cat_mineure = Categorie.objects.create(
+            code="COURSES", nom="Courses", parent=self.cat_majeure
+        )
+        self.compte = Compte.objects.create(
+            code="CPT-0001", nom="Compte A",
+            type_compte=self.type_compte, titulaire=self.titulaire,
+            etablissement=self.etablissement, devise=self.devise,
+            solde_initial=Decimal("1000.00"), solde_reel=Decimal("1000.00"),
+        )
+        self.autre_compte = Compte.objects.create(
+            code="CPT-0002", nom="Compte B",
+            type_compte=self.type_compte, titulaire=self.titulaire,
+            etablissement=self.etablissement, devise=self.devise,
+            solde_initial=Decimal("500.00"), solde_reel=Decimal("500.00"),
+        )
+        self.mois_courant = datetime.date.today().replace(day=1)
+
+    def _flux(self, compte, montant, categorie=None, est_transfert=False,
+              est_ajustement=False, libelle="", date_flux=None):
+        return Flux.objects.create(
+            compte=compte, categorie=categorie,
+            type_flux=self.type_flux, statut=self.statut, devise=self.devise,
+            montant=Decimal(str(montant)),
+            date_flux=date_flux or self.mois_courant,
+            est_transfert=est_transfert, est_ajustement=est_ajustement,
+            libelle=libelle,
+        )
+
+    def test_autre_compte_exclu(self):
+        """Les flux d'un autre compte n'entrent dans aucun agrégat."""
+        self._flux(self.compte, "-100.00", self.cat_mineure)
+        self._flux(self.autre_compte, "-999.00", self.cat_mineure)
+        data = calculer_compte_dashboard(self.compte.id)
+        self.assertEqual(data["metriques"]["depenses_mois"], Decimal("100.00"))
+        self.assertEqual(data["metriques"]["nb_flux"], 1)
+
+    def test_transferts_et_ajustements_exclus(self):
+        """Transferts et ajustements ignorés dans dépenses/revenus/ventilation."""
+        self._flux(self.compte, "-100.00", self.cat_mineure)
+        self._flux(self.compte, "-300.00", est_transfert=True)
+        self._flux(self.compte, "-50.00", self.cat_mineure, est_ajustement=True)
+        data = calculer_compte_dashboard(self.compte.id)
+        self.assertEqual(data["metriques"]["depenses_mois"], Decimal("100.00"))
+        # Une seule majeure, total 100 (l'ajustement n'y figure pas)
+        self.assertEqual(len(data["depenses_par_categorie"]), 1)
+        self.assertEqual(data["depenses_par_categorie"][0]["total"], Decimal("100.00"))
+
+    def test_revenus_et_epargne(self):
+        """Revenus positifs + épargne nette = revenus + dépenses signées."""
+        self._flux(self.compte, "2000.00", self.cat_mineure)
+        self._flux(self.compte, "-500.00", self.cat_mineure)
+        data = calculer_compte_dashboard(self.compte.id)
+        self.assertEqual(data["metriques"]["revenus_mois"], Decimal("2000.00"))
+        self.assertEqual(data["metriques"]["epargne_nette"], Decimal("1500.00"))
+
+    def test_ventilation_regroupee_sous_la_majeure(self):
+        """La mineure est regroupée sous sa catégorie majeure."""
+        self._flux(self.compte, "-80.00", self.cat_mineure)
+        data = calculer_compte_dashboard(self.compte.id)
+        majeure = data["depenses_par_categorie"][0]
+        self.assertEqual(majeure["nom"], "Alimentation")
+        self.assertEqual(majeure["total"], Decimal("80.00"))
+        self.assertEqual(len(majeure["sous_categories"]), 1)
+        self.assertEqual(majeure["sous_categories"][0]["nom"], "Courses")
+
+    def test_top_depenses_triees_et_limitees(self):
+        """Top dépenses : la plus négative d'abord, max 5."""
+        for m in ("-10", "-60", "-20", "-90", "-30", "-5"):
+            self._flux(self.compte, m, self.cat_mineure, libelle=f"D{m}")
+        data = calculer_compte_dashboard(self.compte.id)
+        top = data["top_depenses"]
+        self.assertEqual(len(top), 5)
+        self.assertEqual(top[0]["montant"], Decimal("-90.00"))
+        montants = [t["montant"] for t in top]
+        self.assertEqual(montants, sorted(montants))
+
+    def test_soldes_du_compte_exposes(self):
+        """Les soldes du compte sont lus tels quels, jamais recalculés ici."""
+        self._flux(self.compte, "-100.00", self.cat_mineure)
+        self.compte.refresh_from_db()
+        data = calculer_compte_dashboard(self.compte.id)
+        self.assertEqual(
+            data["compte"]["solde_theorique"], self.compte.solde_theorique
+        )
+        self.assertEqual(data["compte"]["nom"], "Compte A")
+
+    def test_compte_inexistant_leve_does_not_exist(self):
+        import uuid
+        with self.assertRaises(Compte.DoesNotExist):
+            calculer_compte_dashboard(uuid.uuid4())
+
+
+class CompteDashboardAPITest(TestCase):
+    """Teste l'endpoint HTTP du dashboard compte."""
+
+    def setUp(self):
+        self.type_compte = TypeCompte.objects.create(code="COURANT", libelle="Courant")
+        self.titulaire = Titulaire.objects.create(code="PIERRE", libelle="Pierre")
+        self.etablissement = Etablissement.objects.create(code="BNP", libelle="BNP")
+        self.devise = Devise.objects.create(
+            code="EUR", libelle="Euro", symbole="€", est_defaut=True
+        )
+        self.compte = Compte.objects.create(
+            code="CPT-0001", nom="Compte A",
+            type_compte=self.type_compte, titulaire=self.titulaire,
+            etablissement=self.etablissement, devise=self.devise,
+            solde_initial=Decimal("1000.00"), solde_reel=Decimal("1000.00"),
+        )
+
+    def test_endpoint_ok(self):
+        from django.urls import reverse
+        url = reverse("compte-dashboard", args=[self.compte.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        for bloc in ("compte", "metriques", "depenses_par_categorie", "top_depenses"):
+            self.assertIn(bloc, response.data)
+
+    def test_endpoint_404_si_compte_inconnu(self):
+        import uuid
+        from django.urls import reverse
+        url = reverse("compte-dashboard", args=[uuid.uuid4()])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)

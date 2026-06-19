@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useResourceList, useDeleteResource, useUpdateResource } from '../hooks/useResource'
 import { formatEuro } from '../utils/format'
 import Card from '../components/ui/Card'
@@ -8,7 +9,7 @@ import { DEFINITIONS } from '../constants/definitions'
 import { Loading, ErrorState, EmptyState } from '../components/ui/States'
 import IconBadge from '../components/ui/IconBadge'
 import Badge from '../components/ui/Badge'
-import { Landmark, Pencil, Trash2, Users } from 'lucide-react'
+import { Landmark, Pencil, Trash2, Users, BarChart3 } from 'lucide-react'
 import CompteFormModal from '../components/comptes/CompteFormModal'
 
 export default function ComptesPage() {
@@ -138,6 +139,13 @@ function CompteCard({ compte, onEdit }) {
           </div>
         </div>
         <div className="flex gap-1 shrink-0">
+          <Link
+            to={`/comptes/${compte.id}`}
+            title="Voir les transactions"
+            className="p-1.5 rounded-md text-content-2 hover:text-content hover:bg-surface-3 cursor-pointer"
+          >
+            <BarChart3 size={14} />
+          </Link>
           <button
             onClick={onEdit}
             title="Modifier"
