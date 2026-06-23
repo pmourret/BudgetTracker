@@ -25,13 +25,14 @@ function invalidateWithDependencies(queryClient, resource) {
   })
 }
 
-export function useResourceList(resource, params = {}) {
+export function useResourceList(resource, params = {}, options = {}) {
   return useQuery({
     queryKey: [resource, 'list', params],
     queryFn: async () => {
       const { data } = await apiClient.get(`/${resource}/`, { params })
       return data
     },
+    ...options,
   })
 }
 

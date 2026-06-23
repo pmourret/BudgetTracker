@@ -62,7 +62,8 @@ L'application tourne entièrement dans Docker Compose (backend Django, frontend 
 
 - Métriques clés du mois (revenus, dépenses, solde, épargne)
 - Courbe de solde sur 3 / 6 / 12 mois
-- Doughnut « Dépenses par catégorie » avec légende expandable (majeures/mineures)
+- Doughnut « Dépenses par catégorie » avec légende expandable (majeures/mineures) et drill-down (clic → détail des flux de la catégorie)
+- Calendrier des dépenses (heatmap) : grille calendaire compacte du mois, intensité colorée par jour (échelle plafonnée au 90e centile pour rester lisible malgré un gros flux ponctuel), jours à venir atténués, drill-down au clic sur un jour → détail des dépenses du jour
 - Progression des budgets du mois
 - Derniers flux et alertes actives
 - Bloc patrimoine estimatif séparé (jamais mélangé aux soldes)
@@ -373,7 +374,7 @@ BudgetTracker/
 │   │   ├── components/
 │   │   │   ├── ui/            # Button, Card, Input, Select, Modal, Badge…
 │   │   │   ├── layout/        # Layout, Sidebar, BottomNav, ThemeToggle
-│   │   │   ├── charts/        # LineChart, BarChart, DoughnutChart
+│   │   │   ├── charts/        # LineChart, BarChart, DoughnutChart, DepensesCategories, HeatmapDepenses
 │   │   │   ├── comptes/       # CompteFormModal, SelectWithCreate
 │   │   │   └── categories/    # CategorieFormModal
 │   │   ├── hooks/
