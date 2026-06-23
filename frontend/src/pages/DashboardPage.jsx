@@ -10,6 +10,7 @@ import PeriodSelector from '../components/ui/PeriodSelector'
 import { Loading, ErrorState } from '../components/ui/States'
 import LineChart from '../components/charts/LineChart'
 import DepensesCategories from '../components/charts/DepensesCategories'
+import HeatmapDepenses from '../components/charts/HeatmapDepenses'
 import { chartColors } from '../components/charts/chartSetup'
 
 function useDashboard(nbMois) {
@@ -100,7 +101,18 @@ export default function DashboardPage() {
           </span>
         }
       >
-        <DepensesCategories data={data.depenses_par_categorie} />
+        <DepensesCategories data={data.depenses_par_categorie} mois={data.mois_courant} />
+      </Card>
+
+      <Card
+        title={
+          <span className="inline-flex items-center gap-1">
+            Calendrier des dépenses
+            <Tooltip {...DEFINITIONS.heatmap_depenses} align="left" />
+          </span>
+        }
+      >
+        <HeatmapDepenses data={data.depenses_par_jour} mois={data.mois_courant} />
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">

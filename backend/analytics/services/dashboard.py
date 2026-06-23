@@ -114,6 +114,7 @@ def calculer_dashboard(nb_mois: int = 6) -> dict:
         },
         "evolution_solde": evolution,
         "depenses_par_categorie": _calculer_depenses_par_categorie(mois_courant, compte_id=None),
+        "depenses_par_jour": _calculer_depenses_par_jour(mois_courant),
         "budgets": budgets_data,
         "derniers_flux": flux_data,
         "alertes": alertes_data,
@@ -186,6 +187,36 @@ def _calculer_depenses_par_categorie(mois: datetime.date, compte_id=None) -> lis
             item["sous_categories"], key=lambda x: x["total"], reverse=True
         )
     return result
+
+
+def _calculer_depenses_par_jour(mois: datetime.date) -> list:
+    """
+    Dépenses du mois ventilées par jour (heatmap calendaire).
+    Transferts et ajustements exclus. Fiabilité : réelle.
+
+    Renvoie une liste `[{"date": "YYYY-MM-DD", "total": Decimal}, ...]`
+    triée par date, avec une entrée uniquement pour les jours effectivement
+    dépensés (les jours vides sont reconstitués côté front via la grille
+    calendaire). Les montants sont rendus en valeur absolue.
+    """
+    from flux.models import Flux
+
+    par_jour = (
+        Flux.objects.filter(
+            mois=mois,
+            montant__lt=0,
+            est_transfert=False,
+            est_ajustement=False,
+        )
+        .values("date_flux")
+        .annotate(total=Sum("montant"))
+    )
+    jours = [
+        {"date": row["date_flux"].isoformat(), "total": abs(row["total"])}
+        for row in par_jour
+    ]
+    jours.sort(key=lambda x: x["date"])
+    return jours
 
 
 def _calculer_evolution_solde(nb_mois: int) -> list:

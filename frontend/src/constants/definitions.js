@@ -69,8 +69,14 @@ export const DEFINITIONS = {
   depenses_par_categorie: {
     titre: 'Dépenses par catégorie',
     texte:
-      "Répartition de vos dépenses du mois par catégorie majeure. Les sous-catégories sont regroupées sous leur parent. Transferts et ajustements exclus.",
+      "Répartition de vos dépenses du mois par catégorie majeure. Les sous-catégories sont regroupées sous leur parent. Transferts et ajustements exclus. Cliquez une (sous-)catégorie pour voir le détail des flux.",
     formule: 'Σ des dépenses du mois, groupées par catégorie majeure.',
+  },
+  heatmap_depenses: {
+    titre: 'Calendrier des dépenses',
+    texte:
+      "Intensité des dépenses jour par jour sur le mois en cours : plus une case est foncée, plus vous avez dépensé ce jour-là. Transferts et ajustements exclus. Fiabilité : réelle.",
+    formule: 'Σ des dépenses (flux négatifs) de chaque jour du mois.',
   },
 
   // ---- Dashboard par compte ----

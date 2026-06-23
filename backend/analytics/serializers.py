@@ -16,6 +16,7 @@ class DashboardSerializer(serializers.Serializer):
     metriques = DashboardMetriquesSerializer()
     evolution_solde = serializers.ListField()
     depenses_par_categorie = serializers.ListField()
+    depenses_par_jour = serializers.ListField()
     budgets = serializers.ListField()
     derniers_flux = serializers.ListField()
     alertes = serializers.ListField()

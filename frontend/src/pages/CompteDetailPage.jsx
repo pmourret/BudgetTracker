@@ -122,7 +122,11 @@ export default function CompteDetailPage() {
                   }]}
                   height={220}
                 />
-                <DepensesCategories data={data.depenses_par_categorie} />
+                <DepensesCategories
+                  data={data.depenses_par_categorie}
+                  mois={data.mois_courant}
+                  compteId={id}
+                />
               </div>
             )}
           </Card>

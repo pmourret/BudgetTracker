@@ -141,6 +141,30 @@ class DashboardServiceTest(TestCase):
         data = calculer_dashboard()
         self.assertEqual(data["metriques"]["fiabilite"], "reel")
 
+    def test_depenses_par_jour_agregees(self):
+        """Les dépenses sont ventilées par jour, en valeur absolue, triées."""
+        j5 = self.mois_courant.replace(day=5)
+        j12 = self.mois_courant.replace(day=12)
+        self._make_flux("-30.00", date_flux=j12)
+        self._make_flux("-20.00", date_flux=j5)
+        self._make_flux("-10.00", date_flux=j5)
+        data = calculer_dashboard()
+        jours = data["depenses_par_jour"]
+        self.assertEqual(jours, [
+            {"date": j5.isoformat(), "total": Decimal("30.00")},
+            {"date": j12.isoformat(), "total": Decimal("30.00")},
+        ])
+
+    def test_depenses_par_jour_exclut_transferts(self):
+        """Transferts et revenus ne comptent pas dans la heatmap des dépenses."""
+        self._make_flux("-40.00")
+        self._make_flux("-200.00", est_transfert=True)
+        self._make_flux("2800.00")
+        data = calculer_dashboard()
+        jours = data["depenses_par_jour"]
+        self.assertEqual(len(jours), 1)
+        self.assertEqual(jours[0]["total"], Decimal("40.00"))
+
 
 class DashboardAPITest(TestCase):
     """Teste l'endpoint HTTP du dashboard."""
