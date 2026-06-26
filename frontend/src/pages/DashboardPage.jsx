@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import apiClient from '../api/client'
 import { formatEuro, formatDate, formatMonth, formatPercent } from '../utils/format'
 import Card from '../components/ui/Card'
@@ -13,16 +14,24 @@ import DepensesCategories from '../components/charts/DepensesCategories'
 import HeatmapDepenses from '../components/charts/HeatmapDepenses'
 import { chartColors } from '../components/charts/chartSetup'
 
-function useDashboard(nbMois) {
+function useDashboard(nbMois, mois) {
   return useQuery({
-    queryKey: ['analytics', 'dashboard', nbMois],
+    queryKey: ['analytics', 'dashboard', nbMois, mois],
     queryFn: async () => {
-      const { data } = await apiClient.get('/analytics/dashboard/', {
-        params: { nb_mois: nbMois },
-      })
+      const params = { nb_mois: nbMois }
+      if (mois) params.mois = mois
+      const { data } = await apiClient.get('/analytics/dashboard/', { params })
       return data
     },
+    placeholderData: keepPreviousData,
   })
+}
+
+/** Décale un libellé de mois (1er du mois, YYYY-MM-DD) de `delta` mois. */
+function shiftMonth(label, delta) {
+  const d = new Date(`${label}T00:00:00`)
+  d.setMonth(d.getMonth() + delta)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
 }
 
 const NIVEAU_VARIANT = {
@@ -33,12 +42,16 @@ const NIVEAU_VARIANT = {
 
 export default function DashboardPage() {
   const [nbMois, setNbMois] = useState(6)
-  const { data, isLoading, isError, refetch } = useDashboard(nbMois)
+  const [mois, setMois] = useState(null) // null = mois courant
+  const { data, isLoading, isError, refetch } = useDashboard(nbMois, mois)
 
   if (isLoading) return <Loading message="Chargement du tableau de bord..." />
   if (isError) {
     return <ErrorState message="Impossible de charger le tableau de bord." onRetry={refetch} />
   }
+
+  const peutReculer = data.mois_courant > data.mois_min
+  const peutAvancer = data.mois_courant < data.mois_max
 
   const m = data.metriques
   const evolutionLabels = data.evolution_solde.map((p) => {
@@ -51,9 +64,29 @@ export default function DashboardPage() {
     <div className="flex flex-col gap-4">
       <div>
         <h1 className="text-lg font-medium text-content">Tableau de bord</h1>
-        <p className="text-sm text-content-2 mt-0.5 capitalize">
-          {formatMonth(data.mois_courant)}
-        </p>
+        <div className="flex items-center gap-1 mt-0.5">
+          <button
+            type="button"
+            onClick={() => setMois(shiftMonth(data.mois_courant, -1))}
+            disabled={!peutReculer}
+            aria-label="Mois précédent"
+            className="p-0.5 rounded text-content-2 hover:bg-surface-3 disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <p className="text-sm text-content-2 capitalize min-w-[8rem] text-center">
+            {formatMonth(data.mois_courant)}
+          </p>
+          <button
+            type="button"
+            onClick={() => setMois(shiftMonth(data.mois_courant, 1))}
+            disabled={!peutAvancer}
+            aria-label="Mois suivant"
+            className="p-0.5 rounded text-content-2 hover:bg-surface-3 disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+          >
+            <ChevronRight size={18} />
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">

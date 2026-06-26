@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { CreditCard, Repeat, TrendingUp, RefreshCw, Landmark, Tag, ChevronRight } from 'lucide-react'
+import { CreditCard, Repeat, TrendingUp, RefreshCw, Landmark, Tag, Settings, ChevronRight } from 'lucide-react'
 import Card from '../components/ui/Card'
 import IconBadge from '../components/ui/IconBadge'
 import ThemeToggle from '../components/layout/ThemeToggle'
@@ -11,6 +11,7 @@ const liens = [
   { to: '/abonnements', label: 'Abonnements', desc: 'Récurrences et échéances', Icon: RefreshCw },
   { to: '/patrimoine',  label: 'Patrimoine',  desc: 'Actifs et valorisation',   Icon: Landmark },
   { to: '/categories',  label: 'Catégories',  desc: 'Majeures et sous-catégories', Icon: Tag },
+  { to: '/parametres',  label: 'Paramètres',  desc: 'Mois comptable et réglages du foyer', Icon: Settings },
 ]
 
 export default function PlusPage() {

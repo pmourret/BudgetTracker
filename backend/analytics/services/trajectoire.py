@@ -21,6 +21,7 @@ from django.db.models import Sum
 from .projection import (
     ZERO,
     _aujourd_hui_ou,
+    _debut_de_mois,
     _fin_de_mois,
     _mois_de,
     abonnements_a_echoir,
@@ -105,7 +106,9 @@ def _point_mois_futur(aujourd_hui, mois, compteur, abonnements, enveloppes):
     from flux.models import Flux
 
     fin_mois = _fin_de_mois(mois)
-    debut_fenetre = max(aujourd_hui, mois - datetime.timedelta(days=1))
+    # Début de la fenêtre d'échéances : ouverture de la période comptable
+    # (≠ 1er calendaire si jour de bascule > 1), bornée à aujourd'hui.
+    debut_fenetre = max(aujourd_hui, _debut_de_mois(mois) - datetime.timedelta(days=1))
 
     flux_mois = Flux.objects.filter(
         mois=mois,

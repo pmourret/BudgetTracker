@@ -195,4 +195,13 @@ export const DEFINITIONS = {
       "Ce qu'il vous reste à dépenser sur vos budgets du mois, une fois retirés le déjà-consommé et les abonnements restants à couvrir.",
     formule: 'Budgets du mois − déjà consommé − abonnements restants.',
   },
+
+  // ---- Paramètres du foyer ----
+  mois_comptable: {
+    titre: 'Mois comptable',
+    texte:
+      "Jour où débute votre mois budgétaire. Réglé sur 1, c'est le mois calendaire. Réglé par exemple sur 25 (jour de votre salaire), une période va du 25 au 24 du mois suivant et compte comme ce mois suivant : votre salaire et les dépenses qu'il finance restent regroupés.",
+    formule:
+      "Un mouvement daté au jour ≥ jour de bascule est rattaché au mois suivant ; sinon au mois courant. Borné à 28 (valide tous les mois).",
+  },
 }

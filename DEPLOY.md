@@ -42,7 +42,7 @@ docker compose -f docker-compose.prod.yml logs -f backend
 1. `migrate --noinput` — applique les migrations.
 2. `collectstatic --noinput` — collecte les statiques Django dans le volume
    partagé `/app/staticfiles` (servi par nginx sous `/static/`).
-3. `seed_referentiels` — crée les 9 référentiels structurels (idempotent).
+3. `seed_referentiels` — crée les 9 référentiels structurels + le singleton `ParametresBudget` (mois comptable, défaut 1 = calendaire), idempotent.
 4. `gunicorn config.wsgi:application` — sert l'API (jamais `runserver`).
 
 Le frontend est servi en **build statique par Nginx** (jamais le dev server

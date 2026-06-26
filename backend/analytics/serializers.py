@@ -13,6 +13,8 @@ class DashboardMetriquesSerializer(serializers.Serializer):
 class DashboardSerializer(serializers.Serializer):
     """Serializer de sortie pour l'agrégat dashboard."""
     mois_courant = serializers.CharField()
+    mois_min = serializers.CharField()
+    mois_max = serializers.CharField()
     metriques = DashboardMetriquesSerializer()
     evolution_solde = serializers.ListField()
     depenses_par_categorie = serializers.ListField()

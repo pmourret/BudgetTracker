@@ -57,6 +57,7 @@ L'application tourne entièrement dans Docker Compose (backend Django, frontend 
 | **Catégories** | Hiérarchie 2 niveaux (majeure / mineure), soft delete protégé si flux liés |
 | **Patrimoine** | Actifs estimatifs avec historique de valorisation, rappels de réévaluation |
 | **Alertes** | Budget dépassé, solde bas, retard abonnement, écart de solde, valorisation à faire |
+| **Mois comptable** | Découpage budgétaire paramétrable : mois calendaire (défaut) ou calé sur le jour de la paie (ex. du 25 au 24). Affecte tous les agrégats mensuels (dashboard, budgets, prévisionnel) ; modifiable depuis la page Paramètres |
 
 ### Dashboard
 
@@ -264,7 +265,8 @@ VITE_API_BASE_URL=http://localhost:8000/api/v1
 | Alertes | `/alertes` | Filtres par type, acquittement individuel et global |
 | Patrimoine | `/patrimoine` | Actifs estimatifs, historique de valorisation |
 | Catégories | `/categories` | Accordéon majeures/mineures, CRUD complet |
-| Plus (mobile) | `/plus` | Menu mobile + toggle thème |
+| Paramètres | `/parametres` | Réglages du foyer : jour de début du mois comptable (mois calendaire vs calé sur la paie) |
+| Plus (mobile) | `/plus` | Menu mobile + accès Paramètres + toggle thème |
 
 ---
 
@@ -313,12 +315,15 @@ GET|PUT|PATCH|DELETE  /categories/{id}/
 ```
 GET             /referentiels/types-compte/
 GET             /referentiels/types-flux/
-GET             /referentiels/periodicites/
+GET             /referentiels/frequences/
 GET|POST        /referentiels/titulaires/
 GET|PUT|PATCH   /referentiels/titulaires/{id}/
 GET|POST        /referentiels/etablissements/
 GET|PUT|PATCH   /referentiels/etablissements/{id}/
+GET|PATCH       /referentiels/parametres-budget/   # singleton : mois comptable du foyer
 ```
+
+> Le PATCH de `parametres-budget` (changement du jour de début du mois comptable) remappe automatiquement le `mois` de tout l'historique des flux et recalcule soldes et budgets (service `flux/services/recalcul_mois.py`, aussi exposé en commande `manage.py recalculer_mois`).
 
 ### Analytics
 
@@ -349,8 +354,8 @@ BudgetTracker/
 │   │   │   ├── dev.py         # Développement (auth désactivée)
 │   │   │   └── prod.py        # Production
 │   │   └── urls.py            # Router centralisé
-│   ├── core/                  # BaseModel abstrait
-│   ├── referentiels/          # Tables administrables
+│   ├── core/                  # BaseModel abstrait + services/periode.py (mois comptable)
+│   ├── referentiels/          # Tables administrables + ParametresBudget (singleton)
 │   ├── comptes/               # Comptes bancaires
 │   ├── categories/            # Hiérarchie catégories
 │   ├── flux/                  # Journal des mouvements
@@ -380,6 +385,7 @@ BudgetTracker/
 │   │   ├── hooks/
 │   │   │   ├── useResource.js      # CRUD + invalidations croisées
 │   │   │   ├── useReferentiels.js  # Référentiels (lecture + création)
+│   │   │   ├── useParametres.js    # Paramètres du foyer (mois comptable)
 │   │   │   └── useMediaQuery.js    # Responsive (breakpoint 640px)
 │   │   ├── pages/             # Une page par route
 │   │   ├── stores/
@@ -525,7 +531,7 @@ make deploy-front  # rebuild + redéploiement du frontend uniquement
 | **Soft delete** | Aucune suppression physique de donnée financière historique. |
 | **Patrimoine isolé** | Les données de valorisation n'affectent jamais les soldes bancaires. |
 | **Référentiels** | Pas de valeur codée en dur : seuils, types, périodicités → tables administrables. |
-| **Mois calculé** | Toujours dérivé de `date_flux` (1er du mois), jamais saisi manuellement. |
+| **Mois comptable** | Dérivé de `date_flux`, jamais saisi manuellement. Découpage paramétrable via `jour_debut_mois_comptable` (1 = mois calendaire ; ex. 25 = mois budgétaire calé sur la paie). Point unique de vérité : `core/services/periode.py`. |
 
 ---
 
@@ -537,6 +543,7 @@ make deploy-front  # rebuild + redéploiement du frontend uniquement
 - **Phase 9** — Frontend complet (8 pages, CRUD, dark mode, composants UI)
 - **Phase 11a** — CRUD Comptes, Flux, Budgets, Patrimoine
 - **Phase 11b-1** — Catégories hiérarchiques (UI + API)
+- **Mois comptable paramétrable** — découpage budgétaire calé sur la paie (page Paramètres + remap automatique de l'historique)
 
 ### En cours 🟡
 

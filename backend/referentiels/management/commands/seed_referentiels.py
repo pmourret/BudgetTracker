@@ -2,6 +2,7 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from referentiels.models import (
+    ParametresBudget,
     TypeCompte, TypeFlux, Titulaire, ModePaiement,
     Frequence, Etablissement, Devise, Fiscalite, StatutFlux
 )
@@ -19,6 +20,9 @@ class Command(BaseCommand):
     @transaction.atomic
     def handle(self, *args, **options):
         self.stdout.write("Création des référentiels structurels...")
+
+        # --- Paramètres globaux du foyer (singleton, mois comptable au 1er) ---
+        ParametresBudget.get_solo()
 
         # --- Devise (défaut) ---
         Devise.objects.get_or_create(

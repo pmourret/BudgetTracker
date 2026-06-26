@@ -1,8 +1,14 @@
 from django.contrib import admin
 from .models import (
+    ParametresBudget,
     TypeCompte, TypeFlux, Titulaire, ModePaiement,
     Frequence, Etablissement, Devise, Fiscalite, StatutFlux,
 )
+
+
+@admin.register(ParametresBudget)
+class ParametresBudgetAdmin(admin.ModelAdmin):
+    list_display = ["__str__", "jour_debut_mois_comptable"]
 
 
 class ReferentielAdmin(admin.ModelAdmin):

@@ -11,6 +11,7 @@ import PatrimoinePage from './pages/PatrimoinePage'
 import DashboardPage from './pages/DashboardPage'
 import PrevisionnelPage from './pages/PrevisionnelPage'
 import CategoriesPage from './pages/CategoriesPage'
+import ParametresPage from './pages/ParametresPage'
 import PlusPage from './pages/PlusPage'
 
 export default function App() {
@@ -29,6 +30,7 @@ export default function App() {
         <Route path="alertes" element={<AlertesPage />} />
         <Route path="patrimoine" element={<PatrimoinePage />} />
         <Route path="categories" element={<CategoriesPage />} />
+        <Route path="parametres" element={<ParametresPage />} />
         <Route path="plus" element={<PlusPage />} />
       </Route>
     </Routes>

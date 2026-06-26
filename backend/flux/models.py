@@ -116,8 +116,14 @@ class Flux(BaseModel):
         return f"{self.date_flux} | {signe}{self.montant} € | {self.libelle or 'Sans libellé'}"
 
     def _calculer_mois(self):
-        """Retourne le premier jour du mois de date_flux."""
-        return self.date_flux.replace(day=1)
+        """
+        Retourne le libellé (1er du mois) du mois COMPTABLE de date_flux,
+        selon le jour de bascule paramétré (référentiel ParametresBudget).
+        Par défaut (jour=1) : mois calendaire, comportement historique.
+        """
+        from core.services.periode import jour_bascule_actif, mois_comptable
+
+        return mois_comptable(self.date_flux, jour_bascule_actif())
 
     def save(self, *args, **kwargs):
         """

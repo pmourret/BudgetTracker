@@ -27,6 +27,7 @@ from abonnements.views import AbonnementViewSet
 from alertes.views import AlerteViewSet
 from patrimoine.views import ActifViewSet
 from referentiels.views import (
+    ParametresBudgetView,
     TypeCompteViewSet, TypeFluxViewSet, TitulaireViewSet,
     ModePaiementViewSet, FrequenceViewSet, EtablissementViewSet,
     DeviseViewSet, FiscaliteViewSet, StatutFluxViewSet
@@ -63,5 +64,6 @@ urlpatterns = [
     path("api/v1/analytics/dashboard/", DashboardView.as_view(), name="dashboard"),
     path("api/v1/analytics/compte/<uuid:compte_id>/", CompteDashboardView.as_view(), name="compte-dashboard"),
     path("api/v1/analytics/previsionnel/", PrevisionnelView.as_view(), name="previsionnel"),
+    path("api/v1/referentiels/parametres-budget/", ParametresBudgetView.as_view(), name="parametres-budget"),
     path("api/v1/", include(router.urls)),
 ]

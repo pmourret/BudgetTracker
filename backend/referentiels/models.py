@@ -1,5 +1,41 @@
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from core.models import BaseModel
+
+
+class ParametresBudget(BaseModel):
+    """
+    Paramètres globaux du foyer (singleton). Référentiel administrable :
+    aucune valeur codée en dur (règle métier 1).
+
+    `jour_debut_mois_comptable` définit le découpage en mois comptables
+    (voir core/services/periode.py) — 1 = mois calendaire.
+    """
+
+    jour_debut_mois_comptable = models.PositiveSmallIntegerField(
+        default=1,
+        validators=[MinValueValidator(1), MaxValueValidator(28)],
+        help_text=(
+            "Jour du mois où débute le mois comptable (1 = mois calendaire). "
+            "Borné à 28 pour rester valide tous les mois. Ex. 25 : la période "
+            "du 25 au 24 du mois suivant est le mois comptable du suivant."
+        ),
+    )
+
+    class Meta:
+        verbose_name = "Paramètres budget"
+        verbose_name_plural = "Paramètres budget"
+
+    def __str__(self):
+        return f"Paramètres (mois comptable au {self.jour_debut_mois_comptable})"
+
+    @classmethod
+    def get_solo(cls):
+        """Renvoie l'unique instance, la crée avec les défauts si absente."""
+        obj = cls.objects.first()
+        if obj is None:
+            obj = cls.objects.create()
+        return obj
 
 
 class ReferentielBase(BaseModel):

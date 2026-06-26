@@ -515,3 +515,61 @@ class FluxProtectionAPITest(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertTrue(Flux.objects.filter(id=self.flux_ajustement.id).exists())
+
+
+class MoisComptableFluxTest(TestCase):
+    """Le mois comptable des flux suit le paramètre jour_debut_mois_comptable."""
+
+    def setUp(self):
+        from referentiels.models import ParametresBudget
+
+        self.type_compte = TypeCompte.objects.create(code="COURANT", libelle="Compte courant")
+        self.titulaire = Titulaire.objects.create(code="PIERRE", libelle="Pierre")
+        self.etablissement = Etablissement.objects.create(code="BOURSOBANK", libelle="BoursoBank")
+        self.devise = Devise.objects.create(code="EUR", libelle="Euro", symbole="€", est_defaut=True)
+        self.type_flux = TypeFlux.objects.create(code="DEBIT", libelle="Débit")
+        self.statut = StatutFlux.objects.create(code="VALIDE", libelle="Validé", est_definitif=True)
+        self.categorie = Categorie.objects.create(code="ALIMENTATION", nom="Alimentation")
+        self.compte = Compte.objects.create(
+            code="CPT-0001", nom="Compte principal",
+            type_compte=self.type_compte, titulaire=self.titulaire,
+            etablissement=self.etablissement, devise=self.devise,
+            solde_initial=Decimal("0.00"), solde_reel=Decimal("0.00"),
+        )
+        self.params = ParametresBudget.get_solo()
+
+    def _make_flux(self, date_flux):
+        return Flux.objects.create(
+            compte=self.compte, type_flux=self.type_flux, statut=self.statut,
+            devise=self.devise, categorie=self.categorie,
+            montant=Decimal("-50.00"), date_flux=date_flux,
+        )
+
+    def test_defaut_jour_1_reste_calendaire(self):
+        self.assertEqual(self.params.jour_debut_mois_comptable, 1)
+        flux = self._make_flux(datetime.date(2026, 6, 27))
+        self.assertEqual(flux.mois, datetime.date(2026, 6, 1))
+
+    def test_jour_25_bascule_fin_de_mois(self):
+        self.params.jour_debut_mois_comptable = 25
+        self.params.save()
+        flux_tot = self._make_flux(datetime.date(2026, 6, 27))   # salaire/dépense fin juin
+        flux_debut = self._make_flux(datetime.date(2026, 7, 10))  # début juillet
+        flux_avant = self._make_flux(datetime.date(2026, 6, 20))  # avant bascule
+        self.assertEqual(flux_tot.mois, datetime.date(2026, 7, 1))
+        self.assertEqual(flux_debut.mois, datetime.date(2026, 7, 1))
+        self.assertEqual(flux_avant.mois, datetime.date(2026, 6, 1))
+
+    def test_recalculer_mois_remappe_les_flux_existants(self):
+        from django.core.management import call_command
+
+        # Flux créés AVANT changement de paramètre → mois calendaire.
+        flux = self._make_flux(datetime.date(2026, 6, 27))
+        self.assertEqual(flux.mois, datetime.date(2026, 6, 1))
+
+        self.params.jour_debut_mois_comptable = 25
+        self.params.save()
+        call_command("recalculer_mois")
+
+        flux.refresh_from_db()
+        self.assertEqual(flux.mois, datetime.date(2026, 7, 1))

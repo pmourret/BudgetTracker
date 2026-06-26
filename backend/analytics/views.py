@@ -23,13 +23,25 @@ class DashboardView(APIView):
     """
 
     def get(self, request):
+        import datetime
+
         try:
             nb_mois = int(request.query_params.get("nb_mois", 6))
         except (TypeError, ValueError):
             nb_mois = 6
         nb_mois = max(1, min(nb_mois, 24))  # borné 1-24 mois
 
-        data = calculer_dashboard(nb_mois=nb_mois)
+        # Mois comptable affiché (libellé YYYY-MM-DD) ; None → mois courant.
+        # Le service borne la valeur à [premier mois avec flux, mois courant].
+        mois = None
+        mois_param = request.query_params.get("mois")
+        if mois_param:
+            try:
+                mois = datetime.date.fromisoformat(mois_param).replace(day=1)
+            except (TypeError, ValueError):
+                mois = None
+
+        data = calculer_dashboard(nb_mois=nb_mois, mois=mois)
         serializer = DashboardSerializer(data)
         return Response(serializer.data, status=status.HTTP_200_OK)
 

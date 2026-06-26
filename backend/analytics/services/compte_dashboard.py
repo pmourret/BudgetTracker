@@ -7,7 +7,9 @@ from .dashboard import _calculer_depenses_par_categorie
 
 
 def _mois_courant(aujourd_hui: datetime.date) -> datetime.date:
-    return aujourd_hui.replace(day=1)
+    from core.services.periode import jour_bascule_actif, mois_comptable
+
+    return mois_comptable(aujourd_hui, jour_bascule_actif())
 
 
 def calculer_compte_dashboard(compte_id, aujourd_hui: datetime.date = None) -> dict:

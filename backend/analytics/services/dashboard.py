@@ -5,12 +5,19 @@ from django.db.models import Sum, Q
 
 
 def _mois_courant():
-    return datetime.date.today().replace(day=1)
+    from core.services.periode import mois_comptable_courant
+
+    return mois_comptable_courant()
 
 
-def calculer_dashboard(nb_mois: int = 6) -> dict:
+def calculer_dashboard(nb_mois: int = 6, mois: datetime.date = None) -> dict:
     """
-    Agrège tous les indicateurs du dashboard.
+    Agrège tous les indicateurs du dashboard pour un mois comptable donné.
+
+    `mois` (libellé = 1er du mois comptable) permet de naviguer dans
+    l'historique ; par défaut le mois comptable courant. Il est borné entre
+    le premier mois ayant des flux (`mois_min`) et le mois courant
+    (`mois_max`) : le dashboard reste un agrégat RÉEL, pas une projection.
 
     Tous les indicateurs sont de fiabilité RÉELLE (basés sur les flux saisis).
     Les transferts sont exclus des dépenses/revenus (règle métier 4).
@@ -22,14 +29,17 @@ def calculer_dashboard(nb_mois: int = 6) -> dict:
     from budgets.models import Budget
     from alertes.models import Alerte
 
-    mois_courant = _mois_courant()
-
-    # --- Solde total (réel) ---
-    solde_total = (
-        Compte.objects.filter(actif=True)
-        .aggregate(total=Sum("solde_theorique"))["total"]
-        or Decimal("0.00")
+    mois_max = _mois_courant()
+    mois_min = (
+        Flux.objects.order_by("mois").values_list("mois", flat=True).first()
+        or mois_max
     )
+    # Mois ciblé, borné à [mois_min, mois_max] (pas de navigation dans le futur)
+    mois_courant = mois or mois_max
+    mois_courant = max(mois_min, min(mois_courant, mois_max))
+
+    # --- Solde total (réel) à la fin du mois sélectionné ---
+    solde_total = _solde_fin_de_mois(mois_courant)
 
     # --- Dépenses / revenus du mois (hors transferts et ajustements) ---
     flux_mois = Flux.objects.filter(
@@ -50,8 +60,8 @@ def calculer_dashboard(nb_mois: int = 6) -> dict:
         if revenus > 0 else Decimal("0.0")
     )
 
-    # --- Évolution du solde (N derniers mois) ---
-    evolution = _calculer_evolution_solde(nb_mois)
+    # --- Évolution du solde (N derniers mois, se terminant au mois affiché) ---
+    evolution = _calculer_evolution_solde(nb_mois, mois_fin=mois_courant)
 
     # --- Budgets du mois ---
     budgets = list(
@@ -70,9 +80,9 @@ def calculer_dashboard(nb_mois: int = 6) -> dict:
         for b in budgets
     ]
 
-    # --- Derniers flux (5 plus récents, hors transferts) ---
+    # --- Derniers flux du mois affiché (5 plus récents, hors transferts) ---
     derniers_flux = list(
-        Flux.objects.filter(est_transfert=False)
+        Flux.objects.filter(mois=mois_courant, est_transfert=False)
         .select_related("compte", "categorie")
         .order_by("-date_flux", "-created_at")[:5]
     )
@@ -104,6 +114,8 @@ def calculer_dashboard(nb_mois: int = 6) -> dict:
 
     return {
         "mois_courant": mois_courant.isoformat(),
+        "mois_min": mois_min.isoformat(),
+        "mois_max": mois_max.isoformat(),
         "metriques": {
             "solde_total": solde_total,
             "depenses_mois": abs(depenses),
@@ -219,41 +231,53 @@ def _calculer_depenses_par_jour(mois: datetime.date) -> list:
     return jours
 
 
-def _calculer_evolution_solde(nb_mois: int) -> list:
+def _solde_fin_de_mois(mois: datetime.date) -> Decimal:
     """
-    Solde théorique cumulé à la fin de chaque mois sur nb_mois.
+    Solde théorique cumulé de tous les comptes actifs à la fin du mois
+    comptable `mois` : solde_initial total + Σ flux jusqu'au dernier jour
+    de la période. Fiabilité : réelle.
 
-    Pour chaque mois : solde_initial de tous les comptes
-    + somme de tous les flux jusqu'à la fin de ce mois.
-
-    Fiabilité : réelle.
+    Avec le mois courant et aucun flux daté au-delà de la période, ce solde
+    égale `Σ solde_theorique` (cohérence avec l'état affiché des comptes).
     """
     from comptes.models import Compte
     from flux.models import Flux
+    from core.services.periode import bornes_mois_comptable, jour_bascule_actif
 
-    aujourd_hui = datetime.date.today()
-    premier_mois = aujourd_hui.replace(day=1) - relativedelta(months=nb_mois - 1)
-
+    fin_mois = bornes_mois_comptable(mois, jour_bascule_actif())[1]
     solde_initial_total = (
         Compte.objects.filter(actif=True)
         .aggregate(t=Sum("solde_initial"))["t"]
         or Decimal("0.00")
     )
+    flux_cumul = (
+        Flux.objects.filter(
+            compte__actif=True,
+            date_flux__lte=fin_mois,
+        ).aggregate(t=Sum("montant"))["t"]
+        or Decimal("0.00")
+    )
+    return solde_initial_total + flux_cumul
+
+
+def _calculer_evolution_solde(nb_mois: int, mois_fin: datetime.date = None) -> list:
+    """
+    Solde théorique cumulé à la fin de chaque mois sur nb_mois, se terminant
+    au mois `mois_fin` (par défaut le mois comptable courant).
+
+    Fiabilité : réelle.
+    """
+    from core.services.periode import mois_comptable_courant
+
+    mois_fin = mois_fin or mois_comptable_courant()
+    premier_mois = mois_fin - relativedelta(months=nb_mois - 1)
 
     serie = []
     curseur = premier_mois
-    while curseur <= aujourd_hui.replace(day=1):
-        fin_mois = curseur + relativedelta(months=1) - datetime.timedelta(days=1)
-        flux_cumul = (
-            Flux.objects.filter(
-                compte__actif=True,
-                date_flux__lte=fin_mois,
-            ).aggregate(t=Sum("montant"))["t"]
-            or Decimal("0.00")
-        )
+    while curseur <= mois_fin:
         serie.append({
             "mois": curseur.isoformat(),
-            "solde": solde_initial_total + flux_cumul,
+            "solde": _solde_fin_de_mois(curseur),
         })
         curseur = curseur + relativedelta(months=1)
 

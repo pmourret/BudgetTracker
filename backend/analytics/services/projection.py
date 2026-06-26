@@ -29,11 +29,24 @@ def _aujourd_hui_ou(aujourd_hui):
 
 
 def _mois_de(d: datetime.date) -> datetime.date:
-    return d.replace(day=1)
+    """Libellé du mois comptable de `d` (cohérent avec flux.mois)."""
+    from core.services.periode import jour_bascule_actif, mois_comptable
+
+    return mois_comptable(d, jour_bascule_actif())
+
+
+def _debut_de_mois(mois: datetime.date) -> datetime.date:
+    """Premier jour de la période comptable `mois`."""
+    from core.services.periode import bornes_mois_comptable, jour_bascule_actif
+
+    return bornes_mois_comptable(mois, jour_bascule_actif())[0]
 
 
 def _fin_de_mois(mois: datetime.date) -> datetime.date:
-    return mois + relativedelta(months=1) - datetime.timedelta(days=1)
+    """Dernier jour de la période comptable `mois`."""
+    from core.services.periode import bornes_mois_comptable, jour_bascule_actif
+
+    return bornes_mois_comptable(mois, jour_bascule_actif())[1]
 
 
 def _au_jour(d: datetime.date, jour: int) -> datetime.date:

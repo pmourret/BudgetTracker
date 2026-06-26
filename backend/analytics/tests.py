@@ -1,5 +1,6 @@
 import datetime
 from decimal import Decimal
+from dateutil.relativedelta import relativedelta
 from django.test import TestCase
 
 from referentiels.models import (
@@ -164,6 +165,39 @@ class DashboardServiceTest(TestCase):
         jours = data["depenses_par_jour"]
         self.assertEqual(len(jours), 1)
         self.assertEqual(jours[0]["total"], Decimal("40.00"))
+
+    def test_navigation_mois_scope_les_metriques(self):
+        """Sélectionner un mois passé renvoie les métriques de CE mois."""
+        mois_passe = self.mois_courant - relativedelta(months=2)
+        self._make_flux("-100.00")  # mois courant
+        self._make_flux("-30.00", date_flux=mois_passe)  # mois passé
+        data = calculer_dashboard(mois=mois_passe)
+        self.assertEqual(data["mois_courant"], mois_passe.isoformat())
+        self.assertEqual(data["metriques"]["depenses_mois"], Decimal("30.00"))
+
+    def test_navigation_bornee_au_premier_et_dernier_mois(self):
+        """mois_min = premier mois avec flux ; mois_max = mois courant."""
+        mois_passe = self.mois_courant - relativedelta(months=2)
+        self._make_flux("-50.00", date_flux=mois_passe)
+        data = calculer_dashboard()
+        self.assertEqual(data["mois_min"], mois_passe.isoformat())
+        self.assertEqual(data["mois_max"], self.mois_courant.isoformat())
+
+    def test_navigation_futur_ramenee_au_mois_courant(self):
+        """Un mois au-delà du mois courant est borné au mois courant (réel)."""
+        futur = self.mois_courant + relativedelta(months=3)
+        self._make_flux("-100.00")
+        data = calculer_dashboard(mois=futur)
+        self.assertEqual(data["mois_courant"], self.mois_courant.isoformat())
+
+    def test_solde_total_fin_de_mois_passe(self):
+        """Le solde total reflète la fin du mois sélectionné (cumul des flux)."""
+        mois_passe = self.mois_courant - relativedelta(months=1)
+        self._make_flux("-200.00", date_flux=mois_passe)
+        self._make_flux("-500.00")  # mois courant : exclu de la fin du mois passé
+        data = calculer_dashboard(mois=mois_passe)
+        # solde_initial 1000 - 200 (mois passé), le -500 du mois courant exclu
+        self.assertEqual(data["metriques"]["solde_total"], Decimal("800.00"))
 
 
 class DashboardAPITest(TestCase):

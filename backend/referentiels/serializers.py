@@ -1,9 +1,19 @@
 import re
 from rest_framework import serializers
 from .models import (
+    ParametresBudget,
     TypeCompte, TypeFlux, Titulaire, ModePaiement,
     Frequence, Etablissement, Devise, Fiscalite, StatutFlux
 )
+
+
+class ParametresBudgetSerializer(serializers.ModelSerializer):
+    """Paramètres globaux du foyer (singleton)."""
+
+    class Meta:
+        model = ParametresBudget
+        fields = ["id", "jour_debut_mois_comptable"]
+        read_only_fields = ["id"]
 
 
 def _auto_code(libelle, prefix, model_class):
