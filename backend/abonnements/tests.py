@@ -109,6 +109,29 @@ class AbonnementModelTest(TestCase):
             Abonnement.objects.all_with_deleted().filter(id=ab_id).exists()
         )
 
+    def test_materialise_ce_mois(self):
+        """Vrai dès qu'un flux lié tombe dans le mois comptable courant."""
+        from flux.models import Flux
+        from referentiels.models import StatutFlux
+
+        statut = StatutFlux.objects.create(
+            code="VALIDE", libelle="Validé", est_definitif=True
+        )
+        ab = self._make_abonnement()
+        self.assertFalse(ab.materialise_ce_mois)
+
+        Flux.objects.create(
+            compte=self.compte,
+            categorie=self.categorie,
+            type_flux=self.type_flux,
+            statut=statut,
+            devise=self.devise,
+            montant=Decimal("-15.99"),
+            date_flux=datetime.date.today(),
+            abonnement=ab,
+        )
+        self.assertTrue(ab.materialise_ce_mois)
+
 from abonnements.services import (
     calculer_divergence_pct,
     verifier_divergence,
@@ -436,3 +459,152 @@ class AbonnementAPITest(APITestCase):
         self.assertEqual(response.status_code, drf_status.HTTP_204_NO_CONTENT)
         liste = self.client.get(reverse("abonnement-list"))
         self.assertEqual(liste.data["count"], 0)
+
+
+class FluxAbonnementSignalTest(TestCase):
+    """
+    Génération d'un flux depuis un abonnement (FK) : le signal flux
+    alimente derniere_occurrence et détecte la divergence automatiquement.
+    """
+
+    def setUp(self):
+        from referentiels.models import StatutFlux
+
+        type_compte = TypeCompte.objects.create(code="COURANT", libelle="Courant")
+        titulaire = Titulaire.objects.create(code="PIERRE", libelle="Pierre")
+        etablissement = Etablissement.objects.create(code="BNP", libelle="BNP")
+        self.devise = Devise.objects.create(
+            code="EUR", libelle="Euro", symbole="€", est_defaut=True
+        )
+        self.type_flux = TypeFlux.objects.create(code="DEBIT", libelle="Débit")
+        self.statut = StatutFlux.objects.create(
+            code="VALIDE", libelle="Validé", est_definitif=True
+        )
+        self.frequence = Frequence.objects.create(
+            code="MENSUEL", libelle="Mensuel", nb_jours=30
+        )
+        self.categorie = Categorie.objects.create(code="STREAMING", nom="Streaming")
+        self.compte = Compte.objects.create(
+            code="CPT-0001", nom="Compte test",
+            type_compte=type_compte, titulaire=titulaire,
+            etablissement=etablissement, devise=self.devise,
+            solde_initial=Decimal("1000.00"), solde_reel=Decimal("1000.00"),
+        )
+        self.abonnement = Abonnement.objects.create(
+            nom="Netflix", compte=self.compte, categorie=self.categorie,
+            type_flux=self.type_flux, frequence=self.frequence,
+            montant_attendu=Decimal("-15.99"),
+            seuil_divergence_pct=Decimal("10.00"),
+            date_debut=datetime.date(2024, 1, 1),
+        )
+
+    def _make_flux(self, montant, date_flux=None):
+        from flux.models import Flux
+
+        return Flux.objects.create(
+            compte=self.compte, categorie=self.categorie,
+            type_flux=self.type_flux, statut=self.statut, devise=self.devise,
+            montant=Decimal(str(montant)),
+            date_flux=date_flux or datetime.date.today(),
+            abonnement=self.abonnement,
+        )
+
+    def test_flux_lie_met_a_jour_derniere_occurrence(self):
+        d = datetime.date.today()
+        self._make_flux("-15.99", date_flux=d)
+        self.abonnement.refresh_from_db()
+        self.assertEqual(self.abonnement.derniere_occurrence, d)
+
+    def test_flux_conforme_ne_cree_pas_alerte(self):
+        from alertes.models import Alerte, TypeAlerte
+
+        self._make_flux("-15.99")
+        self.assertFalse(
+            Alerte.objects.filter(
+                type_alerte=TypeAlerte.ABONNEMENT_DIVERGENCE,
+                abonnement=self.abonnement,
+            ).exists()
+        )
+
+    def test_flux_divergent_cree_alerte(self):
+        from alertes.models import Alerte, TypeAlerte
+
+        self._make_flux("-25.00")  # +56 % > seuil 10 %
+        self.assertTrue(
+            Alerte.objects.filter(
+                type_alerte=TypeAlerte.ABONNEMENT_DIVERGENCE,
+                abonnement=self.abonnement,
+                acquittee=False,
+            ).exists()
+        )
+
+    def test_flux_sans_abonnement_ignore_le_hook(self):
+        from flux.models import Flux
+        from alertes.models import Alerte
+
+        Flux.objects.create(
+            compte=self.compte, categorie=self.categorie,
+            type_flux=self.type_flux, statut=self.statut, devise=self.devise,
+            montant=Decimal("-25.00"), date_flux=datetime.date.today(),
+        )
+        self.abonnement.refresh_from_db()
+        self.assertIsNone(self.abonnement.derniere_occurrence)
+        self.assertEqual(Alerte.objects.count(), 0)
+
+
+class VerifierEcheancesActionTest(APITestCase):
+    """L'action verifier-echeances génère les alertes 'en retard'."""
+
+    def setUp(self):
+        type_compte = TypeCompte.objects.create(code="COURANT4", libelle="Courant")
+        titulaire = Titulaire.objects.create(code="PIERRE4", libelle="Pierre")
+        etablissement = Etablissement.objects.create(code="BNP4", libelle="BNP")
+        devise = Devise.objects.create(
+            code="EUR4", libelle="Euro", symbole="€", est_defaut=False
+        )
+        type_flux = TypeFlux.objects.create(code="DEBIT4", libelle="Débit")
+        frequence = Frequence.objects.create(
+            code="MENSUEL4", libelle="Mensuel", nb_jours=30
+        )
+        categorie = Categorie.objects.create(code="STREAMING4", nom="Streaming")
+        compte = Compte.objects.create(
+            code="CPT-0004", nom="Compte test",
+            type_compte=type_compte, titulaire=titulaire,
+            etablissement=etablissement, devise=devise,
+            solde_initial=Decimal("1000.00"), solde_reel=Decimal("1000.00"),
+        )
+        self.abonnement = Abonnement.objects.create(
+            nom="Netflix", compte=compte, categorie=categorie,
+            type_flux=type_flux, frequence=frequence,
+            montant_attendu=Decimal("-15.99"),
+            date_debut=datetime.date(2024, 1, 1),
+        )
+
+    def test_verifier_echeances_cree_alerte_en_retard(self):
+        from alertes.models import Alerte, TypeAlerte
+
+        # En retard : dernière occurrence il y a plus d'un cycle.
+        self.abonnement.derniere_occurrence = (
+            datetime.date.today() - datetime.timedelta(days=45)
+        )
+        self.abonnement.save(update_fields=["derniere_occurrence"])
+
+        response = self.client.post(reverse("abonnement-verifier-echeances"))
+        self.assertEqual(response.status_code, drf_status.HTTP_200_OK)
+        self.assertEqual(response.data["crees"], 1)
+        self.assertTrue(
+            Alerte.objects.filter(
+                type_alerte=TypeAlerte.ABONNEMENT_EN_RETARD,
+                abonnement=self.abonnement,
+            ).exists()
+        )
+
+    def test_verifier_echeances_idempotent(self):
+        self.abonnement.derniere_occurrence = (
+            datetime.date.today() - datetime.timedelta(days=45)
+        )
+        self.abonnement.save(update_fields=["derniere_occurrence"])
+
+        self.client.post(reverse("abonnement-verifier-echeances"))
+        second = self.client.post(reverse("abonnement-verifier-echeances"))
+        self.assertEqual(second.data["crees"], 0)

@@ -61,6 +61,24 @@ class AbonnementViewSet(viewsets.ModelViewSet):
         output_serializer = DivergenceResultSerializer(result)
         return Response(output_serializer.data, status=status.HTTP_200_OK)
 
+    @action(detail=False, methods=["post"], url_path="verifier-echeances")
+    def verifier_echeances(self, request):
+        """
+        Passe en revue les abonnements actifs et génère les alertes
+        « en retard » pour ceux non constatés depuis plus d'un cycle.
+
+        Miroir de /patrimoine/verifier-rappels/. Idempotent (pas de doublon
+        d'alerte non acquittée). Retourne le nombre d'alertes créées.
+        """
+        from alertes.services import detecter_alerte_abonnement_en_retard
+
+        crees = 0
+        for abonnement in Abonnement.objects.filter(actif=True).select_related("frequence"):
+            if detecter_alerte_abonnement_en_retard(abonnement) is not None:
+                crees += 1
+
+        return Response({"crees": crees}, status=status.HTTP_200_OK)
+
     @action(detail=True, methods=["post"], url_path="desactiver")
     def desactiver(self, request, pk=None):
         """Désactive un abonnement sans le supprimer."""

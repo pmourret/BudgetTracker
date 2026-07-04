@@ -171,12 +171,6 @@ export const DEFINITIONS = {
       'Mouvements déjà saisis avec une date à venir dans le mois. Nature « engagé » : certitude quasi totale.',
     formule: 'Σ des flux prévisionnels datés d’ici la fin du mois.',
   },
-  prev_abonnements: {
-    titre: 'Abonnements à échoir (non budgétés)',
-    texte:
-      "Échéances d'abonnements attendues ce mois et pas encore matérialisées, hors celles déjà couvertes par un budget (pour éviter le double comptage). Nature « récurrent ».",
-    formule: 'Σ des échéances d’abonnements restantes non budgétées.',
-  },
   prev_reste_budgete: {
     titre: 'Reste à dépenser budgété',
     texte:
@@ -187,13 +181,13 @@ export const DEFINITIONS = {
     titre: 'Solde projeté fin de mois',
     texte:
       "Estimation du solde à la fin du mois si tout se déroule comme prévu. Toujours « projeté » : le solde confirmé reste la seule vérité.",
-    formule: 'Solde actuel + flux futurs + abonnements à échoir − reste à dépenser budgété.',
+    formule: 'Solde actuel + flux futurs datés − reste à dépenser budgété.',
   },
   prev_capacite: {
     titre: 'Capacité à dépenser restante',
     texte:
-      "Ce qu'il vous reste à dépenser sur vos budgets du mois, une fois retirés le déjà-consommé et les abonnements restants à couvrir.",
-    formule: 'Budgets du mois − déjà consommé − abonnements restants.',
+      "Ce qu'il vous reste à dépenser sur vos budgets du mois, une fois retiré le déjà-consommé.",
+    formule: 'Budgets du mois − déjà consommé.',
   },
 
   // ---- Paramètres du foyer ----

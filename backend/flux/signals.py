@@ -50,6 +50,15 @@ def recalculer_apres_save(sender, instance, **kwargs):
         ):
             recalculer_budgets_pour(precedent["categorie_id"], precedent["mois"])
 
+    # Abonnement d'origine : mise à jour du suivi + divergence automatique
+    if instance.abonnement_id:
+        from abonnements.services import mettre_a_jour_derniere_occurrence
+        from alertes.services import detecter_alerte_divergence_abonnement
+
+        abonnement = instance.abonnement
+        mettre_a_jour_derniere_occurrence(abonnement, instance.date_flux)
+        detecter_alerte_divergence_abonnement(abonnement, instance.montant)
+
     # Détection alertes budget : budget direct + budgets majeurs incluant la catégorie
     if not instance.est_transfert and instance.categorie_id:
         from budgets.models import Budget

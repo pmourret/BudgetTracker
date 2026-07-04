@@ -38,7 +38,7 @@ export default function PrevisionnelPage() {
         estVide(data) ? (
           <EmptyState
             icon="🔮"
-            message="Pas encore assez de données pour projeter. Ajoutez des comptes, des flux, des budgets ou des abonnements pour alimenter le prévisionnel."
+            message="Pas encore assez de données pour projeter. Ajoutez des comptes, des flux ou des budgets pour alimenter le prévisionnel."
           />
         ) : (
           <PrevisionnelContenu data={data} nbMois={nbMois} onNbMoisChange={setNbMois} />
@@ -82,7 +82,6 @@ function SoldeProjeteCard({ bloc, moisCourant }) {
   const briques = [
     { label: 'Solde actuel', value: Number(c.solde_actuel), def: DEFINITIONS.prev_solde_actuel },
     { label: 'Flux futurs datés du mois', value: Number(c.flux_futurs_mois), def: DEFINITIONS.prev_flux_futurs },
-    { label: 'Abonnements à échoir (non budgétés)', value: Number(c.abonnements_a_echoir_non_budgetes), def: DEFINITIONS.prev_abonnements },
     { label: 'Reste à dépenser budgété', value: -Number(c.reste_a_depenser_budgete) || 0, def: DEFINITIONS.prev_reste_budgete },
   ]
 
@@ -134,7 +133,7 @@ function SoldeProjeteCard({ bloc, moisCourant }) {
 function CapaciteCard({ bloc }) {
   const c = bloc.composantes
   const totalBudgets = Number(c.total_budgets)
-  const engage = Number(c.total_consomme) + Number(c.abonnements_restants)
+  const engage = Number(c.total_consomme)
   const pctEngage = totalBudgets > 0 ? Math.min((engage / totalBudgets) * 100, 100) : 0
   const capacite = Number(bloc.capacite)
 
@@ -170,10 +169,6 @@ function CapaciteCard({ bloc }) {
         <div className="flex flex-col gap-1.5 border-t border-border-app pt-3">
           <DetailLigne label="Budgets du mois" value={formatEuro(c.total_budgets)} />
           <DetailLigne label="Déjà consommé" value={formatEuro(-Number(c.total_consomme) || 0)} />
-          <DetailLigne
-            label="Abonnements restants (hors budgets)"
-            value={formatEuro(-Number(c.abonnements_restants) || 0)}
-          />
         </div>
 
         <p className="text-[11px] text-content-3 leading-relaxed">{bloc.definition}</p>

@@ -100,6 +100,18 @@ class Abonnement(BaseModel):
         return f"{self.nom} | {self.montant_attendu} € | {self.frequence}"
 
     @property
+    def materialise_ce_mois(self):
+        """
+        Vrai si un flux (non supprimé) rattaché à cet abonnement existe déjà
+        sur le mois comptable courant. Sert au statut du tableau et à
+        désactiver le bouton « Générer le flux » si déjà fait.
+        Fiabilité : réel.
+        """
+        from core.services.periode import mois_comptable_courant
+
+        return self.flux.filter(mois=mois_comptable_courant()).exists()
+
+    @property
     def est_en_retard(self):
         """
         Vrai si aucun flux n'a été saisi depuis plus d'un cycle.

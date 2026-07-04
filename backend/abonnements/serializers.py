@@ -19,6 +19,7 @@ class AbonnementSerializer(serializers.ModelSerializer):
 
     # Champs calculés
     est_en_retard = serializers.BooleanField(read_only=True)
+    materialise_ce_mois = serializers.BooleanField(read_only=True)
     derniere_occurrence = serializers.DateField(read_only=True)
 
     class Meta:
@@ -42,6 +43,7 @@ class AbonnementSerializer(serializers.ModelSerializer):
             "jour_echeance",
             "derniere_occurrence",   # read_only
             "est_en_retard",         # read_only
+            "materialise_ce_mois",   # read_only
             "actif",
             "notes",
             "created_at",

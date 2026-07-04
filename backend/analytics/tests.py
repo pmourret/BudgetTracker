@@ -11,7 +11,6 @@ from comptes.models import Compte
 from categories.models import Categorie
 from flux.models import Flux
 from budgets.models import Budget, BudgetTemplate
-from abonnements.models import Abonnement
 from analytics.services.dashboard import calculer_dashboard
 from analytics.services.compte_dashboard import calculer_compte_dashboard
 from analytics.services.projection import (
@@ -271,31 +270,15 @@ class _PrevisionnelTestMixin:
             **kwargs,
         )
 
-    def _make_abonnement(self, montant, categorie=None, jour_echeance=20,
-                         date_debut=None, frequence=None):
-        return Abonnement.objects.create(
-            nom="Abo test",
-            compte=self.compte,
-            categorie=categorie,
-            type_flux=self.type_flux,
-            frequence=frequence or self.frequence_mensuelle,
-            montant_attendu=Decimal(str(montant)),
-            date_debut=date_debut or datetime.date(2026, 1, 20),
-            jour_echeance=jour_echeance,
-        )
-
 
 class SoldeProjeteServiceTest(_PrevisionnelTestMixin, TestCase):
 
-    def test_solde_projete_sans_futur_ni_abonnement(self):
-        """Sans flux futur ni abonnement, le solde projeté = solde théorique."""
+    def test_solde_projete_sans_futur(self):
+        """Sans flux futur, le solde projeté = solde théorique."""
         self._make_flux("-200.00", date_flux=datetime.date(2026, 6, 5))
         data = calculer_solde_projete(aujourd_hui=self.AUJOURD_HUI)
         self.assertEqual(data["composantes"]["solde_actuel"], Decimal("800.00"))
         self.assertEqual(data["composantes"]["flux_futurs_mois"], Decimal("0.00"))
-        self.assertEqual(
-            data["composantes"]["abonnements_a_echoir_non_budgetes"], Decimal("0.00")
-        )
         self.assertEqual(
             data["composantes"]["reste_a_depenser_budgete"], Decimal("0.00")
         )
@@ -325,63 +308,6 @@ class SoldeProjeteServiceTest(_PrevisionnelTestMixin, TestCase):
         self.assertEqual(data["composantes"]["flux_futurs_mois"], Decimal("0.00"))
         self.assertEqual(data["solde_projete"], Decimal("1000.00"))
 
-    def test_abonnement_a_echoir_compte_une_fois(self):
-        """Un abonnement à échoir dans le mois, non budgété, est déduit une fois."""
-        self._make_abonnement("-25.00", categorie=self.categorie)
-        data = calculer_solde_projete(aujourd_hui=self.AUJOURD_HUI)
-        self.assertEqual(
-            data["composantes"]["abonnements_a_echoir_non_budgetes"],
-            Decimal("-25.00"),
-        )
-        self.assertEqual(data["solde_projete"], Decimal("975.00"))
-
-    def test_abonnement_deja_saisi_en_flux_futur_non_double_compte(self):
-        """Un abonnement déjà matérialisé en flux futur daté n'est pas recompté."""
-        self._make_abonnement("-25.00", categorie=self.categorie)
-        self._make_flux("-25.00", date_flux=datetime.date(2026, 6, 20))
-        data = calculer_solde_projete(aujourd_hui=self.AUJOURD_HUI)
-        self.assertEqual(
-            data["composantes"]["abonnements_a_echoir_non_budgetes"],
-            Decimal("0.00"),
-        )
-        self.assertEqual(data["composantes"]["flux_futurs_mois"], Decimal("-25.00"))
-        self.assertEqual(data["solde_projete"], Decimal("975.00"))
-
-    def test_abonnement_budgete_non_double_compte(self):
-        """Un abonnement couvert par un budget est inclus dans le reste, pas recompté."""
-        Budget.objects.create(
-            categorie=self.categorie, mois=self.MOIS,
-            montant_prevu=Decimal("100.00"),
-        )
-        self._make_abonnement("-25.00", categorie=self.categorie)
-        data = calculer_solde_projete(aujourd_hui=self.AUJOURD_HUI)
-        self.assertEqual(
-            data["composantes"]["abonnements_a_echoir_non_budgetes"],
-            Decimal("0.00"),
-        )
-        self.assertEqual(
-            data["composantes"]["reste_a_depenser_budgete"], Decimal("100.00")
-        )
-        self.assertEqual(data["solde_projete"], Decimal("900.00"))
-
-    def test_abonnement_couvert_par_budget_majeur(self):
-        """Un abonnement sur une mineure incluse d'un budget majeur est couvert."""
-        parent = Categorie.objects.create(code="LOISIRS", nom="Loisirs")
-        mineure = Categorie.objects.create(
-            code="STREAMING", nom="Streaming", parent=parent
-        )
-        budget = Budget.objects.create(
-            categorie=parent, mois=self.MOIS,
-            montant_prevu=Decimal("100.00"), est_budget_majeur=True,
-        )
-        budget.categories_incluses.add(mineure)
-        self._make_abonnement("-25.00", categorie=mineure)
-        data = calculer_solde_projete(aujourd_hui=self.AUJOURD_HUI)
-        self.assertEqual(
-            data["composantes"]["abonnements_a_echoir_non_budgetes"],
-            Decimal("0.00"),
-        )
-
     def test_reste_a_depenser_budgete(self):
         """Le reste à dépenser (prévu − consommé) est déduit du solde projeté."""
         Budget.objects.create(
@@ -406,7 +332,7 @@ class SoldeProjeteServiceTest(_PrevisionnelTestMixin, TestCase):
 class CapaciteRestanteServiceTest(_PrevisionnelTestMixin, TestCase):
 
     def test_capacite_nominale(self):
-        """capacité = budgets − consommé − abonnements restants non budgétés."""
+        """capacité = budgets − consommé."""
         autre = Categorie.objects.create(code="TRANSPORT", nom="Transport")
         Budget.objects.create(
             categorie=self.categorie, mois=self.MOIS,
@@ -417,14 +343,10 @@ class CapaciteRestanteServiceTest(_PrevisionnelTestMixin, TestCase):
             montant_prevu=Decimal("200.00"),
         )
         self._make_flux("-150.00", date_flux=datetime.date(2026, 6, 5))
-        self._make_abonnement("-30.00", categorie=None)  # non budgété
         data = calculer_capacite_restante(aujourd_hui=self.AUJOURD_HUI)
         self.assertEqual(data["composantes"]["total_budgets"], Decimal("600.00"))
         self.assertEqual(data["composantes"]["total_consomme"], Decimal("150.00"))
-        self.assertEqual(
-            data["composantes"]["abonnements_restants"], Decimal("30.00")
-        )
-        self.assertEqual(data["capacite"], Decimal("420.00"))
+        self.assertEqual(data["capacite"], Decimal("450.00"))
 
     def test_capacite_budget_a_zero(self):
         """Un budget à 0 déjà consommé donne une capacité négative (dépassement)."""
@@ -437,7 +359,7 @@ class CapaciteRestanteServiceTest(_PrevisionnelTestMixin, TestCase):
         self.assertEqual(data["capacite"], Decimal("-50.00"))
 
     def test_capacite_sans_budget(self):
-        """Sans budget ni abonnement, la capacité est nulle."""
+        """Sans budget, la capacité est nulle."""
         data = calculer_capacite_restante(aujourd_hui=self.AUJOURD_HUI)
         self.assertEqual(data["capacite"], Decimal("0.00"))
         self.assertEqual(data["fiabilite"], "moyenne")
@@ -464,19 +386,15 @@ class TrajectoireServiceTest(_PrevisionnelTestMixin, TestCase):
         # Le bloc porte la fiabilité du point le plus lointain
         self.assertEqual(data["fiabilite"], "faible")
 
-    def test_cumul_avec_revenu_recurrent(self):
-        """Un salaire récurrent alimente chaque mois ; le cumul s'additionne."""
-        self._make_abonnement(
-            "1000.00", categorie=None, jour_echeance=25,
-            date_debut=datetime.date(2026, 1, 25),
-        )
+    def test_cumul_avec_revenu_futur(self):
+        """Un revenu futur daté alimente le cumul du mois où il tombe."""
+        self._make_flux("2000.00", date_flux=datetime.date(2026, 7, 5))
         data = calculer_trajectoire(nb_mois=3, aujourd_hui=self.AUJOURD_HUI)
-        for point in data["points"]:
-            self.assertEqual(point["revenus_attendus"], Decimal("1000.00"))
-            self.assertEqual(point["epargne_mois"], Decimal("1000.00"))
-        self.assertEqual(data["points"][0]["cumul"], Decimal("1000.00"))
+        # M0 (juin) : aucun flux → 0 ; M+1 (juillet) : +2000 daté
+        self.assertEqual(data["points"][0]["revenus_attendus"], Decimal("0.00"))
+        self.assertEqual(data["points"][1]["revenus_attendus"], Decimal("2000.00"))
         self.assertEqual(data["points"][1]["cumul"], Decimal("2000.00"))
-        self.assertEqual(data["points"][2]["cumul"], Decimal("3000.00"))
+        self.assertEqual(data["points"][2]["cumul"], Decimal("2000.00"))
 
     def test_template_estime_les_mois_futurs(self):
         """Les templates actifs estiment les dépenses variables des mois futurs."""
@@ -489,21 +407,15 @@ class TrajectoireServiceTest(_PrevisionnelTestMixin, TestCase):
         # M+1 : l'enveloppe du template est comptée
         self.assertEqual(data["points"][1]["depenses_attendues"], Decimal("300.00"))
 
-    def test_abonnement_couvert_par_template_non_double_compte(self):
-        """Mois futur : un abonnement couvert par un template reste dans l'enveloppe."""
+    def test_flux_futur_deduit_de_l_enveloppe_template(self):
+        """Mois futur : un flux daté couvre une part de l'enveloppe du template."""
         BudgetTemplate.objects.create(
             categorie=self.categorie, montant_defaut=Decimal("300.00")
         )
-        self._make_abonnement("-50.00", categorie=self.categorie)
+        self._make_flux("-50.00", date_flux=datetime.date(2026, 7, 15))
         data = calculer_trajectoire(nb_mois=2, aujourd_hui=self.AUJOURD_HUI)
-        # M+1 : 50 (abonnement) + 250 (complément d'enveloppe) = 300, pas 350
+        # M+1 : 50 (flux daté) + 250 (complément d'enveloppe) = 300, pas 350
         self.assertEqual(data["points"][1]["depenses_attendues"], Decimal("300.00"))
-
-    def test_abonnement_non_couvert_ajoute_aux_mois_futurs(self):
-        """Mois futur : un abonnement sans template est ajouté en dépense autonome."""
-        self._make_abonnement("-50.00", categorie=self.categorie)
-        data = calculer_trajectoire(nb_mois=2, aujourd_hui=self.AUJOURD_HUI)
-        self.assertEqual(data["points"][1]["depenses_attendues"], Decimal("50.00"))
 
 
 class PrevisionnelAPITest(TestCase):

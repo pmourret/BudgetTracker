@@ -7,11 +7,15 @@ import {
 import apiClient from '../api/client'
 
 const RESOURCE_DEPENDENCIES = {
-  flux:               ['comptes', 'budgets', 'alertes', 'analytics'],
+  // Un flux met à jour derniere_occurrence de son abonnement (statut du
+  // tableau abonnements) et peut créer une alerte de divergence.
+  flux:               ['comptes', 'budgets', 'alertes', 'analytics', 'abonnements'],
   transferts:         ['comptes', 'flux', 'analytics'],
   budgets:            ['analytics'],
   'budget-templates': ['budgets', 'analytics'],
-  abonnements:        ['analytics'],
+  // Les abonnements ne nourrissent plus le prévisionnel (référentiel pur).
+  // L'action verifier-echeances crée des alertes « en retard ».
+  abonnements:        ['alertes'],
   comptes:            ['flux', 'analytics'],
   patrimoine:         ['analytics'],
   alertes:            ['analytics'],

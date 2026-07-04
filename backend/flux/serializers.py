@@ -9,6 +9,7 @@ class FluxSerializer(serializers.ModelSerializer):
     type_flux_code = serializers.CharField(source="type_flux.code", read_only=True)
     statut_code = serializers.CharField(source="statut.code", read_only=True)
     devise_symbole = serializers.CharField(source="devise.symbole", read_only=True)
+    abonnement_nom = serializers.CharField(source="abonnement.nom", read_only=True)
 
     # Champ calculé — jamais éditable
     mois = serializers.DateField(read_only=True)
@@ -25,6 +26,8 @@ class FluxSerializer(serializers.ModelSerializer):
             "type_flux_code",
             "statut",
             "statut_code",
+            "abonnement",
+            "abonnement_nom",
             "titulaire",
             "mode_paiement",
             "devise",

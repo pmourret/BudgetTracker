@@ -58,6 +58,14 @@ class Flux(BaseModel):
         on_delete=models.PROTECT,
         related_name="flux",
     )
+    abonnement = models.ForeignKey(
+        "abonnements.Abonnement",
+        on_delete=models.SET_NULL,
+        related_name="flux",
+        null=True,
+        blank=True,
+        help_text="Abonnement d'origine si ce flux a été généré depuis le référentiel.",
+    )
     devise = models.ForeignKey(
         Devise,
         on_delete=models.PROTECT,

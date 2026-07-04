@@ -18,7 +18,7 @@ function shiftDate(iso, days) {
   return d.toISOString().slice(0, 10)
 }
 
-export default function FluxFormModal({ isOpen, onClose, flux = null }) {
+export default function FluxFormModal({ isOpen, onClose, flux = null, initialValues = null }) {
   const isEdit = Boolean(flux)
 
   const [sens, setSens] = useState('depense')
@@ -29,6 +29,7 @@ export default function FluxFormModal({ isOpen, onClose, flux = null }) {
   const [dateFlux, setDateFlux] = useState(todayISO())
   const [modePaiement, setModePaiement] = useState('')
   const [statut, setStatut] = useState('')
+  const [abonnementId, setAbonnementId] = useState(null)
   const [errors, setErrors] = useState({})
 
   const createFlux = useCreateResource('flux')
@@ -72,13 +73,26 @@ export default function FluxFormModal({ isOpen, onClose, flux = null }) {
       setDateFlux(flux.date_flux ?? todayISO())
       setModePaiement(flux.mode_paiement ? String(flux.mode_paiement) : '')
       setStatut(flux.statut ? String(flux.statut) : '')
+      setAbonnementId(flux.abonnement ?? null)
+    } else if (initialValues) {
+      // Pré-remplissage (ex. génération d'un flux depuis un abonnement).
+      const m = Number(initialValues.montant ?? 0)
+      setSens(m < 0 ? 'depense' : 'recette')
+      setMontant(m ? String(Math.abs(m)) : '')
+      setLibelle(initialValues.libelle ?? '')
+      setCompte(initialValues.compte ? String(initialValues.compte) : '')
+      setCategorie(initialValues.categorie ? String(initialValues.categorie) : '')
+      setDateFlux(initialValues.date_flux ?? todayISO())
+      setModePaiement(initialValues.mode_paiement ? String(initialValues.mode_paiement) : '')
+      setStatut(initialValues.statut ? String(initialValues.statut) : '')
+      setAbonnementId(initialValues.abonnement ?? null)
     } else {
       setSens('depense'); setMontant(''); setLibelle(''); setCategorie('')
       setCompte(''); setDateFlux(todayISO())
-      setModePaiement(''); setStatut('')
+      setModePaiement(''); setStatut(''); setAbonnementId(null)
     }
     setErrors({})
-  }, [isOpen, isEdit, flux])
+  }, [isOpen, isEdit, flux, initialValues])
 
   const typeFluxId = (typesFluxData ?? []).find(
     (t) => t.code === (sens === 'depense' ? 'DEBIT' : 'CREDIT')
@@ -116,6 +130,7 @@ export default function FluxFormModal({ isOpen, onClose, flux = null }) {
       const deviseDefaut = (devises ?? []).find((d) => d.est_defaut) || (devises ?? [])[0]
       payload.devise = deviseDefaut?.id
       payload.est_transfert = false
+      payload.abonnement = abonnementId || null
     }
 
     const mutation = isEdit ? updateFlux : createFlux
