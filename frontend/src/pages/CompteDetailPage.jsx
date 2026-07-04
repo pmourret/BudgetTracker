@@ -2,15 +2,15 @@ import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, Users } from 'lucide-react'
 import apiClient from '../api/client'
-import { useResourceList } from '../hooks/useResource'
 import { formatEuro, formatDate } from '../utils/format'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Tooltip from '../components/ui/Tooltip'
 import { DEFINITIONS } from '../constants/definitions'
-import { Loading, ErrorState, EmptyState } from '../components/ui/States'
+import { Loading, ErrorState } from '../components/ui/States'
 import BarChart from '../components/charts/BarChart'
 import DepensesCategories, { CAT_PALETTE } from '../components/charts/DepensesCategories'
+import FluxSearchPanel from '../components/flux/FluxSearchPanel'
 
 function useCompteDashboard(id) {
   return useQuery({
@@ -26,12 +26,6 @@ function useCompteDashboard(id) {
 export default function CompteDetailPage() {
   const { id } = useParams()
   const { data, isLoading, isError, refetch } = useCompteDashboard(id)
-  const fluxQuery = useResourceList('flux', {
-    compte: id,
-    ordering: '-date_flux',
-    page_size: 1000,
-  })
-  const flux = fluxQuery.data?.results ?? []
 
   const compte = data?.compte
   const m = data?.metriques
@@ -163,48 +157,11 @@ export default function CompteDetailPage() {
             )}
           </Card>
 
-          {/* Liste de tous les flux du compte */}
-          <Card title={`Tous les flux (${flux.length})`} bodyClassName="p-0">
-            {fluxQuery.isLoading && <div className="p-4"><Loading message="Chargement des flux..." /></div>}
-            {!fluxQuery.isLoading && flux.length === 0 && (
-              <div className="p-4">
-                <EmptyState icon="💸" message="Aucun flux sur ce compte." />
-              </div>
-            )}
-            {!fluxQuery.isLoading && flux.length > 0 && (
-              <table className="w-full border-collapse text-sm">
-                <thead>
-                  <tr className="border-b border-border-app">
-                    <th className="text-left px-4 py-3 text-xs font-medium text-content-2">Date</th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-content-2">Libellé</th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-content-2">Catégorie</th>
-                    <th className="text-right px-4 py-3 text-xs font-medium text-content-2">Montant</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {flux.map((f) => {
-                    const value = Number(f.montant)
-                    return (
-                      <tr key={f.id} className="border-b border-border-app last:border-b-0">
-                        <td className="px-4 py-3 text-content">{formatDate(f.date_flux)}</td>
-                        <td className="px-4 py-3 text-content">
-                          <div className="flex items-center gap-2">
-                            {f.libelle || '—'}
-                            {f.est_transfert && <Tag label="Transfert" />}
-                            {f.est_ajustement && <Tag label="Ajustement" />}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-content">{f.categorie_nom || '—'}</td>
-                        <td className={`px-4 py-3 text-right font-medium ${value < 0 ? 'text-red-600' : 'text-teal-600'}`}>
-                          {formatEuro(value)}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            )}
-          </Card>
+          {/* Recherche + liste des flux du compte (édition possible) */}
+          <div>
+            <h2 className="text-sm font-medium text-content mb-2">Flux du compte</h2>
+            <FluxSearchPanel baseParams={{ compte: id }} hideCompteFilter />
+          </div>
         </>
       )}
     </div>
@@ -220,13 +177,5 @@ function MetricCard({ label, value, valueClass = 'text-content', def, defAlign =
       </div>
       <div className={`text-xl font-medium ${valueClass}`}>{value}</div>
     </div>
-  )
-}
-
-function Tag({ label }) {
-  return (
-    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200">
-      {label}
-    </span>
   )
 }

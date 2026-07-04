@@ -13,6 +13,11 @@ class FluxFilterSet(django_filters.FilterSet):
     mois = django_filters.DateFilter(field_name="mois", lookup_expr="exact")
     montant_min = django_filters.NumberFilter(field_name="montant", lookup_expr="gte")
     montant_max = django_filters.NumberFilter(field_name="montant", lookup_expr="lte")
+    # Propriétaire du compte (≠ titulaire du flux, souvent nul) : filtre sur
+    # le titulaire du compte rattaché.
+    titulaire_compte = django_filters.UUIDFilter(field_name="compte__titulaire")
+    # Prévisionnel (False) vs validé/définitif (True) — via le statut du flux.
+    est_definitif = django_filters.BooleanFilter(field_name="statut__est_definitif")
 
     class Meta:
         model = Flux
@@ -22,7 +27,10 @@ class FluxFilterSet(django_filters.FilterSet):
             "type_flux",
             "statut",
             "titulaire",
+            "titulaire_compte",
             "est_transfert",
+            "est_ajustement",
+            "est_definitif",
             "date_min",
             "date_max",
             "mois",
@@ -37,8 +45,10 @@ class FluxViewSet(viewsets.ModelViewSet):
 
     Filtres disponibles :
     - compte, categorie, type_flux, statut, titulaire, est_transfert
+    - titulaire_compte (propriétaire du compte), est_definitif (validé/prévisionnel)
     - date_min, date_max, mois
     - montant_min, montant_max
+    - search (libellé, référence externe, notes)
 
     Note : les flux de transfert ne sont pas créés ici —
     passer par /api/v1/transferts/ pour garantir l'atomicité.

@@ -1,5 +1,6 @@
 import {
   useQuery,
+  useInfiniteQuery,
   useMutation,
   useQueryClient,
 } from '@tanstack/react-query'
@@ -52,6 +53,28 @@ export function useCategories(params = {}) {
       const results = data?.results ?? data ?? []
       return Array.isArray(data) ? { results } : { ...data, results }
     },
+  })
+}
+
+// Chargement paginé « à la demande » d'une ressource DRF (PageNumberPagination).
+// Corrige la disparition des lignes au-delà de la 1re page (ex. flux d'un mois
+// ancien jamais chargés) : on suit le champ `next` de la réponse DRF. Les
+// filtres passés dans `params` font partie de la query key → un changement de
+// filtre repart de la page 1. L'invalidation par préfixe `[resource]` couvre
+// aussi ces caches infinis.
+export function useInfiniteResource(resource, params = {}, options = {}) {
+  return useInfiniteQuery({
+    queryKey: [resource, 'infinite', params],
+    queryFn: async ({ pageParam = 1 }) => {
+      const { data } = await apiClient.get(`/${resource}/`, {
+        params: { ...params, page: pageParam },
+      })
+      return data
+    },
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage?.next ? allPages.length + 1 : undefined,
+    ...options,
   })
 }
 

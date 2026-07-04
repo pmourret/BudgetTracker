@@ -310,6 +310,81 @@ class FluxAPITest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["count"], 1)
 
+
+class FluxRechercheFiltresAPITest(APITestCase):
+    """Filtres de recherche de la FluxPage : libellé, propriétaire du compte,
+    statut (prévisionnel/validé), sens (montant)."""
+
+    def setUp(self):
+        type_compte = TypeCompte.objects.create(code="COURANT6", libelle="Courant")
+        self.titA = Titulaire.objects.create(code="ALICE6", libelle="Alice")
+        self.titB = Titulaire.objects.create(code="BOB6", libelle="Bob")
+        etab = Etablissement.objects.create(code="BNP6", libelle="BNP")
+        self.devise = Devise.objects.create(
+            code="EUR6", libelle="Euro", symbole="€", est_defaut=True
+        )
+        self.type_flux = TypeFlux.objects.create(code="DEBIT6", libelle="Débit")
+        self.statut_valide = StatutFlux.objects.create(
+            code="VAL6", libelle="Validé", est_definitif=True
+        )
+        self.statut_prev = StatutFlux.objects.create(
+            code="PREV6", libelle="Prévisionnel", est_definitif=False
+        )
+        self.categorie = Categorie.objects.create(code="CAT6", nom="Courses")
+        self.compte_a = Compte.objects.create(
+            code="CPT-A6", nom="Compte Alice", type_compte=type_compte,
+            titulaire=self.titA, etablissement=etab, devise=self.devise,
+            solde_initial=Decimal("0.00"),
+        )
+        self.compte_b = Compte.objects.create(
+            code="CPT-B6", nom="Compte Bob", type_compte=type_compte,
+            titulaire=self.titB, etablissement=etab, devise=self.devise,
+            solde_initial=Decimal("0.00"),
+        )
+
+    def _make(self, compte, statut, montant, libelle):
+        return Flux.objects.create(
+            compte=compte, categorie=self.categorie, type_flux=self.type_flux,
+            statut=statut, devise=self.devise, montant=Decimal(montant),
+            date_flux=datetime.date(2024, 3, 15), libelle=libelle,
+        )
+
+    def test_recherche_par_libelle(self):
+        self._make(self.compte_a, self.statut_valide, "-50.00", "Boulangerie")
+        self._make(self.compte_a, self.statut_valide, "-30.00", "Essence")
+        r = self.client.get(reverse("flux-list"), {"search": "boulang"})
+        self.assertEqual(r.data["count"], 1)
+        self.assertEqual(r.data["results"][0]["libelle"], "Boulangerie")
+
+    def test_filtre_par_titulaire_compte(self):
+        self._make(self.compte_a, self.statut_valide, "-50.00", "A")
+        self._make(self.compte_b, self.statut_valide, "-30.00", "B")
+        r = self.client.get(
+            reverse("flux-list"), {"titulaire_compte": str(self.titA.id)}
+        )
+        self.assertEqual(r.data["count"], 1)
+        self.assertEqual(r.data["results"][0]["libelle"], "A")
+
+    def test_filtre_est_definitif(self):
+        self._make(self.compte_a, self.statut_valide, "-50.00", "Validé")
+        self._make(self.compte_a, self.statut_prev, "-30.00", "Prévu")
+        r_val = self.client.get(reverse("flux-list"), {"est_definitif": "true"})
+        r_prev = self.client.get(reverse("flux-list"), {"est_definitif": "false"})
+        self.assertEqual(r_val.data["count"], 1)
+        self.assertEqual(r_val.data["results"][0]["libelle"], "Validé")
+        self.assertEqual(r_prev.data["count"], 1)
+        self.assertEqual(r_prev.data["results"][0]["libelle"], "Prévu")
+
+    def test_filtre_sens_depense_recette(self):
+        self._make(self.compte_a, self.statut_valide, "-50.00", "Dépense")
+        self._make(self.compte_a, self.statut_valide, "1200.00", "Recette")
+        r_dep = self.client.get(reverse("flux-list"), {"montant_max": "-0.01"})
+        r_rec = self.client.get(reverse("flux-list"), {"montant_min": "0.01"})
+        self.assertEqual(r_dep.data["count"], 1)
+        self.assertEqual(r_dep.data["results"][0]["libelle"], "Dépense")
+        self.assertEqual(r_rec.data["count"], 1)
+        self.assertEqual(r_rec.data["results"][0]["libelle"], "Recette")
+
 class FluxChangementRecalculTest(APITestCase):
     """
     Régression : quand un flux change de compte, de catégorie ou de mois,
