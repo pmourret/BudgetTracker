@@ -19,6 +19,7 @@ export default function BudgetFormModal({ isOpen, onClose, moisDefaut, budget = 
   const [mois, setMois] = useState(moisDefaut || moisActuelISO())
   const [montantPrevu, setMontantPrevu] = useState('')
   const [notes, setNotes] = useState('')
+  const [enJeu, setEnJeu] = useState(false)
   const [categoriesIncluses, setCategoriesIncluses] = useState([])
   const [errors, setErrors] = useState({})
 
@@ -97,6 +98,7 @@ export default function BudgetFormModal({ isOpen, onClose, moisDefaut, budget = 
       setMois(budget.mois ?? moisDefaut ?? moisActuelISO())
       setMontantPrevu(String(budget.montant_prevu ?? ''))
       setNotes(budget.notes ?? '')
+      setEnJeu(Boolean(budget.en_jeu))
       setCategoriesIncluses((budget.categories_incluses ?? []).map((id) => String(id)))
     } else {
       setTypeBudget('categorie')
@@ -105,6 +107,7 @@ export default function BudgetFormModal({ isOpen, onClose, moisDefaut, budget = 
       setMois(moisDefaut || moisActuelISO())
       setMontantPrevu('')
       setNotes('')
+      setEnJeu(false)
       setCategoriesIncluses([])
     }
     setErrors({})
@@ -152,6 +155,7 @@ export default function BudgetFormModal({ isOpen, onClose, moisDefaut, budget = 
       mois,
       montant_prevu: montant.toFixed(2),
       notes,
+      en_jeu: enJeu,
     }
 
     if (estThematique) {
@@ -349,6 +353,21 @@ export default function BudgetFormModal({ isOpen, onClose, moisDefaut, budget = 
           error={errors.montantPrevu || errors.montant_prevu}
           required
         />
+
+        <label className="flex items-start gap-2.5 cursor-pointer rounded-lg border border-border-app bg-surface-2 px-3 py-2.5">
+          <input
+            type="checkbox"
+            className="w-4 h-4 mt-0.5 accent-purple-600 cursor-pointer"
+            checked={enJeu}
+            onChange={(e) => setEnJeu(e.target.checked)}
+          />
+          <span className="text-sm text-content">
+            Enveloppe « en jeu » (système de points)
+            <span className="block text-xs text-content-3 mt-0.5">
+              Rapporte des points si non dépassée, en fait perdre sinon.
+            </span>
+          </span>
+        </label>
 
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-content-2">Notes</label>

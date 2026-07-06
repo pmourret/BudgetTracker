@@ -124,6 +124,26 @@ export const DEFINITIONS = {
     formule: 'Σ des dépenses des sous-catégories incluses.',
   },
 
+  // ---- Système de points (mécanique B) ----
+  valeur_point: {
+    titre: 'Valeur du point',
+    texte:
+      "Conversion entre euros et points de discipline budgétaire. Une enveloppe « en jeu » rapporte des points si elle n'est pas dépassée, en fait perdre sinon. Paramètre du foyer, ajustable.",
+    formule: '1 point = valeur_point € (défaut 10 €). Arrondi à l’entier supérieur.',
+  },
+  points_reserve: {
+    titre: 'Réserve de points',
+    texte:
+      "Points accumulés (discipline budgétaire) sur les mois clôturés, reportés de mois en mois. Le mois en cours est projeté (non figé) : il n'entre dans la réserve disponible qu'à la clôture.",
+    formule: 'Σ(points des mois clôturés) − Σ(points distribués). Peut être négatif.',
+  },
+  points_enveloppe: {
+    titre: 'Points de l’enveloppe',
+    texte:
+      "Points générés par cette enveloppe. Positif si elle n'est pas dépassée, négatif si elle l'est. Réel à la clôture du mois, projeté tant que le mois est en cours.",
+    formule: 'signe(prévu − consommé) × ⌈ |prévu − consommé| ÷ valeur_point ⌉.',
+  },
+
   // ---- Abonnements ----
   abo_total_mensuel: {
     titre: 'Total mensuel estimé',

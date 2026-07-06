@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { CalendarRange, Check, AlertTriangle } from 'lucide-react'
+import { CalendarRange, Check, AlertTriangle, Coins } from 'lucide-react'
 import Card from '../components/ui/Card'
 import Select from '../components/ui/Select'
+import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
 import Tooltip from '../components/ui/Tooltip'
 import { Loading, ErrorState } from '../components/ui/States'
@@ -36,14 +37,37 @@ export default function ParametresPage() {
 
   const [jour, setJour] = useState(null)
   const [feedback, setFeedback] = useState(null)
+  const [vp, setVp] = useState('')
+  const [vpFeedback, setVpFeedback] = useState(null)
 
   useEffect(() => {
-    if (data) setJour(data.jour_debut_mois_comptable)
+    if (data) {
+      setJour(data.jour_debut_mois_comptable)
+      setVp(String(data.valeur_point ?? ''))
+    }
   }, [data])
 
   const jourNum = Number(jour)
   const initial = data?.jour_debut_mois_comptable
   const dirty = jour != null && jourNum !== initial
+
+  const vpNum = parseFloat(String(vp).replace(',', '.'))
+  const vpValide = !Number.isNaN(vpNum) && vpNum > 0
+  const vpDirty =
+    vpValide && data && vpNum !== parseFloat(data.valeur_point)
+
+  function handleSaveVp() {
+    setVpFeedback(null)
+    update.mutate(
+      { valeur_point: vpNum.toFixed(2) },
+      {
+        onSuccess: () =>
+          setVpFeedback({ type: 'success', msg: 'Valeur du point mise à jour.' }),
+        onError: () =>
+          setVpFeedback({ type: 'error', msg: 'Échec. Saisissez un montant > 0.' }),
+      }
+    )
+  }
 
   function handleSave() {
     setFeedback(null)
@@ -141,6 +165,64 @@ export default function ParametresPage() {
                 >
                   {feedback.type === 'success' && <Check size={14} />}
                   {feedback.msg}
+                </span>
+              )}
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {!isLoading && !isError && (
+        <Card
+          title={
+            <span className="inline-flex items-center gap-1.5">
+              <Coins size={16} className="text-content-2" />
+              Système de points
+              <Tooltip {...DEFINITIONS.valeur_point} align="left" />
+            </span>
+          }
+        >
+          <div className="flex flex-col gap-4 max-w-md">
+            <p className="text-sm text-content-2 leading-relaxed">
+              Les enveloppes budgétaires marquées « en jeu » rapportent des points
+              quand elles ne sont pas dépassées, et en font perdre sinon. La valeur
+              du point fixe la conversion : par défaut <strong>10 € = 1 point</strong>.
+            </p>
+
+            <Input
+              label="Valeur d'un point (€)"
+              type="text"
+              inputMode="decimal"
+              value={vp}
+              onChange={(v) => {
+                setVp(v)
+                setVpFeedback(null)
+              }}
+              placeholder="10,00"
+            />
+
+            <div className="rounded-lg bg-surface-2 border border-border-app px-3 py-2.5">
+              <span className="text-xs text-content-2 leading-relaxed">
+                Exemple : avec {vpValide ? `${vpNum.toFixed(0)} €` : '10 €'} par point,
+                une enveloppe sous-consommée de 30 € rapporte{' '}
+                {vpValide ? Math.ceil(30 / vpNum) : 3} point
+                {(vpValide ? Math.ceil(30 / vpNum) : 3) > 1 ? 's' : ''}.
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Button onClick={handleSaveVp} disabled={!vpDirty || update.isPending}>
+                {update.isPending ? 'Enregistrement…' : 'Enregistrer'}
+              </Button>
+              {vpFeedback && (
+                <span
+                  className={[
+                    'inline-flex items-center gap-1.5 text-xs',
+                    vpFeedback.type === 'success' ? 'text-green-600' : 'text-red-600',
+                  ].join(' ')}
+                >
+                  {vpFeedback.type === 'success' && <Check size={14} />}
+                  {vpFeedback.msg}
                 </span>
               )}
             </div>

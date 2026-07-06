@@ -45,6 +45,11 @@ class BudgetTemplate(BaseModel):
         default=False,
         help_text="Auto-détecté : True si la catégorie est une majeure avec mineures actives."
     )
+    en_jeu = models.BooleanField(
+        default=False,
+        help_text="Mécanique B (points) : l'enveloppe participe au calcul des points. "
+                  "Reporté sur les budgets reconduits depuis ce modèle."
+    )
     actif = models.BooleanField(default=True)
     notes = models.TextField(blank=True)
 
@@ -138,6 +143,16 @@ class Budget(BaseModel):
         on_delete=models.SET_NULL,
         related_name="budgets_mensuels",
         help_text="Template dont ce budget est issu. Null = budget ponctuel créé manuellement."
+    )
+    en_jeu = models.BooleanField(
+        default=False,
+        help_text="Mécanique B (points) : cette enveloppe participe au calcul des points "
+                  "du mois (sous-consommé → gain, dépassé → perte)."
+    )
+    points_alloues = models.PositiveIntegerField(
+        default=0,
+        help_text="Mécanique B (12-B-2) : points distribués depuis la réserve vers cette "
+                  "enveloppe. Prévu effectif = montant_prevu + points_alloues × valeur_point."
     )
 
     class Meta(BaseModel.Meta):

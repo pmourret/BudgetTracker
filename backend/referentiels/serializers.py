@@ -12,7 +12,7 @@ class ParametresBudgetSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ParametresBudget
-        fields = ["id", "jour_debut_mois_comptable"]
+        fields = ["id", "jour_debut_mois_comptable", "valeur_point"]
         read_only_fields = ["id"]
 
 

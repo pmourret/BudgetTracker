@@ -35,9 +35,18 @@ def _calculer_consommation_avec_model(budget, FluxModel) -> None:
 
         budget.montant_consomme = abs(total)
 
-        if budget.montant_prevu > 0:
+        # Prévu effectif = base + bonus distribué (mécanique B). Le taux se
+        # calcule contre l'enveloppe effective : distribuer des points agrandit
+        # l'enveloppe et réduit donc le taux (et les alertes de dépassement).
+        if budget.points_alloues:
+            from .points import valeur_point
+            prevu_effectif = budget.montant_prevu + (budget.points_alloues * valeur_point())
+        else:
+            prevu_effectif = budget.montant_prevu
+
+        if prevu_effectif > 0:
             budget.taux_consommation = (
-                budget.montant_consomme / budget.montant_prevu * 100
+                budget.montant_consomme / prevu_effectif * 100
             ).quantize(Decimal("0.01"))
         else:
             budget.taux_consommation = Decimal("0.00")

@@ -48,3 +48,19 @@ class PrevisionnelSerializer(serializers.Serializer):
     solde_projete = serializers.DictField()
     capacite_restante = serializers.DictField()
     trajectoire = serializers.DictField()
+
+
+class PointsSerializer(serializers.Serializer):
+    """
+    Serializer de sortie pour le système de points (mécanique B, socle 12-B-1).
+    Lecture seule : le mois en cours est PROJETÉ (drapeau provisoire dans l'historique).
+    """
+    valeur_point = serializers.DecimalField(max_digits=8, decimal_places=2)
+    solde_disponible = serializers.IntegerField()
+    solde_disponible_euros = serializers.DecimalField(max_digits=12, decimal_places=2)
+    mois_courant = serializers.CharField()
+    delta_courant_provisoire = serializers.IntegerField()
+    historique = serializers.ListField()
+    enveloppes_courantes = serializers.ListField()
+    fiabilite_mois_courant = serializers.CharField()
+    definition = serializers.CharField()

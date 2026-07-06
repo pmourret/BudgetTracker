@@ -82,6 +82,7 @@ class BudgetTemplateSerializer(serializers.ModelSerializer):
             "est_budget_majeur",
             "categories_incluses",
             "categories_incluses_detail",
+            "en_jeu",
             "actif",
             "notes",
             "nb_budgets_mensuels",
@@ -246,6 +247,7 @@ class BudgetSerializer(serializers.ModelSerializer):
         max_digits=6, decimal_places=2, read_only=True
     )
     montant_restant = serializers.SerializerMethodField()
+    montant_prevu_effectif = serializers.SerializerMethodField()
     statut_consommation = serializers.SerializerMethodField()
 
     _montant_consomme_input = serializers.DecimalField(
@@ -275,6 +277,7 @@ class BudgetSerializer(serializers.ModelSerializer):
             "libelle",
             "mois",
             "montant_prevu",
+            "montant_prevu_effectif",
             "montant_consomme",
             "taux_consommation",
             "montant_restant",
@@ -284,6 +287,8 @@ class BudgetSerializer(serializers.ModelSerializer):
             "est_budget_majeur",
             "categories_incluses",
             "categories_incluses_detail",
+            "en_jeu",
+            "points_alloues",
             "template_id",
             "notes",
             "created_at",
@@ -295,6 +300,7 @@ class BudgetSerializer(serializers.ModelSerializer):
             "taux_consommation",
             "est_budget_majeur",
             "categories_incluses_detail",
+            "points_alloues",
             "template_id",
             "created_at",
             "updated_at",
@@ -311,8 +317,22 @@ class BudgetSerializer(serializers.ModelSerializer):
     def get_libelle(self, obj):
         return _libelle_budget(obj)
 
+    @property
+    def _vp(self):
+        """Valeur du point, lue une seule fois par sérialisation."""
+        if not hasattr(self, "_vp_cache"):
+            from .services.points import valeur_point
+            self._vp_cache = valeur_point()
+        return self._vp_cache
+
+    def get_montant_prevu_effectif(self, obj):
+        """Prévu de base + bonus distribué (points_alloues × valeur_point)."""
+        if not obj.points_alloues:
+            return obj.montant_prevu
+        return obj.montant_prevu + (obj.points_alloues * self._vp)
+
     def get_montant_restant(self, obj):
-        return obj.montant_prevu - obj.montant_consomme
+        return self.get_montant_prevu_effectif(obj) - obj.montant_consomme
 
     def get_statut_consommation(self, obj):
         """Fiabilité : réel (basé sur les flux saisis)."""

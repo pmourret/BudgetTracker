@@ -56,6 +56,24 @@ class BudgetViewSet(viewsets.ModelViewSet):
         budget.refresh_from_db()
         return Response(self.get_serializer(budget).data)
 
+    @action(detail=True, methods=["post"], url_path="allouer")
+    def allouer(self, request, pk=None):
+        """
+        Distribue des points de la réserve vers cette enveloppe (mécanique B, 12-B-2).
+        Body : { "points": N } (entier ≥ 0). Plafonné à la réserve disponible.
+        """
+        from .services import allouer as allouer_service, AllocationInvalide
+
+        budget = self.get_object()
+        try:
+            allouer_service(budget, request.data.get("points"))
+        except AllocationInvalide as exc:
+            return Response(
+                {"points": str(exc)}, status=status.HTTP_400_BAD_REQUEST
+            )
+        budget.refresh_from_db()
+        return Response(self.get_serializer(budget).data)
+
 
 class BudgetTemplateViewSet(viewsets.ModelViewSet):
     """

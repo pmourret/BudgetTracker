@@ -9,6 +9,7 @@ from .serializers import (
     DashboardSerializer,
     CompteDashboardSerializer,
     PrevisionnelSerializer,
+    PointsSerializer,
 )
 
 
@@ -91,4 +92,29 @@ class PrevisionnelView(APIView):
 
         data = calculer_previsionnel(nb_mois=nb_mois)
         serializer = PrevisionnelSerializer(data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class PointsView(APIView):
+    """
+    Système de points — mécanique B, socle 12-B-1 (lecture seule).
+
+    GET /api/v1/analytics/points/?nb_mois=6
+
+    Réserve de points de discipline budgétaire : chaque enveloppe « en jeu »
+    rapporte/coûte des points à la clôture. Le mois en cours est PROJETÉ (non figé) ;
+    la réserve disponible ne compte que les mois clôturés. Ne modifie rien.
+    """
+
+    def get(self, request):
+        from budgets.services import calculer_tableau_points
+
+        try:
+            nb_mois = int(request.query_params.get("nb_mois", 6))
+        except (TypeError, ValueError):
+            nb_mois = 6
+        nb_mois = max(1, min(nb_mois, 24))  # borné 1-24 mois
+
+        data = calculer_tableau_points(nb_mois=nb_mois)
+        serializer = PointsSerializer(data)
         return Response(serializer.data, status=status.HTTP_200_OK)

@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { useResourceList, useDeleteResource, useResourceAction } from '../hooks/useResource'
+import { useParametres } from '../hooks/useParametres'
+import usePoints from '../hooks/usePoints'
 import { formatEuro, formatMonth } from '../utils/format'
-import { Pencil, Trash2, RefreshCw } from 'lucide-react'
+import { Pencil, Trash2, RefreshCw, Coins } from 'lucide-react'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
@@ -10,6 +12,91 @@ import { DEFINITIONS } from '../constants/definitions'
 import { Loading, ErrorState, EmptyState } from '../components/ui/States'
 import BudgetFormModal from '../components/budgets/BudgetFormModal'
 import BudgetTemplateFormModal from '../components/budgets/BudgetTemplateFormModal'
+import AllocationModal from '../components/budgets/AllocationModal'
+
+// Points d'une enveloppe (miroir client de budgets/services/points.py) :
+// signe(prévu_effectif − consommé) × ⌈ |écart| / valeur_point ⌉.
+function computePoints(budget, vp) {
+  const prevuEff = Number(budget.montant_prevu) + Number(budget.points_alloues || 0) * vp
+  const ecart = prevuEff - Number(budget.montant_consomme)
+  if (ecart === 0 || !vp) return 0
+  const mag = Math.ceil(Math.abs(ecart) / vp)
+  return ecart > 0 ? mag : -mag
+}
+
+function PointsChip({ points }) {
+  if (points === 0) {
+    return <Badge variant="neutre">0 pt</Badge>
+  }
+  const positif = points > 0
+  return (
+    <span
+      className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
+        positif ? 'bg-teal-50 text-teal-700' : 'bg-red-50 text-red-700'
+      }`}
+    >
+      {positif ? '+' : ''}{points} pt{Math.abs(points) > 1 ? 's' : ''}
+    </span>
+  )
+}
+
+function PointsReservePanel({ nbMois = 6 }) {
+  const { data } = usePoints(nbMois)
+  if (!data) return null
+  const actif =
+    (data.enveloppes_courantes?.length ?? 0) > 0 ||
+    data.solde_disponible !== 0 ||
+    data.delta_courant_provisoire !== 0
+  if (!actif) return null
+
+  const solde = data.solde_disponible
+  const soldePositif = solde >= 0
+  const delta = data.delta_courant_provisoire
+
+  return (
+    <Card
+      title={
+        <span className="inline-flex items-center gap-1.5">
+          <Coins size={16} className="text-content-2" />
+          Réserve de points
+          <Tooltip {...DEFINITIONS.points_reserve} align="left" />
+        </span>
+      }
+    >
+      <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
+        <div>
+          <div className="text-xs text-content-3 mb-0.5">Disponible (mois clôturés)</div>
+          <div className={`text-2xl font-semibold ${soldePositif ? 'text-teal-600' : 'text-red-600'}`}>
+            {soldePositif ? '+' : ''}{solde} pt{Math.abs(solde) > 1 ? 's' : ''}
+          </div>
+          <div className="text-xs text-content-3 mt-0.5">
+            ≈ {formatEuro(data.solde_disponible_euros)}
+          </div>
+        </div>
+        <div>
+          <div className="text-xs text-content-3 mb-0.5 inline-flex items-center gap-1">
+            Mois en cours <Badge variant="info">projeté</Badge>
+          </div>
+          <div className={`text-2xl font-semibold ${delta >= 0 ? 'text-teal-600' : 'text-red-600'}`}>
+            {delta >= 0 ? '+' : ''}{delta} pt{Math.abs(delta) > 1 ? 's' : ''}
+          </div>
+          <div className="text-xs text-content-3 mt-0.5">non figé avant la clôture</div>
+        </div>
+      </div>
+
+      {data.enveloppes_courantes?.length > 0 && (
+        <div className="mt-3 flex flex-col gap-1.5 border-t border-border-app pt-3">
+          {data.enveloppes_courantes.map((e) => (
+            <div key={e.id} className="flex items-center justify-between text-sm">
+              <span className="text-content-2 truncate">{e.libelle}</span>
+              <PointsChip points={e.points} />
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  )
+}
 
 function moisActuelDate() {
   const d = new Date()
@@ -36,9 +123,16 @@ export default function BudgetsPage() {
   const [templateModalOpen, setTemplateModalOpen] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState(null)
   const [reconduireMsg, setReconduireMsg] = useState(null)
+  const [allocOpen, setAllocOpen] = useState(false)
+  const [allocBudget, setAllocBudget] = useState(null)
 
   const moisISO = toISO(moisCourant)
   const { data, isLoading, isError, refetch } = useResourceList('budgets', { mois: moisISO })
+  const { data: paramsData } = useParametres()
+  const { data: pointsData } = usePoints()
+  const valeurPoint = Number(paramsData?.valeur_point ?? 10)
+  const soldeDisponible = Number(pointsData?.solde_disponible ?? 0)
+  const moisCourantPoints = pointsData?.mois_courant // libellé du mois comptable courant
   const budgets = data?.results ?? []
   const totalPrevu = budgets.reduce((s, b) => s + Number(b.montant_prevu || 0), 0)
   const totalConsomme = budgets.reduce((s, b) => s + Number(b.montant_consomme || 0), 0)
@@ -65,6 +159,9 @@ export default function BudgetsPage() {
   const openTemplateCreate = () => { setSelectedTemplate(null); setTemplateModalOpen(true) }
   const openTemplateEdit = (tmpl) => { setSelectedTemplate(tmpl); setTemplateModalOpen(true) }
   const closeTemplateModal = () => { setTemplateModalOpen(false); setSelectedTemplate(null) }
+
+  const openAllocate = (budget) => { setAllocBudget(budget); setAllocOpen(true) }
+  const closeAllocate = () => { setAllocOpen(false); setAllocBudget(null) }
 
   const handleReconduire = () => {
     setReconduireMsg(null)
@@ -133,6 +230,8 @@ export default function BudgetsPage() {
             </button>
           </div>
 
+          <PointsReservePanel />
+
           {isLoading && <Loading message="Chargement des budgets..." />}
           {isError && <ErrorState message="Impossible de charger les budgets." onRetry={refetch} />}
 
@@ -180,7 +279,17 @@ export default function BudgetsPage() {
               ) : (
                 <div className="flex flex-col gap-3">
                   {budgets.map((budget) => (
-                    <BudgetCard key={budget.id} budget={budget} onEdit={() => openEdit(budget)} />
+                    <BudgetCard
+                      key={budget.id}
+                      budget={budget}
+                      valeurPoint={valeurPoint}
+                      onEdit={() => openEdit(budget)}
+                      onAllocate={
+                        budget.en_jeu && budget.mois === moisCourantPoints
+                          ? () => openAllocate(budget)
+                          : null
+                      }
+                    />
                   ))}
                 </div>
               )}
@@ -252,6 +361,13 @@ export default function BudgetsPage() {
         onClose={closeTemplateModal}
         template={selectedTemplate}
       />
+      <AllocationModal
+        isOpen={allocOpen}
+        onClose={closeAllocate}
+        budget={allocBudget}
+        soldeDisponible={soldeDisponible}
+        valeurPoint={valeurPoint}
+      />
     </div>
   )
 }
@@ -296,13 +412,18 @@ function MineuresIncluses({ detail }) {
   )
 }
 
-function BudgetCard({ budget, onEdit }) {
+function BudgetCard({ budget, onEdit, onAllocate = null, valeurPoint = 10 }) {
   const statut = statutFromTaux(budget.taux_consommation)
   const largeur = Math.min(Number(budget.taux_consommation), 100)
   const deleteBudget = useDeleteResource('budgets')
 
   const libelle = budget.libelle ?? budget.categorie_nom
   const estThematique = !budget.categorie
+  const points = budget.en_jeu ? computePoints(budget, valeurPoint) : null
+  const pointsAlloues = Number(budget.points_alloues ?? 0)
+  const prevuEffectif = Number(
+    budget.montant_prevu_effectif ?? budget.montant_prevu
+  )
 
   const handleDelete = () => {
     if (!window.confirm(`Supprimer le budget « ${libelle} » pour ${formatMonth(budget.mois)} ?`)) return
@@ -315,6 +436,12 @@ function BudgetCard({ budget, onEdit }) {
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-content">{libelle}</span>
           {estThematique && <Badge variant="info">Thématique</Badge>}
+          {budget.en_jeu && (
+            <span className="inline-flex items-center gap-1">
+              <PointsChip points={points} />
+              <Tooltip {...DEFINITIONS.points_enveloppe} align="left" size={12} />
+            </span>
+          )}
           {budget.template_id && (
             <span title="Créé depuis un modèle" className="text-content-3">
               <RefreshCw size={11} />
@@ -323,6 +450,15 @@ function BudgetCard({ budget, onEdit }) {
         </div>
         <div className="flex items-center gap-2">
           <Badge variant={statut.variant}>{statut.label}</Badge>
+          {onAllocate && (
+            <button
+              onClick={onAllocate}
+              title="Distribuer des points"
+              className="p-1.5 rounded-md text-content-2 hover:text-teal-600 hover:bg-teal-50 cursor-pointer"
+            >
+              <Coins size={13} />
+            </button>
+          )}
           <button
             onClick={onEdit}
             title="Modifier"
@@ -354,7 +490,10 @@ function BudgetCard({ budget, onEdit }) {
           Consommé : <strong className="text-content font-medium">{formatEuro(budget.montant_consomme)}</strong>
         </span>
         <span>
-          Prévu : <strong className="text-content font-medium">{formatEuro(budget.montant_prevu)}</strong>
+          Prévu : <strong className="text-content font-medium">{formatEuro(prevuEffectif)}</strong>
+          {pointsAlloues > 0 && (
+            <span className="text-teal-600"> (dont +{pointsAlloues} pt{pointsAlloues > 1 ? 's' : ''})</span>
+          )}
         </span>
         <span className={`font-medium flex items-center gap-1 ${statut.pct}`}>
           {Number(budget.taux_consommation).toFixed(0)} %
@@ -389,6 +528,11 @@ function TemplateCard({ template, onEdit }) {
                 <Badge variant="neutre">Inactif</Badge>
               )}
               {estThematique && <Badge variant="info">Thématique</Badge>}
+              {template.en_jeu && (
+                <span className="inline-flex items-center gap-1 text-teal-700">
+                  <Coins size={13} />
+                </span>
+              )}
               {template.est_budget_majeur && (
                 <span className="inline-flex items-center gap-1">
                   <Badge variant="purple">Global</Badge>

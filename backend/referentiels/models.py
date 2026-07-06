@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from core.models import BaseModel
@@ -19,6 +21,16 @@ class ParametresBudget(BaseModel):
             "Jour du mois où débute le mois comptable (1 = mois calendaire). "
             "Borné à 28 pour rester valide tous les mois. Ex. 25 : la période "
             "du 25 au 24 du mois suivant est le mois comptable du suivant."
+        ),
+    )
+    valeur_point = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        default=Decimal("10"),
+        validators=[MinValueValidator(Decimal("0.01"))],
+        help_text=(
+            "Valeur d'un point de budget (mécanique B — système de points). "
+            "En € : combien d'euros sous/sur-consommés valent un point. Défaut 10 €."
         ),
     )
 

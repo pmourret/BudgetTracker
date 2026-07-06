@@ -998,3 +998,226 @@ class BudgetTemplateThematiqueTest(APITestCase):
         result2 = reconduire_vers_mois(datetime.date(2026, 7, 1))
         self.assertEqual(result2["crees"], 0)
         self.assertEqual(result2["ignores"], 1)
+
+
+class PointsServiceTest(TestCase):
+    """
+    Mécanique B — système de points (socle 12-B-1, lecture seule).
+    valeur_point = 10 € par défaut ; arrondi magnitude vers le haut.
+    """
+
+    def setUp(self):
+        from referentiels.models import ParametresBudget
+        self.params = ParametresBudget.get_solo()
+        self.params.valeur_point = Decimal("10.00")
+        self.params.save()
+        self.cat = Categorie.objects.create(code="PTS_CAT", nom="Courses PTS")
+
+    def _budget(self, mois, prevu, consomme, en_jeu=True, categorie=None):
+        return Budget.objects.create(
+            categorie=categorie or self.cat,
+            mois=mois,
+            montant_prevu=Decimal(str(prevu)),
+            montant_consomme=Decimal(str(consomme)),
+            en_jeu=en_jeu,
+        )
+
+    def test_points_gain_sous_consomme(self):
+        from budgets.services.points import points_enveloppe
+        b = self._budget(datetime.date(2026, 6, 1), 300, 270)
+        self.assertEqual(points_enveloppe(b, Decimal("10")), 3)
+
+    def test_points_perte_depassement(self):
+        from budgets.services.points import points_enveloppe
+        b = self._budget(datetime.date(2026, 6, 1), 300, 330)
+        self.assertEqual(points_enveloppe(b, Decimal("10")), -3)
+
+    def test_arrondi_magnitude_vers_le_haut(self):
+        from budgets.services.points import points_enveloppe
+        # +25 € → 2,5 pts → arrondi magnitude à 3
+        b_gain = self._budget(datetime.date(2026, 6, 1), 300, 275)
+        self.assertEqual(points_enveloppe(b_gain, Decimal("10")), 3)
+        # −25 € → −3 (magnitude vers le haut aussi)
+        b_perte = self._budget(
+            datetime.date(2026, 6, 1), 300, 325,
+            categorie=Categorie.objects.create(code="PTS_C2", nom="C2"),
+        )
+        self.assertEqual(points_enveloppe(b_perte, Decimal("10")), -3)
+
+    def test_valeur_point_parametrable(self):
+        from budgets.services.points import points_enveloppe
+        b = self._budget(datetime.date(2026, 6, 1), 300, 250)  # écart +50
+        self.assertEqual(points_enveloppe(b, Decimal("10")), 5)
+        self.assertEqual(points_enveloppe(b, Decimal("25")), 2)  # 50/25 = 2
+
+    def test_delta_mois_ignore_hors_jeu(self):
+        from budgets.services.points import delta_mois
+        self._budget(datetime.date(2026, 6, 1), 300, 270)  # +3, en jeu
+        self._budget(
+            datetime.date(2026, 6, 1), 100, 200, en_jeu=False,
+            categorie=Categorie.objects.create(code="PTS_C3", nom="C3"),
+        )  # hors jeu → ignoré
+        self.assertEqual(delta_mois(datetime.date(2026, 6, 1), Decimal("10")), 3)
+
+    def test_solde_disponible_exclut_mois_courant(self):
+        from budgets.services.points import solde_disponible
+        aujourd = datetime.date(2026, 7, 15)  # mois comptable courant = juillet
+        self._budget(datetime.date(2026, 6, 1), 300, 270)  # clôturé → +3
+        self._budget(
+            datetime.date(2026, 7, 1), 300, 200,  # courant → +10 mais PROVISOIRE
+            categorie=Categorie.objects.create(code="PTS_C4", nom="C4"),
+        )
+        # Seul juin (clôturé) compte dans la réserve disponible.
+        self.assertEqual(solde_disponible(aujourd_hui=aujourd), 3)
+
+    def test_tableau_points_historique_et_provisoire(self):
+        from budgets.services.points import calculer_tableau_points
+        aujourd = datetime.date(2026, 7, 15)
+        self._budget(datetime.date(2026, 6, 1), 300, 270)  # +3 clôturé
+        self._budget(
+            datetime.date(2026, 7, 1), 300, 330,  # −3 provisoire
+            categorie=Categorie.objects.create(code="PTS_C5", nom="C5"),
+        )
+        data = calculer_tableau_points(nb_mois=3, aujourd_hui=aujourd)
+        self.assertEqual(data["solde_disponible"], 3)
+        self.assertEqual(data["solde_disponible_euros"], Decimal("30.00"))
+        # dernier point = mois courant, provisoire
+        courant = data["historique"][-1]
+        self.assertEqual(str(courant["mois"]), "2026-07-01")
+        self.assertTrue(courant["provisoire"])
+        self.assertEqual(courant["delta"], -3)
+        # cumul de fin = 3 (juin) − 3 (juillet provisoire) = 0
+        self.assertEqual(courant["cumul"], 0)
+        self.assertEqual(len(data["enveloppes_courantes"]), 1)
+
+
+class BudgetPrevuEffectifTest(TestCase):
+    """Le taux se calcule contre le prévu effectif (base + points × valeur_point)."""
+
+    def test_taux_contre_prevu_effectif(self):
+        from budgets.services.consommation import _calculer_consommation_avec_model
+        cat = Categorie.objects.create(code="EFF_CAT", nom="Eff")
+        b = Budget.objects.create(
+            categorie=cat, mois=datetime.date(2026, 7, 1),
+            montant_prevu=Decimal("300.00"), en_jeu=True, points_alloues=5,
+        )  # valeur_point défaut 10 → prévu effectif = 350
+        MockFlux = MagicMock()
+        MockFlux.objects.filter.return_value.aggregate.return_value = {
+            "total": Decimal("-350.00")
+        }
+        _calculer_consommation_avec_model(b, MockFlux)
+        self.assertEqual(b.montant_consomme, Decimal("350.00"))
+        self.assertEqual(b.taux_consommation, Decimal("100.00"))
+
+
+class PointsAllocationTest(TestCase):
+    """Distribution manuelle de points (mécanique B, 12-B-2)."""
+
+    def setUp(self):
+        from referentiels.models import ParametresBudget
+        p = ParametresBudget.get_solo()
+        p.valeur_point = Decimal("10.00")
+        p.save()
+        self.aujourd = datetime.date(2026, 7, 15)  # mois comptable courant = juillet
+        # Mois clôturé (juin) : +10 points → réserve disponible = 10.
+        Budget.objects.create(
+            categorie=Categorie.objects.create(code="AL_JUIN", nom="Juin"),
+            mois=datetime.date(2026, 6, 1),
+            montant_prevu=Decimal("300.00"), montant_consomme=Decimal("200.00"),
+            en_jeu=True,
+        )
+        self.courant = Budget.objects.create(
+            categorie=Categorie.objects.create(code="AL_COUR", nom="Courant"),
+            mois=datetime.date(2026, 7, 1),
+            montant_prevu=Decimal("200.00"), en_jeu=True,
+        )
+
+    def test_allocation_reduit_reserve(self):
+        from budgets.services.points import allouer, solde_disponible
+        allouer(self.courant, 5, aujourd_hui=self.aujourd)
+        self.courant.refresh_from_db()
+        self.assertEqual(self.courant.points_alloues, 5)
+        self.assertEqual(solde_disponible(aujourd_hui=self.aujourd), 5)  # 10 − 5
+
+    def test_allocation_plafonnee(self):
+        from budgets.services.points import allouer, AllocationInvalide
+        with self.assertRaises(AllocationInvalide):
+            allouer(self.courant, 15, aujourd_hui=self.aujourd)  # > 10 disponibles
+
+    def test_desallocation_rend_reserve(self):
+        from budgets.services.points import allouer, solde_disponible
+        allouer(self.courant, 5, aujourd_hui=self.aujourd)
+        allouer(self.courant, 0, aujourd_hui=self.aujourd)
+        self.courant.refresh_from_db()
+        self.assertEqual(self.courant.points_alloues, 0)
+        self.assertEqual(solde_disponible(aujourd_hui=self.aujourd), 10)
+
+    def test_allocation_hors_jeu_refusee(self):
+        from budgets.services.points import allouer, AllocationInvalide
+        hors = Budget.objects.create(
+            categorie=Categorie.objects.create(code="AL_HJ", nom="HorsJeu"),
+            mois=datetime.date(2026, 7, 1),
+            montant_prevu=Decimal("100.00"), en_jeu=False,
+        )
+        with self.assertRaises(AllocationInvalide):
+            allouer(hors, 1, aujourd_hui=self.aujourd)
+
+    def test_allocation_mois_non_courant_refusee(self):
+        from budgets.services.points import allouer, AllocationInvalide
+        juin = Budget.objects.get(mois=datetime.date(2026, 6, 1))
+        with self.assertRaises(AllocationInvalide):
+            allouer(juin, 1, aujourd_hui=self.aujourd)
+
+
+class PointsAllocationAPITest(APITestCase):
+    """Endpoint POST /budgets/{id}/allouer/."""
+
+    def test_allouer_endpoint(self):
+        from dateutil.relativedelta import relativedelta
+        from core.services.periode import mois_comptable_courant
+        from referentiels.models import ParametresBudget
+        p = ParametresBudget.get_solo()
+        p.valeur_point = Decimal("10.00")
+        p.save()
+
+        courant = mois_comptable_courant()
+        prev = courant - relativedelta(months=1)
+        # Mois clôturé → +10 de réserve.
+        Budget.objects.create(
+            categorie=Categorie.objects.create(code="API_PREV", nom="Prev"),
+            mois=prev,
+            montant_prevu=Decimal("300.00"), montant_consomme=Decimal("200.00"),
+            en_jeu=True,
+        )
+        b = Budget.objects.create(
+            categorie=Categorie.objects.create(code="API_COUR", nom="Cour"),
+            mois=courant,
+            montant_prevu=Decimal("200.00"), en_jeu=True,
+        )
+        resp = self.client.post(reverse("budget-allouer", args=[b.id]), {"points": 3}, format="json")
+        self.assertEqual(resp.status_code, drf_status.HTTP_200_OK)
+        self.assertEqual(resp.data["points_alloues"], 3)
+        # 200 base + 3 × 10 = 230 effectif
+        self.assertEqual(Decimal(resp.data["montant_prevu_effectif"]), Decimal("230.00"))
+
+        # Au-delà de la réserve → 400
+        resp2 = self.client.post(reverse("budget-allouer", args=[b.id]), {"points": 999}, format="json")
+        self.assertEqual(resp2.status_code, drf_status.HTTP_400_BAD_REQUEST)
+
+
+class PointsAPITest(APITestCase):
+    """L'endpoint /analytics/points/ répond avec la structure attendue."""
+
+    def test_endpoint_points(self):
+        cat = Categorie.objects.create(code="PTS_API", nom="Courses API")
+        Budget.objects.create(
+            categorie=cat,
+            mois=datetime.date(2026, 6, 1),
+            montant_prevu=Decimal("300.00"),
+            montant_consomme=Decimal("280.00"),
+            en_jeu=True,
+        )
+        response = self.client.get(reverse("points"), {"nb_mois": 6})
+        self.assertEqual(response.status_code, drf_status.HTTP_200_OK)
+        for key in ("valeur_point", "solde_disponible", "historique", "enveloppes_courantes"):
+            self.assertIn(key, response.data)

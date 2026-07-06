@@ -14,6 +14,7 @@ export default function BudgetTemplateFormModal({ isOpen, onClose, template = nu
   const [montantDefaut, setMontantDefaut] = useState('')
   const [notes, setNotes] = useState('')
   const [actif, setActif] = useState(true)
+  const [enJeu, setEnJeu] = useState(false)
   const [categoriesIncluses, setCategoriesIncluses] = useState([])
   const [errors, setErrors] = useState({})
 
@@ -86,6 +87,7 @@ export default function BudgetTemplateFormModal({ isOpen, onClose, template = nu
       setMontantDefaut(String(template.montant_defaut ?? ''))
       setNotes(template.notes ?? '')
       setActif(template.actif ?? true)
+      setEnJeu(Boolean(template.en_jeu))
       setCategoriesIncluses((template.categories_incluses ?? []).map((id) => String(id)))
     } else {
       setTypeBudget('categorie')
@@ -94,6 +96,7 @@ export default function BudgetTemplateFormModal({ isOpen, onClose, template = nu
       setMontantDefaut('')
       setNotes('')
       setActif(true)
+      setEnJeu(false)
       setCategoriesIncluses([])
     }
     setErrors({})
@@ -140,6 +143,7 @@ export default function BudgetTemplateFormModal({ isOpen, onClose, template = nu
       montant_defaut: montant.toFixed(2),
       notes,
       actif,
+      en_jeu: enJeu,
     }
     if (estThematique) {
       payload.categorie = null
@@ -324,6 +328,21 @@ export default function BudgetTemplateFormModal({ isOpen, onClose, template = nu
           error={errors.montantDefaut || errors.montant_defaut}
           required
         />
+
+        <label className="flex items-start gap-2.5 cursor-pointer rounded-lg border border-border-app bg-surface-2 px-3 py-2.5">
+          <input
+            type="checkbox"
+            className="w-4 h-4 mt-0.5 accent-purple-600 cursor-pointer"
+            checked={enJeu}
+            onChange={(e) => setEnJeu(e.target.checked)}
+          />
+          <span className="text-sm text-content">
+            Enveloppe « en jeu » (système de points)
+            <span className="block text-xs text-content-3 mt-0.5">
+              Reporté sur chaque budget reconduit depuis ce modèle.
+            </span>
+          </span>
+        </label>
 
         {isEdit && (
           <label className="flex items-center gap-3 cursor-pointer">

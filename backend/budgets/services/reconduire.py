@@ -58,6 +58,7 @@ def reconduire_vers_mois(mois_cible: date) -> dict:
                 mois=mois,
                 montant_prevu=template.montant_defaut,
                 est_budget_majeur=template.est_budget_majeur,
+                en_jeu=template.en_jeu,
                 template=template,
                 notes=template.notes,
             )
