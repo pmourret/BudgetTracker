@@ -72,7 +72,7 @@ def calculer_dashboard(nb_mois: int = 6, mois: datetime.date = None) -> dict:
     budgets_data = [
         {
             "id": str(b.id),
-            "categorie_nom": b.categorie.nom,
+            "categorie_nom": b.categorie.nom if b.categorie_id else b.nom,
             "montant_prevu": b.montant_prevu,
             "montant_consomme": b.montant_consomme,
             "taux_consommation": b.taux_consommation,

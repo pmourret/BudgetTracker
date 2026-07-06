@@ -792,3 +792,209 @@ class AlerteBudgetMajeurTest(TestCase):
                 budget=self.budget_majeur,
             ).exists()
         )
+
+
+class BudgetThematiqueAPITest(APITestCase):
+    """
+    Budgets thématiques (phase 11b-3) : enveloppe regroupant des feuilles
+    appartenant à des arbres différents (ex. Assurances = santé + habitation).
+    """
+
+    def setUp(self):
+        # Trois arbres distincts, une feuille dans chacun.
+        self.sante = Categorie.objects.create(code="SANTE_TH", nom="Santé")
+        self.mnh = Categorie.objects.create(
+            code="MNH_TH", nom="Mutuelle MNH", parent=self.sante
+        )
+        self.logement = Categorie.objects.create(code="LOG_TH", nom="Logement")
+        self.assur_hab = Categorie.objects.create(
+            code="AHAB_TH", nom="Assurance habitation", parent=self.logement
+        )
+        self.animaux = Categorie.objects.create(code="ANIM_TH", nom="Animaux")
+        self.assur_anim = Categorie.objects.create(
+            code="AANIM_TH", nom="Assurance animaux", parent=self.animaux
+        )
+
+    def _payload(self, **over):
+        base = {
+            "nom": "Assurances",
+            "mois": "2026-07-01",
+            "montant_prevu": "180.00",
+            "categories_incluses": [
+                str(self.mnh.id), str(self.assur_hab.id), str(self.assur_anim.id)
+            ],
+        }
+        base.update(over)
+        return base
+
+    def test_creation_thematique(self):
+        """Budget thématique sans catégorie ancre → 201, feuilles multi-arbres."""
+        response = self.client.post(
+            reverse("budget-list"), self._payload(), format="json"
+        )
+        self.assertEqual(response.status_code, drf_status.HTTP_201_CREATED)
+        self.assertIsNone(response.data["categorie"])
+        self.assertEqual(response.data["libelle"], "Assurances")
+        self.assertFalse(response.data["est_budget_majeur"])
+        ids = {d["id"] for d in response.data["categories_incluses_detail"]}
+        self.assertEqual(
+            ids,
+            {str(self.mnh.id), str(self.assur_hab.id), str(self.assur_anim.id)},
+        )
+
+    def test_thematique_sans_nom_refuse(self):
+        response = self.client.post(
+            reverse("budget-list"), self._payload(nom=""), format="json"
+        )
+        self.assertEqual(response.status_code, drf_status.HTTP_400_BAD_REQUEST)
+        self.assertIn("nom", response.data)
+
+    def test_thematique_sans_categorie_refuse(self):
+        response = self.client.post(
+            reverse("budget-list"),
+            self._payload(categories_incluses=[]),
+            format="json",
+        )
+        self.assertEqual(response.status_code, drf_status.HTTP_400_BAD_REQUEST)
+        self.assertIn("categories_incluses", response.data)
+
+    def test_thematique_refuse_categorie_majeure(self):
+        """Inclure une majeure (non-feuille) dans un thématique → 400."""
+        response = self.client.post(
+            reverse("budget-list"),
+            self._payload(categories_incluses=[str(self.sante.id)]),
+            format="json",
+        )
+        self.assertEqual(response.status_code, drf_status.HTTP_400_BAD_REQUEST)
+        self.assertIn("categories_incluses", response.data)
+
+    def test_exclusivite_feuille_deja_dans_budget_simple(self):
+        """Une feuille déjà couverte par un budget simple ce mois → 400."""
+        Budget.objects.create(
+            categorie=self.mnh,
+            mois=datetime.date(2026, 7, 1),
+            montant_prevu=Decimal("50.00"),
+        )
+        response = self.client.post(
+            reverse("budget-list"), self._payload(), format="json"
+        )
+        self.assertEqual(response.status_code, drf_status.HTTP_400_BAD_REQUEST)
+
+    def test_exclusivite_budget_simple_apres_thematique(self):
+        """Après un thématique, un budget simple sur une feuille couverte → 400."""
+        self.client.post(reverse("budget-list"), self._payload(), format="json")
+        response = self.client.post(
+            reverse("budget-list"),
+            {
+                "categorie": str(self.assur_hab.id),
+                "mois": "2026-07-01",
+                "montant_prevu": "60.00",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, drf_status.HTTP_400_BAD_REQUEST)
+
+    def test_meme_feuilles_mois_different_ok(self):
+        """Les enveloppes exclusives sont par mois : un autre mois est libre."""
+        self.client.post(reverse("budget-list"), self._payload(), format="json")
+        response = self.client.post(
+            reverse("budget-list"),
+            self._payload(mois="2026-08-01"),
+            format="json",
+        )
+        self.assertEqual(response.status_code, drf_status.HTTP_201_CREATED)
+
+
+class BudgetThematiqueConsommationTest(TestCase):
+    """La consommation d'un thématique agrège les flux de ses feuilles libres."""
+
+    def setUp(self):
+        type_compte = TypeCompte.objects.create(code="CPT_THC", libelle="Courant")
+        titulaire = Titulaire.objects.create(code="TIT_THC", libelle="Pierre")
+        etablissement = Etablissement.objects.create(code="ETA_THC", libelle="BNP")
+        self.devise = Devise.objects.create(
+            code="EUR_THC", libelle="Euro", symbole="€", est_defaut=False
+        )
+        self.type_flux = TypeFlux.objects.create(code="DEB_THC", libelle="Débit")
+        self.statut = StatutFlux.objects.create(
+            code="VAL_THC", libelle="Validé", est_definitif=True
+        )
+        self.compte = Compte.objects.create(
+            code="CPT-THC01",
+            nom="Compte thématique",
+            type_compte=type_compte,
+            titulaire=titulaire,
+            etablissement=etablissement,
+            devise=self.devise,
+            solde_initial=Decimal("3000.00"),
+        )
+        sante = Categorie.objects.create(code="SANTE_C", nom="Santé")
+        self.mnh = Categorie.objects.create(code="MNH_C", nom="MNH", parent=sante)
+        log = Categorie.objects.create(code="LOG_C", nom="Logement")
+        self.assur_hab = Categorie.objects.create(
+            code="AHAB_C", nom="Assur habitation", parent=log
+        )
+        self.autre = Categorie.objects.create(code="AUTRE_C", nom="Autre", parent=log)
+        self.budget = Budget.objects.create(
+            nom="Assurances",
+            mois=datetime.date(2026, 7, 1),
+            montant_prevu=Decimal("200.00"),
+        )
+        self.budget.categories_incluses.set([self.mnh, self.assur_hab])
+
+    def _flux(self, categorie, montant):
+        return Flux.objects.create(
+            compte=self.compte,
+            categorie=categorie,
+            type_flux=self.type_flux,
+            statut=self.statut,
+            devise=self.devise,
+            montant=Decimal(str(montant)),
+            date_flux=datetime.date(2026, 7, 10),
+        )
+
+    def test_consommation_agrege_feuilles(self):
+        self._flux(self.mnh, "-40.00")
+        self._flux(self.assur_hab, "-120.00")
+        self._flux(self.autre, "-500.00")  # hors enveloppe → ignoré
+        self.budget.refresh_from_db()
+        self.assertEqual(self.budget.montant_consomme, Decimal("160.00"))
+
+
+class BudgetTemplateThematiqueTest(APITestCase):
+    """Modèle thématique + reconduction vers un mois."""
+
+    def setUp(self):
+        sante = Categorie.objects.create(code="SANTE_TT", nom="Santé")
+        self.mnh = Categorie.objects.create(code="MNH_TT", nom="MNH", parent=sante)
+        log = Categorie.objects.create(code="LOG_TT", nom="Logement")
+        self.assur_hab = Categorie.objects.create(
+            code="AHAB_TT", nom="Assur habitation", parent=log
+        )
+
+    def test_creation_et_reconduction_template_thematique(self):
+        response = self.client.post(
+            reverse("budget-template-list"),
+            {
+                "nom": "Assurances",
+                "montant_defaut": "180.00",
+                "categories_incluses": [str(self.mnh.id), str(self.assur_hab.id)],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, drf_status.HTTP_201_CREATED)
+        self.assertIsNone(response.data["categorie"])
+        self.assertEqual(response.data["libelle"], "Assurances")
+
+        result = reconduire_vers_mois(datetime.date(2026, 7, 1))
+        self.assertEqual(result["crees"], 1)
+        budget = Budget.objects.get(nom="Assurances", mois=datetime.date(2026, 7, 1))
+        self.assertIsNone(budget.categorie_id)
+        self.assertEqual(
+            {c.id for c in budget.categories_incluses.all()},
+            {self.mnh.id, self.assur_hab.id},
+        )
+        # Idempotence : deuxième reconduction ne recrée pas.
+        result2 = reconduire_vers_mois(datetime.date(2026, 7, 1))
+        self.assertEqual(result2["crees"], 0)
+        self.assertEqual(result2["ignores"], 1)

@@ -301,8 +301,11 @@ function BudgetCard({ budget, onEdit }) {
   const largeur = Math.min(Number(budget.taux_consommation), 100)
   const deleteBudget = useDeleteResource('budgets')
 
+  const libelle = budget.libelle ?? budget.categorie_nom
+  const estThematique = !budget.categorie
+
   const handleDelete = () => {
-    if (!window.confirm(`Supprimer le budget « ${budget.categorie_nom} » pour ${formatMonth(budget.mois)} ?`)) return
+    if (!window.confirm(`Supprimer le budget « ${libelle} » pour ${formatMonth(budget.mois)} ?`)) return
     deleteBudget.mutate(budget.id)
   }
 
@@ -310,7 +313,8 @@ function BudgetCard({ budget, onEdit }) {
     <Card>
       <div className="flex justify-between items-center mb-2.5">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-content">{budget.categorie_nom}</span>
+          <span className="text-sm font-medium text-content">{libelle}</span>
+          {estThematique && <Badge variant="info">Thématique</Badge>}
           {budget.template_id && (
             <span title="Créé depuis un modèle" className="text-content-3">
               <RefreshCw size={11} />
@@ -337,7 +341,7 @@ function BudgetCard({ budget, onEdit }) {
         </div>
       </div>
 
-      {budget.est_budget_majeur && budget.categories_incluses_detail?.length > 0 && (
+      {budget.categories_incluses_detail?.length > 0 && (
         <MineuresIncluses detail={budget.categories_incluses_detail} />
       )}
 
@@ -364,8 +368,11 @@ function BudgetCard({ budget, onEdit }) {
 function TemplateCard({ template, onEdit }) {
   const deleteTemplate = useDeleteResource('budget-templates')
 
+  const libelle = template.libelle ?? template.categorie_nom
+  const estThematique = !template.categorie
+
   const handleDelete = () => {
-    if (!window.confirm(`Supprimer le modèle « ${template.categorie_nom} » ?`)) return
+    if (!window.confirm(`Supprimer le modèle « ${libelle} » ?`)) return
     deleteTemplate.mutate(template.id)
   }
 
@@ -376,11 +383,12 @@ function TemplateCard({ template, onEdit }) {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium text-content truncate">
-                {template.categorie_nom}
+                {libelle}
               </span>
               {!template.actif && (
                 <Badge variant="neutre">Inactif</Badge>
               )}
+              {estThematique && <Badge variant="info">Thématique</Badge>}
               {template.est_budget_majeur && (
                 <span className="inline-flex items-center gap-1">
                   <Badge variant="purple">Global</Badge>
@@ -388,7 +396,7 @@ function TemplateCard({ template, onEdit }) {
                 </span>
               )}
             </div>
-            {template.est_budget_majeur && template.categories_incluses_detail?.length > 0 && (
+            {template.categories_incluses_detail?.length > 0 && (
               <MineuresIncluses detail={template.categories_incluses_detail} />
             )}
             {template.nb_budgets_mensuels > 0 && (

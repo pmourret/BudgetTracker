@@ -52,11 +52,14 @@ def _enveloppes_templates():
         "categories_incluses"
     )
     for template in templates:
-        categories = {template.categorie_id}
-        if template.est_budget_majeur:
-            categories.update(
-                template.categories_incluses.values_list("id", flat=True)
-            )
+        inclus = set(template.categories_incluses.values_list("id", flat=True))
+        if template.categorie_id:
+            categories = {template.categorie_id}
+            if template.est_budget_majeur:
+                categories.update(inclus)
+        else:
+            # Modèle thématique : uniquement les feuilles libres couvertes.
+            categories = inclus
         enveloppes.append((template, categories))
     return enveloppes
 

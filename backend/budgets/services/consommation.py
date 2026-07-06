@@ -7,38 +7,31 @@ def _calculer_consommation_avec_model(budget, FluxModel) -> None:
     """
     Logique pure — séparée pour être testable sans dépendance à Flux.
 
-    Budget majeur : somme des flux des mineures incluses dans categories_incluses.
-    Budget mineure : somme des flux de la catégorie directe.
-    Dans les deux cas : exclut les transferts et les flux d'ajustement.
+    Couverture unifiée (majeur, thématique, simple) :
+    - categories_incluses non vide → somme des flux de ces catégories
+      (mineures d'une majeure OU feuilles libres d'un thématique) ;
+    - sinon → somme des flux de la catégorie ancre (budget simple).
+    Dans tous les cas : exclut les transferts et les flux d'ajustement.
     """
     with transaction.atomic():
-        if budget.est_budget_majeur:
-            categories = list(budget.categories_incluses.all())
-            total = (
-                FluxModel.objects
-                .filter(
-                    categorie__in=categories,
-                    mois=budget.mois,
-                    montant__lt=0,
-                    est_transfert=False,
-                    est_ajustement=False,
-                )
-                .aggregate(total=Sum("montant"))
-                ["total"]
-            ) or Decimal("0.00")
+        categories = list(budget.categories_incluses.all())
+        if categories:
+            filtre = {"categorie__in": categories}
         else:
-            total = (
-                FluxModel.objects
-                .filter(
-                    categorie=budget.categorie,
-                    mois=budget.mois,
-                    montant__lt=0,
-                    est_transfert=False,
-                    est_ajustement=False,
-                )
-                .aggregate(total=Sum("montant"))
-                ["total"]
-            ) or Decimal("0.00")
+            filtre = {"categorie": budget.categorie}
+
+        total = (
+            FluxModel.objects
+            .filter(
+                mois=budget.mois,
+                montant__lt=0,
+                est_transfert=False,
+                est_ajustement=False,
+                **filtre,
+            )
+            .aggregate(total=Sum("montant"))
+            ["total"]
+        ) or Decimal("0.00")
 
         budget.montant_consomme = abs(total)
 
@@ -87,8 +80,9 @@ def calculer_consommation_pour_flux(flux) -> None:
 def recalculer_budgets_pour(categorie_id, mois) -> None:
     """
     Recalcule tous les budgets concernés par une (catégorie, mois) :
-    - le budget direct sur la catégorie (mineure ou majeure ciblée directement) ;
-    - les budgets majeurs qui incluent cette catégorie dans leurs mineures.
+    - le budget direct sur la catégorie (budget simple ciblé directement) ;
+    - tous les budgets (majeurs ou thématiques) qui incluent cette catégorie
+      dans leurs categories_incluses.
 
     Utilisé par le signal Flux, y compris pour l'ancienne (catégorie, mois)
     quand un flux change de catégorie ou de date.
@@ -101,9 +95,8 @@ def recalculer_budgets_pour(categorie_id, mois) -> None:
     for budget in Budget.objects.filter(categorie_id=categorie_id, mois=mois):
         calculer_consommation(budget)
 
-    for budget_majeur in Budget.objects.filter(
+    for budget_groupe in Budget.objects.filter(
         mois=mois,
-        est_budget_majeur=True,
         categories_incluses=categorie_id,
     ):
-        calculer_consommation(budget_majeur)
+        calculer_consommation(budget_groupe)

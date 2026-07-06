@@ -21,6 +21,14 @@ class BudgetTemplate(BaseModel):
         "categories.Categorie",
         on_delete=models.PROTECT,
         related_name="budget_templates",
+        null=True,
+        blank=True,
+        help_text="Catégorie ancre (simple ou majeure). Null = budget thématique (voir nom)."
+    )
+    nom = models.CharField(
+        max_length=120,
+        blank=True,
+        help_text="Libellé du modèle. Requis pour un budget thématique (categorie null)."
     )
     montant_defaut = models.DecimalField(
         max_digits=12,
@@ -31,7 +39,7 @@ class BudgetTemplate(BaseModel):
         "categories.Categorie",
         blank=True,
         related_name="budget_templates_incluant",
-        help_text="Sous-catégories incluses (pertinent si est_budget_majeur=True)."
+        help_text="Catégories couvertes (mineures d'une majeure, ou feuilles libres d'un thématique)."
     )
     est_budget_majeur = models.BooleanField(
         default=False,
@@ -43,18 +51,24 @@ class BudgetTemplate(BaseModel):
     class Meta(BaseModel.Meta):
         verbose_name = "Modèle de budget"
         verbose_name_plural = "Modèles de budget"
-        ordering = ["categorie__nom"]
+        ordering = ["categorie__nom", "nom"]
         constraints = [
             models.UniqueConstraint(
                 fields=["categorie"],
-                condition=models.Q(is_deleted=False),
+                condition=models.Q(is_deleted=False, categorie__isnull=False),
                 name="budgettemplate_unique_categorie"
-            )
+            ),
+            models.UniqueConstraint(
+                fields=["nom"],
+                condition=models.Q(is_deleted=False, categorie__isnull=True),
+                name="budgettemplate_unique_nom_thematique"
+            ),
         ]
 
     def __str__(self):
         statut = "" if self.actif else " [inactif]"
-        return f"Template {self.categorie.nom} — {self.montant_defaut} €{statut}"
+        libelle = self.categorie.nom if self.categorie_id else self.nom
+        return f"Template {libelle} — {self.montant_defaut} €{statut}"
 
 
 class Budget(BaseModel):
@@ -74,6 +88,14 @@ class Budget(BaseModel):
         "categories.Categorie",
         on_delete=models.PROTECT,
         related_name="budgets",
+        null=True,
+        blank=True,
+        help_text="Catégorie ancre (simple ou majeure). Null = budget thématique (voir nom)."
+    )
+    nom = models.CharField(
+        max_length=120,
+        blank=True,
+        help_text="Libellé du budget. Requis pour un budget thématique (categorie null)."
     )
     mois = models.DateField(
         help_text="Premier jour du mois budgété (ex: 2024-03-01)."
@@ -107,7 +129,7 @@ class Budget(BaseModel):
         "categories.Categorie",
         blank=True,
         related_name="budgets_incluant",
-        help_text="Sous-catégories incluses dans ce budget majeur (pertinent uniquement si est_budget_majeur=True)."
+        help_text="Catégories couvertes (mineures d'une majeure, ou feuilles libres d'un thématique)."
     )
     template = models.ForeignKey(
         BudgetTemplate,
@@ -121,13 +143,18 @@ class Budget(BaseModel):
     class Meta(BaseModel.Meta):
         verbose_name = "Budget"
         verbose_name_plural = "Budgets"
-        ordering = ["-mois", "categorie__nom"]
+        ordering = ["-mois", "categorie__nom", "nom"]
         constraints = [
             models.UniqueConstraint(
                 fields=["categorie", "mois"],
-                condition=models.Q(is_deleted=False),
+                condition=models.Q(is_deleted=False, categorie__isnull=False),
                 name="budget_unique_categorie_mois"
-            )
+            ),
+            models.UniqueConstraint(
+                fields=["nom", "mois"],
+                condition=models.Q(is_deleted=False, categorie__isnull=True),
+                name="budget_unique_nom_mois_thematique"
+            ),
         ]
         indexes = [
             models.Index(fields=["mois"]),
@@ -135,7 +162,8 @@ class Budget(BaseModel):
         ]
 
     def __str__(self):
-        return f"{self.categorie.nom} | {self.mois:%Y-%m} | {self.montant_prevu} €"
+        libelle = self.categorie.nom if self.categorie_id else self.nom
+        return f"{libelle} | {self.mois:%Y-%m} | {self.montant_prevu} €"
 
     def save(self, *args, **kwargs):
         """Force le mois au 1er du mois avant chaque sauvegarde."""

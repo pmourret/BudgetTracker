@@ -36,12 +36,25 @@ def reconduire_vers_mois(mois_cible: date) -> dict:
         )
 
         for template in templates:
-            if Budget.objects.filter(categorie=template.categorie, mois=mois).exists():
-                details_ignores.append(template.categorie.nom)
+            libelle = template.categorie.nom if template.categorie_id else template.nom
+
+            # Idempotence : budget déjà instancié pour ce (template, mois),
+            # ou pour cette catégorie ancre ce mois (budget simple/majeur).
+            if template.categorie_id:
+                deja = Budget.objects.filter(
+                    categorie=template.categorie, mois=mois
+                ).exists()
+            else:
+                deja = Budget.objects.filter(
+                    template=template, mois=mois
+                ).exists()
+            if deja:
+                details_ignores.append(libelle)
                 continue
 
             budget = Budget.objects.create(
                 categorie=template.categorie,
+                nom=template.nom,
                 mois=mois,
                 montant_prevu=template.montant_defaut,
                 est_budget_majeur=template.est_budget_majeur,
@@ -50,7 +63,7 @@ def reconduire_vers_mois(mois_cible: date) -> dict:
             )
             budget.categories_incluses.set(template.categories_incluses.all())
             calculer_consommation(budget)
-            details_crees.append(template.categorie.nom)
+            details_crees.append(libelle)
 
     return {
         "crees": len(details_crees),
