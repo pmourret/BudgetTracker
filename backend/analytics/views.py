@@ -5,10 +5,12 @@ from rest_framework import status
 from .services.dashboard import calculer_dashboard
 from .services.compte_dashboard import calculer_compte_dashboard
 from .services.projection import calculer_previsionnel
+from .services.analyse import calculer_analyse
 from .serializers import (
     DashboardSerializer,
     CompteDashboardSerializer,
     PrevisionnelSerializer,
+    AnalyseSerializer,
     PointsSerializer,
 )
 
@@ -92,6 +94,31 @@ class PrevisionnelView(APIView):
 
         data = calculer_previsionnel(nb_mois=nb_mois)
         serializer = PrevisionnelSerializer(data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class AnalyseView(APIView):
+    """
+    Analyse rétrospective (Phase 13) — lecture seule, fiabilité RÉELLE.
+
+    GET /api/v1/analytics/analyse/?nb_mois=6
+
+    Trois blocs sur une fenêtre glissante de mois comptables : tendances
+    (dépenses/revenus/épargne + comparaison à la période précédente),
+    categories (évolution des postes dans le temps), rythme (jour de
+    semaine + libellés récurrents). Aucune projection : le solde réel
+    reste la seule vérité, le prévisionnel est une vue séparée.
+    """
+
+    def get(self, request):
+        try:
+            nb_mois = int(request.query_params.get("nb_mois", 6))
+        except (TypeError, ValueError):
+            nb_mois = 6
+        nb_mois = max(1, min(nb_mois, 24))  # borné 1-24 mois
+
+        data = calculer_analyse(nb_mois=nb_mois)
+        serializer = AnalyseSerializer(data)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 

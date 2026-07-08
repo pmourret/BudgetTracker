@@ -33,7 +33,7 @@ from referentiels.views import (
     DeviseViewSet, FiscaliteViewSet, StatutFluxViewSet
 )
 
-from analytics.views import DashboardView, CompteDashboardView, PrevisionnelView, PointsView
+from analytics.views import DashboardView, CompteDashboardView, PrevisionnelView, AnalyseView, PointsView
 
 router = DefaultRouter()
 
@@ -64,6 +64,7 @@ urlpatterns = [
     path("api/v1/analytics/dashboard/", DashboardView.as_view(), name="dashboard"),
     path("api/v1/analytics/compte/<uuid:compte_id>/", CompteDashboardView.as_view(), name="compte-dashboard"),
     path("api/v1/analytics/previsionnel/", PrevisionnelView.as_view(), name="previsionnel"),
+    path("api/v1/analytics/analyse/", AnalyseView.as_view(), name="analyse"),
     path("api/v1/analytics/points/", PointsView.as_view(), name="points"),
     path("api/v1/referentiels/parametres-budget/", ParametresBudgetView.as_view(), name="parametres-budget"),
     path("api/v1/", include(router.urls)),

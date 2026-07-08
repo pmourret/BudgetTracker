@@ -50,6 +50,22 @@ class PrevisionnelSerializer(serializers.Serializer):
     trajectoire = serializers.DictField()
 
 
+class AnalyseSerializer(serializers.Serializer):
+    """
+    Serializer de sortie pour la vue Analyse rétrospective (Phase 13).
+    Lecture seule, fiabilité RÉELLE : chaque bloc porte 'fiabilite' et
+    'definition'. Aucune projection (le prévisionnel reste séparé).
+    """
+    nb_mois = serializers.IntegerField()
+    mois_debut = serializers.CharField()
+    mois_fin = serializers.CharField()
+    fiabilite = serializers.CharField()
+    tendances = serializers.DictField()
+    titulaires = serializers.DictField()
+    categories = serializers.DictField()
+    rythme = serializers.DictField()
+
+
 class PointsSerializer(serializers.Serializer):
     """
     Serializer de sortie pour le système de points (mécanique B, socle 12-B-1).

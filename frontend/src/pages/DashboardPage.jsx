@@ -1,6 +1,7 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChartColumn } from 'lucide-react'
 import apiClient from '../api/client'
 import { formatEuro, formatDate, formatMonth, formatPercent } from '../utils/format'
 import Card from '../components/ui/Card'
@@ -62,7 +63,8 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
+      <div className="flex items-start justify-between gap-3">
+       <div>
         <h1 className="text-lg font-medium text-content">Tableau de bord</h1>
         <div className="flex items-center gap-1 mt-0.5">
           <button
@@ -87,6 +89,14 @@ export default function DashboardPage() {
             <ChevronRight size={18} />
           </button>
         </div>
+       </div>
+       <Link
+         to="/analyse"
+         className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-xs font-medium text-purple-800 bg-purple-50 hover:bg-purple-100 no-underline shrink-0"
+       >
+         <ChartColumn size={15} />
+         Analyse
+       </Link>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">

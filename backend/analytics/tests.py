@@ -17,6 +17,7 @@ from analytics.services.projection import (
     calculer_solde_projete, calculer_capacite_restante
 )
 from analytics.services.trajectoire import calculer_trajectoire
+from analytics.services.analyse import calculer_analyse
 
 
 class DashboardServiceTest(TestCase):
@@ -578,3 +579,220 @@ class CompteDashboardAPITest(TestCase):
         url = reverse("compte-dashboard", args=[uuid.uuid4()])
         response = self.client.get(url)
         self.assertEqual(response.status_code, 404)
+
+
+class _AnalyseTestMixin:
+    """
+    Données communes aux tests de l'analyse rétrospective (Phase 13).
+
+    Date de référence injectée (le service accepte `aujourd_hui`) : les
+    tests sont déterministes. Avec jour de bascule 1 (défaut), le mois
+    comptable d'un flux = date_flux.replace(day=1).
+    """
+
+    AUJOURD_HUI = datetime.date(2026, 6, 10)  # mois comptable courant : 2026-06
+
+    def setUp(self):
+        self.type_compte = TypeCompte.objects.create(code="COURANT", libelle="Courant")
+        self.titulaire = Titulaire.objects.create(code="PIERRE", libelle="Pierre")
+        self.etablissement = Etablissement.objects.create(code="BNP", libelle="BNP")
+        self.devise = Devise.objects.create(
+            code="EUR", libelle="Euro", symbole="EUR", est_defaut=True
+        )
+        self.type_flux = TypeFlux.objects.create(code="DEBIT", libelle="Debit")
+        self.statut = StatutFlux.objects.create(
+            code="VALIDE", libelle="Valide", est_definitif=True
+        )
+        self.titulaire2 = Titulaire.objects.create(code="CONJOINT", libelle="Conjoint")
+        self.parent = Categorie.objects.create(code="ALIM", nom="Alimentation")
+        self.enfant = Categorie.objects.create(
+            code="COURSES", nom="Courses", parent=self.parent
+        )
+        self.autre = Categorie.objects.create(code="TRANSPORT", nom="Transport")
+        self.compte = Compte.objects.create(
+            code="CPT-0001", nom="Compte A",
+            type_compte=self.type_compte, titulaire=self.titulaire,
+            etablissement=self.etablissement, devise=self.devise,
+            solde_initial=Decimal("1000.00"), solde_reel=Decimal("1000.00"),
+        )
+        # Compte perso du second titulaire + compte commun du foyer.
+        self.compte2 = Compte.objects.create(
+            code="CPT-0002", nom="Compte B",
+            type_compte=self.type_compte, titulaire=self.titulaire2,
+            etablissement=self.etablissement, devise=self.devise,
+        )
+        self.compte_commun = Compte.objects.create(
+            code="CPT-0003", nom="Compte joint", est_commun=True,
+            type_compte=self.type_compte, titulaire=self.titulaire,
+            etablissement=self.etablissement, devise=self.devise,
+        )
+
+    def _flux(self, montant, date_flux, categorie=None, libelle="Flux",
+              est_transfert=False, est_ajustement=False, compte=None):
+        return Flux.objects.create(
+            compte=compte or self.compte,
+            categorie=categorie,
+            type_flux=self.type_flux,
+            statut=self.statut,
+            devise=self.devise,
+            montant=Decimal(str(montant)),
+            date_flux=date_flux,
+            libelle=libelle,
+            est_transfert=est_transfert,
+            est_ajustement=est_ajustement,
+        )
+
+
+class AnalyseServiceTest(_AnalyseTestMixin, TestCase):
+
+    def test_structure_et_fiabilite(self):
+        """Trois blocs présents, tout étiqueté réel, fenêtre bornée."""
+        data = calculer_analyse(nb_mois=3, aujourd_hui=self.AUJOURD_HUI)
+        self.assertEqual(data["fiabilite"], "reel")
+        self.assertEqual(data["mois_debut"], "2026-04-01")
+        self.assertEqual(data["mois_fin"], "2026-06-01")
+        for bloc in ("tendances", "categories", "rythme"):
+            self.assertIn(bloc, data)
+            self.assertEqual(data[bloc]["fiabilite"], "reel")
+
+    def test_serie_mensuelle_un_point_par_mois(self):
+        """La série tendances a un point par mois de la fenêtre."""
+        self._flux("-100.00", datetime.date(2026, 4, 15), self.enfant)
+        self._flux("-200.00", datetime.date(2026, 5, 15), self.enfant)
+        self._flux("2800.00", datetime.date(2026, 6, 5))
+        data = calculer_analyse(nb_mois=3, aujourd_hui=self.AUJOURD_HUI)
+        series = data["tendances"]["series"]
+        self.assertEqual([p["mois"] for p in series],
+                         ["2026-04-01", "2026-05-01", "2026-06-01"])
+        self.assertEqual(series[0]["depenses"], Decimal("100.00"))
+        self.assertEqual(series[2]["revenus"], Decimal("2800.00"))
+
+    def test_totaux_et_moyennes(self):
+        """Totaux et moyennes mensuelles sur la fenêtre."""
+        self._flux("-300.00", datetime.date(2026, 4, 10), self.enfant)
+        self._flux("-300.00", datetime.date(2026, 6, 10), self.enfant)
+        self._flux("3000.00", datetime.date(2026, 5, 1))
+        data = calculer_analyse(nb_mois=3, aujourd_hui=self.AUJOURD_HUI)
+        tend = data["tendances"]
+        self.assertEqual(tend["totaux_periode"]["depenses"], Decimal("600.00"))
+        self.assertEqual(tend["totaux_periode"]["revenus"], Decimal("3000.00"))
+        self.assertEqual(tend["totaux_periode"]["epargne_nette"], Decimal("2400.00"))
+        self.assertEqual(tend["moyennes_mensuelles"]["depenses"], Decimal("200.00"))
+
+    def test_comparaison_periode_precedente(self):
+        """La comparaison oppose la fenêtre à la fenêtre précédente."""
+        # Période précédente (jan-mar) : 100 de dépenses
+        self._flux("-100.00", datetime.date(2026, 2, 10), self.enfant)
+        # Période courante (avr-juin) : 200 de dépenses
+        self._flux("-200.00", datetime.date(2026, 5, 10), self.enfant)
+        data = calculer_analyse(nb_mois=3, aujourd_hui=self.AUJOURD_HUI)
+        cmp = data["tendances"]["comparaison_periode_precedente"]["depenses"]
+        self.assertEqual(cmp["actuel"], Decimal("200.00"))
+        self.assertEqual(cmp["precedent"], Decimal("100.00"))
+        self.assertEqual(cmp["variation_pct"], Decimal("100.0"))
+
+    def test_comparaison_sans_base_precedente(self):
+        """variation_pct = None si la période précédente est nulle."""
+        self._flux("-200.00", datetime.date(2026, 5, 10), self.enfant)
+        data = calculer_analyse(nb_mois=3, aujourd_hui=self.AUJOURD_HUI)
+        cmp = data["tendances"]["comparaison_periode_precedente"]["depenses"]
+        self.assertIsNone(cmp["variation_pct"])
+
+    def test_transferts_et_ajustements_exclus(self):
+        """Transferts et ajustements ne comptent nulle part."""
+        self._flux("-500.00", datetime.date(2026, 5, 10), self.enfant, est_transfert=True)
+        self._flux("-400.00", datetime.date(2026, 5, 11), self.enfant, est_ajustement=True)
+        self._flux("-100.00", datetime.date(2026, 5, 12), self.enfant)
+        data = calculer_analyse(nb_mois=3, aujourd_hui=self.AUJOURD_HUI)
+        self.assertEqual(data["tendances"]["totaux_periode"]["depenses"], Decimal("100.00"))
+        self.assertEqual(data["categories"]["total_periode"], Decimal("100.00"))
+
+    def test_categories_mineure_regroupee_sous_majeure(self):
+        """La dépense d'une mineure remonte sous sa catégorie majeure."""
+        self._flux("-150.00", datetime.date(2026, 5, 10), self.enfant)
+        self._flux("-50.00", datetime.date(2026, 6, 10), self.autre)
+        data = calculer_analyse(nb_mois=3, aujourd_hui=self.AUJOURD_HUI)
+        cats = data["categories"]["par_categorie"]
+        # Triées par total décroissant : Alimentation (150) avant Transport (50)
+        self.assertEqual(cats[0]["nom"], "Alimentation")
+        self.assertEqual(cats[0]["total_periode"], Decimal("150.00"))
+        self.assertEqual(cats[0]["part_pct"], Decimal("75.0"))
+        self.assertEqual(len(cats[0]["serie"]), 3)
+
+    def test_titulaires_bucket_commun_separe(self):
+        """Comptes perso ventilés par titulaire ; les communs dans « Commun »."""
+        self._flux("-100.00", datetime.date(2026, 5, 10), self.enfant, compte=self.compte)
+        self._flux("-200.00", datetime.date(2026, 5, 11), self.enfant, compte=self.compte2)
+        self._flux("-300.00", datetime.date(2026, 5, 12), self.enfant, compte=self.compte_commun)
+        data = calculer_analyse(nb_mois=3, aujourd_hui=self.AUJOURD_HUI)
+        bloc = data["titulaires"]
+        self.assertEqual(bloc["total_depenses"], Decimal("600.00"))
+        # Trié par dépenses décroissantes : Commun (300) devant les persos.
+        commun = next(b for b in bloc["par_titulaire"] if b["est_commun"])
+        self.assertEqual(commun["nom"], "Commun")
+        self.assertEqual(commun["depenses"], Decimal("300.00"))
+        self.assertEqual(commun["part_depenses_pct"], Decimal("50.0"))
+        noms = {b["nom"] for b in bloc["par_titulaire"]}
+        self.assertEqual(noms, {"Commun", "Pierre", "Conjoint"})
+
+    def test_titulaires_compte_commun_jamais_attribue_au_proprietaire(self):
+        """Le compte joint (propriétaire Pierre) va dans Commun, pas chez Pierre."""
+        self._flux("-100.00", datetime.date(2026, 5, 10), self.enfant, compte=self.compte)
+        self._flux("-300.00", datetime.date(2026, 5, 12), self.enfant, compte=self.compte_commun)
+        data = calculer_analyse(nb_mois=3, aujourd_hui=self.AUJOURD_HUI)
+        pierre = next(b for b in data["titulaires"]["par_titulaire"] if b["nom"] == "Pierre")
+        self.assertEqual(pierre["depenses"], Decimal("100.00"))  # sans le compte joint
+        self.assertFalse(pierre["est_commun"])
+
+    def test_titulaires_commun_vs_perso_et_revenus(self):
+        """Résumé commun/perso et revenus par titulaire."""
+        self._flux("2000.00", datetime.date(2026, 5, 1), compte=self.compte)  # revenu Pierre
+        self._flux("-100.00", datetime.date(2026, 5, 10), self.enfant, compte=self.compte2)
+        self._flux("-300.00", datetime.date(2026, 5, 12), self.enfant, compte=self.compte_commun)
+        data = calculer_analyse(nb_mois=3, aujourd_hui=self.AUJOURD_HUI)
+        cvp = data["titulaires"]["commun_vs_perso"]
+        self.assertEqual(cvp["commun"]["depenses"], Decimal("300.00"))
+        self.assertEqual(cvp["perso"]["depenses"], Decimal("100.00"))
+        self.assertEqual(cvp["perso"]["revenus"], Decimal("2000.00"))
+        pierre = next(b for b in data["titulaires"]["par_titulaire"] if b["nom"] == "Pierre")
+        self.assertEqual(pierre["revenus"], Decimal("2000.00"))
+        self.assertEqual(pierre["epargne_nette"], Decimal("2000.00"))
+
+    def test_rythme_par_jour_semaine(self):
+        """Les dépenses sont ventilées par jour de semaine (1=lundi)."""
+        jour = datetime.date(2026, 5, 11)  # lundi
+        self.assertEqual(jour.isoweekday(), 1)
+        self._flux("-40.00", jour, self.enfant)
+        data = calculer_analyse(nb_mois=3, aujourd_hui=self.AUJOURD_HUI)
+        lundi = next(j for j in data["rythme"]["par_jour_semaine"] if j["jour"] == 1)
+        self.assertEqual(lundi["total"], Decimal("40.00"))
+        self.assertEqual(lundi["nb"], 1)
+
+    def test_rythme_libelles_recurrents(self):
+        """Un libellé revenant >= 2 fois est récurrent ; un unique est ignoré."""
+        self._flux("-30.00", datetime.date(2026, 5, 1), self.enfant, libelle="Netflix")
+        self._flux("-30.00", datetime.date(2026, 6, 1), self.enfant, libelle="netflix")
+        self._flux("-10.00", datetime.date(2026, 6, 2), self.enfant, libelle="Boulangerie unique")
+        data = calculer_analyse(nb_mois=3, aujourd_hui=self.AUJOURD_HUI)
+        recurrents = data["rythme"]["libelles_recurrents"]
+        self.assertEqual(len(recurrents), 1)
+        self.assertEqual(recurrents[0]["occurrences"], 2)
+        self.assertEqual(recurrents[0]["total"], Decimal("60.00"))
+        self.assertEqual(recurrents[0]["moyenne"], Decimal("30.00"))
+
+
+class AnalyseAPITest(_AnalyseTestMixin, TestCase):
+
+    def test_endpoint_repond(self):
+        from django.urls import reverse
+        response = self.client.get(reverse("analyse"))
+        self.assertEqual(response.status_code, 200)
+        for bloc in ("tendances", "categories", "rythme"):
+            self.assertIn(bloc, response.data)
+
+    def test_nb_mois_parametrable(self):
+        from django.urls import reverse
+        response = self.client.get(reverse("analyse"), {"nb_mois": 12})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["nb_mois"], 12)
+        self.assertEqual(len(response.data["tendances"]["series"]), 12)

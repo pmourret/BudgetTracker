@@ -210,6 +210,55 @@ export const DEFINITIONS = {
     formule: 'Budgets du mois − déjà consommé.',
   },
 
+  // ---- Analyse rétrospective (Phase 13) ----
+  analyse_tendances: {
+    titre: 'Tendances',
+    texte:
+      "Évolution de vos dépenses, revenus et épargne mois par mois sur la période. Fiabilité réelle (basé sur les flux saisis) ; transferts et ajustements exclus.",
+    formule:
+      'Par mois comptable : dépenses = Σ montants négatifs, revenus = Σ montants positifs, épargne = revenus − dépenses.',
+  },
+  analyse_comparaison: {
+    titre: 'Comparaison à la période précédente',
+    texte:
+      "Écart entre la période affichée et la période équivalente qui la précède immédiatement. Purement descriptif, sans jugement.",
+    formule:
+      '(total période actuelle − total période précédente) / |période précédente| × 100. Vide si la période précédente est nulle.',
+  },
+  analyse_titulaires: {
+    titre: 'Répartition par titulaire',
+    texte:
+      "Qui du foyer dépense, gagne et épargne, selon le propriétaire du compte. Les comptes communs forment un groupe « Commun » à part, jamais rattaché à une seule personne. Fiabilité réelle.",
+    formule:
+      'Flux regroupés par propriétaire du compte (comptes communs = bucket « Commun ») : dépenses, revenus, épargne = revenus − dépenses, part = dépenses / dépenses totales × 100.',
+  },
+  analyse_commun_perso: {
+    titre: 'Commun vs perso',
+    texte:
+      "Comparaison entre les comptes communs du foyer et l'ensemble des comptes personnels. Aide à voir la part mutualisée. Descriptif, fiabilité réelle.",
+    formule: 'Somme des dépenses/revenus des comptes est_commun d\'un côté, des comptes personnels de l\'autre.',
+  },
+  analyse_categories: {
+    titre: 'Dépenses par catégorie dans le temps',
+    texte:
+      "Répartition des dépenses par catégorie majeure (les sous-catégories sont regroupées sous leur parent) et leur évolution sur la période. Fiabilité réelle.",
+    formule:
+      "Par catégorie : total sur la période, part = total / dépenses totales × 100, moyenne = total / nombre de mois.",
+  },
+  analyse_rythme_jour: {
+    titre: 'Dépenses par jour de semaine',
+    texte:
+      "Sur quels jours de la semaine se concentrent vos dépenses, cumulées sur toute la période. Descriptif — aucun jugement.",
+    formule: 'Σ des dépenses de la période regroupées selon le jour de la semaine de leur date.',
+  },
+  analyse_recurrents: {
+    titre: 'Postes récurrents',
+    texte:
+      "Libellés de dépense qui reviennent au moins deux fois sur la période, pour repérer vos habitudes. Descriptif, sans jugement ni seuil.",
+    formule:
+      'Dépenses regroupées par libellé (casse et espaces normalisés), gardées si ≥ 2 occurrences, triées par montant cumulé.',
+  },
+
   // ---- Paramètres du foyer ----
   mois_comptable: {
     titre: 'Mois comptable',
