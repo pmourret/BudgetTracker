@@ -64,6 +64,7 @@ class AnalyseSerializer(serializers.Serializer):
     titulaires = serializers.DictField()
     categories = serializers.DictField()
     rythme = serializers.DictField()
+    saisonnalite = serializers.DictField()
 
 
 class PointsSerializer(serializers.Serializer):

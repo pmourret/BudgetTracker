@@ -245,6 +245,13 @@ export const DEFINITIONS = {
     formule:
       "Par catégorie : total sur la période, part = total / dépenses totales × 100, moyenne = total / nombre de mois.",
   },
+  analyse_saisonnalite: {
+    titre: 'Comparaison à l\'année précédente',
+    texte:
+      "Dépenses de chaque mois comptable clôturé face au même mois un an plus tôt, sur tout l'historique. Le mois en cours (partiel) est exclu. Descriptif, sans jugement ; fiabilité réelle.",
+    formule:
+      'Pour un mois : dépenses du mois vs dépenses du même mois l\'année précédente. Δ = (mois − année-1) / année-1 × 100 (vide si l\'année précédente est nulle).',
+  },
   analyse_rythme_jour: {
     titre: 'Dépenses par jour de semaine',
     texte:

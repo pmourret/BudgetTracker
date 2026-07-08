@@ -403,6 +403,63 @@ def _bloc_rythme(mois_labels: list) -> dict:
 
 
 # --------------------------------------------------------------------------
+# Bloc « saisonnalité » (comparaison année sur année)
+# --------------------------------------------------------------------------
+def _bloc_saisonnalite(mois_courant: datetime.date) -> dict:
+    """
+    Comparaison année sur année (YoY) sur TOUT l'historique : pour chaque mois
+    comptable clôturé, dépenses de ce mois vs celles du même mois un an avant.
+
+    Le mois courant est exclu (partiel → un YoY dessus serait trompeur). Un
+    mois n'apparaît que si son homologue année-1 est dans l'historique.
+    `variation_pct` = None si l'année précédente est nulle. Fiabilité réelle ;
+    transferts et ajustements exclus.
+    """
+    from flux.models import Flux
+
+    lignes = (
+        Flux.objects.filter(
+            montant__lt=0, est_transfert=False, est_ajustement=False
+        )
+        .values("mois")
+        .annotate(total=Sum("montant"))
+    )
+    depenses_par_mois = {row["mois"]: -row["total"] for row in lignes}
+
+    comparaisons = []
+    if depenses_par_mois:
+        premier = min(depenses_par_mois)
+        mois = premier
+        while mois < mois_courant:  # mois clôturés uniquement
+            an_precedent = mois - relativedelta(years=1)
+            if an_precedent >= premier:
+                dep = depenses_par_mois.get(mois, ZERO)
+                dep_prec = depenses_par_mois.get(an_precedent, ZERO)
+                variation = (
+                    ((dep - dep_prec) / dep_prec * 100).quantize(DIX)
+                    if dep_prec > 0 else None
+                )
+                comparaisons.append({
+                    "mois": mois.isoformat(),
+                    "depenses": dep,
+                    "depenses_an_precedent": dep_prec,
+                    "variation_pct": variation,
+                })
+            mois += relativedelta(months=1)
+
+    return {
+        "definition": (
+            "Comparaison année sur année : dépenses de chaque mois comptable "
+            "clôturé face au même mois un an plus tôt. Le mois en cours "
+            "(partiel) est exclu. Descriptif, sans jugement ni seuil ; "
+            "fiabilité réelle."
+        ),
+        "fiabilite": "reel",
+        "comparaisons": comparaisons,
+    }
+
+
+# --------------------------------------------------------------------------
 # Point d'entrée
 # --------------------------------------------------------------------------
 def calculer_analyse(nb_mois: int = 6, aujourd_hui: datetime.date = None) -> dict:
@@ -427,4 +484,5 @@ def calculer_analyse(nb_mois: int = 6, aujourd_hui: datetime.date = None) -> dic
         "titulaires": _bloc_titulaires(mois_labels),
         "categories": _bloc_categories(mois_labels),
         "rythme": _bloc_rythme(mois_labels),
+        "saisonnalite": _bloc_saisonnalite(mois_fin),
     }

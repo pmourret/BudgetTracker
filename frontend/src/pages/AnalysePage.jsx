@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react'
 import useAnalyse from '../hooks/useAnalyse'
-import { formatEuro, formatPercent } from '../utils/format'
+import { formatEuro, formatPercent, formatMonth } from '../utils/format'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Tooltip from '../components/ui/Tooltip'
@@ -9,6 +9,7 @@ import { DEFINITIONS } from '../constants/definitions'
 import PeriodSelector from '../components/ui/PeriodSelector'
 import { ErrorState, EmptyState } from '../components/ui/States'
 import BarChart from '../components/charts/BarChart'
+import LineChart from '../components/charts/LineChart'
 import { chartColors } from '../components/charts/chartSetup'
 import { CAT_PALETTE } from '../components/charts/DepensesCategories'
 
@@ -53,6 +54,7 @@ export default function AnalysePage() {
             <TitulairesCard bloc={data.titulaires} />
             <CategoriesCard bloc={data.categories} series={data.tendances.series} />
             <RythmeCard bloc={data.rythme} />
+            <SaisonnaliteCard bloc={data.saisonnalite} />
           </>
         )
       )}
@@ -381,6 +383,70 @@ function RythmeCard({ bloc }) {
         )}
       </Card>
     </div>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/* Saisonnalité — comparaison à l'année précédente (YoY)                      */
+/* -------------------------------------------------------------------------- */
+function SaisonnaliteCard({ bloc }) {
+  const comps = bloc.comparaisons
+  const title = (
+    <span className="inline-flex items-center gap-1">
+      Comparaison à l'année précédente
+      <Tooltip {...DEFINITIONS.analyse_saisonnalite} align="left" />
+    </span>
+  )
+
+  if (comps.length === 0) {
+    return (
+      <Card title={title}>
+        <p className="text-sm text-content-3 py-4 text-center">
+          Il faut au moins 13 mois d'historique pour comparer une année sur l'autre.
+        </p>
+      </Card>
+    )
+  }
+
+  const labels = comps.map((c) => moisLabel(c.mois))
+  const datasets = [
+    { label: 'Cette année', data: comps.map((c) => Number(c.depenses)), color: chartColors.purple },
+    {
+      label: 'Année précédente',
+      data: comps.map((c) => Number(c.depenses_an_precedent)),
+      color: chartColors.gray,
+      dashed: true,
+      points: false,
+    },
+  ]
+  // Liste : les 12 mois clôturés les plus récents, du plus récent au plus ancien.
+  const recents = comps.slice(-12).reverse()
+
+  return (
+    <Card title={title}>
+      <div className="flex flex-col gap-4">
+        <LineChart labels={labels} datasets={datasets} height={220} />
+
+        <div className="flex flex-col divide-y divide-border-app">
+          {recents.map((c) => (
+            <div key={c.mois} className="flex items-center gap-3 py-2">
+              <span className="text-sm text-content capitalize flex-1 min-w-0 truncate">
+                {formatMonth(c.mois)}
+              </span>
+              <span className="text-xs text-content-3 tabular-nums">
+                an dernier {formatEuro(c.depenses_an_precedent)}
+              </span>
+              <span className="text-sm text-content tabular-nums w-24 text-right">
+                {formatEuro(c.depenses)}
+              </span>
+              <span className="w-20 text-right">
+                <VariationChip variation={c.variation_pct} />
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Card>
   )
 }
 

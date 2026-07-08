@@ -651,7 +651,7 @@ class AnalyseServiceTest(_AnalyseTestMixin, TestCase):
         self.assertEqual(data["fiabilite"], "reel")
         self.assertEqual(data["mois_debut"], "2026-04-01")
         self.assertEqual(data["mois_fin"], "2026-06-01")
-        for bloc in ("tendances", "categories", "rythme"):
+        for bloc in ("tendances", "titulaires", "categories", "rythme", "saisonnalite"):
             self.assertIn(bloc, data)
             self.assertEqual(data[bloc]["fiabilite"], "reel")
 
@@ -758,6 +758,40 @@ class AnalyseServiceTest(_AnalyseTestMixin, TestCase):
         self.assertEqual(pierre["revenus"], Decimal("2000.00"))
         self.assertEqual(pierre["epargne_nette"], Decimal("2000.00"))
 
+    def test_saisonnalite_yoy_de_base(self):
+        """Chaque mois clôturé est comparé au même mois un an avant."""
+        self._flux("-100.00", datetime.date(2025, 5, 10), self.enfant)
+        self._flux("-200.00", datetime.date(2026, 5, 10), self.enfant)
+        data = calculer_analyse(nb_mois=3, aujourd_hui=self.AUJOURD_HUI)
+        comps = data["saisonnalite"]["comparaisons"]
+        mai = next(c for c in comps if c["mois"] == "2026-05-01")
+        self.assertEqual(mai["depenses"], Decimal("200.00"))
+        self.assertEqual(mai["depenses_an_precedent"], Decimal("100.00"))
+        self.assertEqual(mai["variation_pct"], Decimal("100.0"))
+
+    def test_saisonnalite_exclut_mois_courant(self):
+        """Le mois courant (partiel) n'apparaît pas dans le YoY."""
+        self._flux("-100.00", datetime.date(2025, 6, 10), self.enfant)
+        self._flux("-300.00", datetime.date(2026, 6, 10), self.enfant)  # mois courant
+        data = calculer_analyse(nb_mois=3, aujourd_hui=self.AUJOURD_HUI)
+        mois_compares = [c["mois"] for c in data["saisonnalite"]["comparaisons"]]
+        self.assertNotIn("2026-06-01", mois_compares)
+
+    def test_saisonnalite_variation_none_sans_annee_precedente(self):
+        """variation_pct = None si le même mois un an avant est à zéro."""
+        self._flux("-50.00", datetime.date(2025, 4, 10), self.enfant)   # fixe le 1er mois
+        self._flux("-200.00", datetime.date(2026, 5, 10), self.enfant)  # an-1 (2025-05) = 0
+        data = calculer_analyse(nb_mois=3, aujourd_hui=self.AUJOURD_HUI)
+        mai = next(c for c in data["saisonnalite"]["comparaisons"] if c["mois"] == "2026-05-01")
+        self.assertEqual(mai["depenses_an_precedent"], Decimal("0.00"))
+        self.assertIsNone(mai["variation_pct"])
+
+    def test_saisonnalite_vide_sans_annee_complete(self):
+        """Moins de 13 mois d'historique → aucune comparaison possible."""
+        self._flux("-100.00", datetime.date(2026, 5, 10), self.enfant)
+        data = calculer_analyse(nb_mois=3, aujourd_hui=self.AUJOURD_HUI)
+        self.assertEqual(data["saisonnalite"]["comparaisons"], [])
+
     def test_rythme_par_jour_semaine(self):
         """Les dépenses sont ventilées par jour de semaine (1=lundi)."""
         jour = datetime.date(2026, 5, 11)  # lundi
@@ -787,7 +821,7 @@ class AnalyseAPITest(_AnalyseTestMixin, TestCase):
         from django.urls import reverse
         response = self.client.get(reverse("analyse"))
         self.assertEqual(response.status_code, 200)
-        for bloc in ("tendances", "categories", "rythme"):
+        for bloc in ("tendances", "titulaires", "categories", "rythme", "saisonnalite"):
             self.assertIn(bloc, response.data)
 
     def test_nb_mois_parametrable(self):
