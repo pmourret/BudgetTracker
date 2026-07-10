@@ -51,6 +51,7 @@ export default function AnalysePage() {
         ) : (
           <>
             <TendancesCard bloc={data.tendances} />
+            <EpargneCard bloc={data.epargne} />
             <TitulairesCard bloc={data.titulaires} />
             <CategoriesCard bloc={data.categories} series={data.tendances.series} />
             <RythmeCard bloc={data.rythme} />
@@ -156,6 +157,108 @@ function VariationChip({ variation }) {
       <Icon size={12} />
       {Math.abs(n).toFixed(1).replace('.', ',')} %
     </span>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/* Épargne réellement mise de côté                                            */
+/* -------------------------------------------------------------------------- */
+function EpargneCard({ bloc }) {
+  const title = (
+    <span className="inline-flex items-center gap-1">
+      Épargne
+      <Tooltip {...DEFINITIONS.analyse_epargne_versements} align="left" />
+    </span>
+  )
+
+  if (bloc.par_compte.length === 0) {
+    return (
+      <Card title={title}>
+        <p className="text-sm text-content-3 py-4 text-center">
+          Marquez un compte comme « épargne » (dans Comptes) pour suivre ici vos versements et votre encours.
+        </p>
+      </Card>
+    )
+  }
+
+  const vpm = bloc.versements_par_mois
+  const labels = vpm.map((v) => moisLabel(v.mois))
+  const verseSurPeriode = vpm.length ? Number(vpm[vpm.length - 1].cumul) : 0
+
+  const ecartDatasets = [
+    {
+      label: 'Épargne budgétaire (reste)',
+      data: bloc.ecart_budgetaire.map((e) => Number(e.epargne_budgetaire)),
+      color: chartColors.teal,
+    },
+    {
+      label: 'Versé réellement',
+      data: bloc.ecart_budgetaire.map((e) => Number(e.versement_reel)),
+      color: chartColors.purple,
+    },
+  ]
+  const cumulDataset = [
+    { label: 'Cumul versé', data: vpm.map((v) => Number(v.cumul)), color: chartColors.purple, fill: true },
+  ]
+
+  return (
+    <Card title={title}>
+      <div className="flex flex-col gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <div className="bg-surface-2 rounded-lg p-3 flex flex-col gap-1">
+            <span className="text-xs text-content-2 inline-flex items-center gap-1">
+              Encours total
+              <Tooltip {...DEFINITIONS.analyse_epargne_encours} align="left" size={12} />
+            </span>
+            <span className="text-xl font-medium text-content tabular-nums">
+              {formatEuro(bloc.encours_total)}
+            </span>
+          </div>
+          <div className="bg-surface-2 rounded-lg p-3 flex flex-col gap-1">
+            <span className="text-xs text-content-2">Versé sur la période</span>
+            <span
+              className={`text-xl font-medium tabular-nums ${verseSurPeriode < 0 ? 'text-red-600' : 'text-content'}`}
+            >
+              {verseSurPeriode > 0 ? '+' : ''}{formatEuro(verseSurPeriode)}
+            </span>
+          </div>
+        </div>
+
+        <div>
+          <div className="text-xs text-content-2 mb-1 inline-flex items-center gap-1">
+            Budgétaire (reste) vs réellement versé
+            <Tooltip {...DEFINITIONS.analyse_epargne_ecart} align="left" size={12} />
+          </div>
+          <BarChart labels={labels} datasets={ecartDatasets} height={220} />
+        </div>
+
+        <div>
+          <div className="text-xs text-content-2 mb-1">Cumul versé sur la période</div>
+          <LineChart labels={labels} datasets={cumulDataset} height={150} />
+        </div>
+
+        <div className="flex flex-col divide-y divide-border-app">
+          {bloc.par_compte.map((c) => (
+            <div key={c.id} className="flex items-center gap-3 py-2">
+              <div className="flex-1 min-w-0">
+                <div className="text-sm text-content truncate flex items-center gap-1.5">
+                  {c.nom}
+                  {c.taux_annuel != null && (
+                    <Badge variant="info">{formatPercent(c.taux_annuel)}/an</Badge>
+                  )}
+                </div>
+                <div className="text-[11px] text-content-3 tabular-nums">
+                  versé {c.versements_nets >= 0 ? '+' : ''}{formatEuro(c.versements_nets)} sur la période
+                </div>
+              </div>
+              <div className="text-sm text-content tabular-nums shrink-0">
+                {formatEuro(c.encours)}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Card>
   )
 }
 

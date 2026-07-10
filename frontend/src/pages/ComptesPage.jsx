@@ -9,7 +9,7 @@ import { DEFINITIONS } from '../constants/definitions'
 import { Loading, ErrorState, EmptyState } from '../components/ui/States'
 import IconBadge from '../components/ui/IconBadge'
 import Badge from '../components/ui/Badge'
-import { Landmark, Pencil, Trash2, Users, BarChart3 } from 'lucide-react'
+import { Landmark, Pencil, Trash2, Users, BarChart3, PiggyBank } from 'lucide-react'
 import CompteFormModal from '../components/comptes/CompteFormModal'
 
 export default function ComptesPage() {
@@ -129,6 +129,14 @@ function CompteCard({ compte, onEdit }) {
                 <Badge variant="purple">
                   <span className="flex items-center gap-1">
                     <Users size={11} /> Commun
+                  </span>
+                </Badge>
+              )}
+              {compte.est_epargne && (
+                <Badge variant="info">
+                  <span className="flex items-center gap-1">
+                    <PiggyBank size={11} /> Épargne
+                    {compte.taux_annuel != null && ` · ${String(compte.taux_annuel).replace('.', ',')} %`}
                   </span>
                 </Badge>
               )}

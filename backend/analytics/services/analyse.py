@@ -460,6 +460,101 @@ def _bloc_saisonnalite(mois_courant: datetime.date) -> dict:
 
 
 # --------------------------------------------------------------------------
+# Bloc « epargne » (épargne réellement mise de côté)
+# --------------------------------------------------------------------------
+def _bloc_epargne(mois_labels: list) -> dict:
+    """
+    Épargne RÉELLEMENT mise de côté, mesurée par les **versements nets** vers
+    les comptes marqués `est_epargne` : Σ(montant des flux de transfert sur ces
+    comptes) par mois (entrées +, sorties −). À distinguer de l'« épargne nette »
+    budgétaire (revenus − dépenses) du bloc tendances : ici c'est l'argent
+    effectivement transféré sur un livret.
+
+    - `encours_total`      : solde actuel cumulé des comptes d'épargne (stock) ;
+    - `versements_par_mois`: versement net + cumul, mois par mois (fenêtre) ;
+    - `ecart_budgetaire`   : par mois, épargne budgétaire (rev − dép) vs
+                             versement réel — révèle si le « reste » finit épargné ;
+    - `par_compte`         : par livret, encours + versements sur la période + taux.
+
+    Le taux est renvoyé (informatif) mais n'entre PAS dans les mesures : la
+    projection des intérêts est prévue côté prévisionnel (à venir). Fiabilité
+    réelle. Les transferts entre deux comptes d'épargne se neutralisent (un −,
+    un +), donc ne gonflent pas les versements.
+    """
+    from comptes.models import Compte
+    from flux.models import Flux
+
+    comptes = list(Compte.objects.filter(est_epargne=True))
+    encours_total = sum((c.solde_theorique for c in comptes), ZERO)
+
+    # Versements nets par mois (tous comptes d'épargne confondus).
+    versements = {
+        row["mois"]: (row["net"] or ZERO)
+        for row in (
+            Flux.objects.filter(
+                est_transfert=True, compte__est_epargne=True, mois__in=mois_labels
+            )
+            .values("mois")
+            .annotate(net=Sum("montant"))
+        )
+    }
+
+    versements_par_mois, cumul = [], ZERO
+    serie_budget = {p["mois"]: p for p in _serie_mensuelle(mois_labels)}
+    ecart_budgetaire = []
+    for mois in mois_labels:
+        net = versements.get(mois, ZERO)
+        cumul += net
+        versements_par_mois.append({
+            "mois": mois.isoformat(),
+            "versement_net": net,
+            "cumul": cumul,
+        })
+        budget = serie_budget[mois.isoformat()]
+        ecart_budgetaire.append({
+            "mois": mois.isoformat(),
+            "epargne_budgetaire": budget["epargne_nette"],
+            "versement_reel": net,
+        })
+
+    # Versements par compte sur la période.
+    versements_compte = {
+        row["compte"]: (row["net"] or ZERO)
+        for row in (
+            Flux.objects.filter(
+                est_transfert=True, compte__est_epargne=True, mois__in=mois_labels
+            )
+            .values("compte")
+            .annotate(net=Sum("montant"))
+        )
+    }
+    par_compte = [
+        {
+            "id": str(c.id),
+            "nom": c.nom,
+            "taux_annuel": c.taux_annuel,
+            "encours": c.solde_theorique,
+            "versements_nets": versements_compte.get(c.id, ZERO),
+        }
+        for c in sorted(comptes, key=lambda x: x.solde_theorique, reverse=True)
+    ]
+
+    return {
+        "definition": (
+            "Épargne réellement mise de côté = versements nets (transferts) vers "
+            "les comptes d'épargne, à distinguer de l'épargne budgétaire "
+            "(revenus − dépenses). Encours = solde actuel des livrets. Le taux "
+            "est informatif (projection des intérêts à venir). Fiabilité réelle."
+        ),
+        "fiabilite": "reel",
+        "encours_total": encours_total,
+        "versements_par_mois": versements_par_mois,
+        "ecart_budgetaire": ecart_budgetaire,
+        "par_compte": par_compte,
+    }
+
+
+# --------------------------------------------------------------------------
 # Point d'entrée
 # --------------------------------------------------------------------------
 def calculer_analyse(nb_mois: int = 6, aujourd_hui: datetime.date = None) -> dict:
@@ -481,6 +576,7 @@ def calculer_analyse(nb_mois: int = 6, aujourd_hui: datetime.date = None) -> dic
         "mois_fin": mois_labels[-1].isoformat(),
         "fiabilite": "reel",
         "tendances": _bloc_tendances(mois_labels, mois_precedents),
+        "epargne": _bloc_epargne(mois_labels),
         "titulaires": _bloc_titulaires(mois_labels),
         "categories": _bloc_categories(mois_labels),
         "rythme": _bloc_rythme(mois_labels),

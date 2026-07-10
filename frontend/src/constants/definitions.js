@@ -225,6 +225,30 @@ export const DEFINITIONS = {
     formule:
       '(total période actuelle − total période précédente) / |période précédente| × 100. Vide si la période précédente est nulle.',
   },
+  analyse_epargne_encours: {
+    titre: 'Encours d\'épargne',
+    texte:
+      "Somme actuelle des soldes de vos comptes marqués « épargne » (livrets, PEL, PEA…). Le stock accumulé. Fiabilité réelle.",
+    formule: 'Σ solde des comptes est_epargne.',
+  },
+  analyse_epargne_versements: {
+    titre: 'Épargne mise de côté',
+    texte:
+      "L'argent réellement transféré vers vos comptes d'épargne chaque mois (versements − retraits). À distinguer de l'épargne budgétaire (revenus − dépenses) : ici c'est ce qui finit vraiment sur un livret. Fiabilité réelle.",
+    formule: 'Par mois : Σ montant des transferts sur les comptes d\'épargne (entrées +, sorties −), puis cumul.',
+  },
+  analyse_epargne_ecart: {
+    titre: 'Écart budgétaire vs réel',
+    texte:
+      "Compare ce qui restait après dépenses (épargne budgétaire = revenus − dépenses) à ce qui a été réellement transféré sur un livret. Un écart positif signale du « reste » non encore épargné.",
+    formule: 'Épargne budgétaire (revenus − dépenses) vs versement réel (transferts vers l\'épargne), mois par mois.',
+  },
+  taux_annuel: {
+    titre: 'Taux annuel',
+    texte:
+      "Taux d'intérêt annuel du compte d'épargne (ex. 3 % pour un Livret A). Informatif pour l'instant ; il servira à projeter les intérêts dans le prévisionnel (à venir). N'entre pas dans les mesures d'épargne actuelles.",
+    formule: 'Saisi par compte. La projection des intérêts composés viendra dans un incrément ultérieur.',
+  },
   analyse_titulaires: {
     titre: 'Répartition par titulaire',
     texte:

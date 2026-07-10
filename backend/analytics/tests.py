@@ -626,6 +626,20 @@ class _AnalyseTestMixin:
             type_compte=self.type_compte, titulaire=self.titulaire,
             etablissement=self.etablissement, devise=self.devise,
         )
+        # Comptes d'épargne (est_epargne) avec taux, alimentés par transferts.
+        self.epargne = Compte.objects.create(
+            code="CPT-0004", nom="Livret A", est_epargne=True,
+            taux_annuel=Decimal("3.00"),
+            type_compte=self.type_compte, titulaire=self.titulaire,
+            etablissement=self.etablissement, devise=self.devise,
+            solde_initial=Decimal("500.00"), solde_reel=Decimal("500.00"),
+        )
+        self.epargne2 = Compte.objects.create(
+            code="CPT-0005", nom="LDD", est_epargne=True,
+            taux_annuel=Decimal("2.50"),
+            type_compte=self.type_compte, titulaire=self.titulaire,
+            etablissement=self.etablissement, devise=self.devise,
+        )
 
     def _flux(self, montant, date_flux, categorie=None, libelle="Flux",
               est_transfert=False, est_ajustement=False, compte=None):
@@ -651,7 +665,7 @@ class AnalyseServiceTest(_AnalyseTestMixin, TestCase):
         self.assertEqual(data["fiabilite"], "reel")
         self.assertEqual(data["mois_debut"], "2026-04-01")
         self.assertEqual(data["mois_fin"], "2026-06-01")
-        for bloc in ("tendances", "titulaires", "categories", "rythme", "saisonnalite"):
+        for bloc in ("tendances", "epargne", "titulaires", "categories", "rythme", "saisonnalite"):
             self.assertIn(bloc, data)
             self.assertEqual(data[bloc]["fiabilite"], "reel")
 
@@ -758,6 +772,57 @@ class AnalyseServiceTest(_AnalyseTestMixin, TestCase):
         self.assertEqual(pierre["revenus"], Decimal("2000.00"))
         self.assertEqual(pierre["epargne_nette"], Decimal("2000.00"))
 
+    def test_epargne_versements_nets_et_cumul(self):
+        """Versements nets (transferts) vers l'épargne, mois par mois + cumul."""
+        self._flux("300.00", datetime.date(2026, 5, 5), compte=self.epargne, est_transfert=True)
+        self._flux("200.00", datetime.date(2026, 6, 5), compte=self.epargne, est_transfert=True)
+        data = calculer_analyse(nb_mois=3, aujourd_hui=self.AUJOURD_HUI)
+        vpm = {v["mois"]: v for v in data["epargne"]["versements_par_mois"]}
+        self.assertEqual(vpm["2026-05-01"]["versement_net"], Decimal("300.00"))
+        self.assertEqual(vpm["2026-06-01"]["versement_net"], Decimal("200.00"))
+        self.assertEqual(vpm["2026-06-01"]["cumul"], Decimal("500.00"))
+
+    def test_epargne_retrait_compte_en_negatif(self):
+        """Un retrait de l'épargne (transfert sortant) apparaît en négatif."""
+        self._flux("-100.00", datetime.date(2026, 6, 5), compte=self.epargne, est_transfert=True)
+        data = calculer_analyse(nb_mois=3, aujourd_hui=self.AUJOURD_HUI)
+        vpm = {v["mois"]: v for v in data["epargne"]["versements_par_mois"]}
+        self.assertEqual(vpm["2026-06-01"]["versement_net"], Decimal("-100.00"))
+
+    def test_epargne_encours_total(self):
+        """Encours = solde actuel cumulé des comptes d'épargne."""
+        # Livret A : 500 initial + 300 transféré ; LDD : 0.
+        self._flux("300.00", datetime.date(2026, 6, 5), compte=self.epargne, est_transfert=True)
+        data = calculer_analyse(nb_mois=3, aujourd_hui=self.AUJOURD_HUI)
+        self.assertEqual(data["epargne"]["encours_total"], Decimal("800.00"))
+
+    def test_epargne_ecart_budgetaire_vs_reel(self):
+        """Écart entre épargne budgétaire (rev−dép) et versement réel."""
+        self._flux("2000.00", datetime.date(2026, 6, 1), compte=self.compte)   # revenu
+        self._flux("-500.00", datetime.date(2026, 6, 3), self.enfant, compte=self.compte)  # dépense
+        self._flux("400.00", datetime.date(2026, 6, 5), compte=self.epargne, est_transfert=True)
+        data = calculer_analyse(nb_mois=3, aujourd_hui=self.AUJOURD_HUI)
+        juin = next(e for e in data["epargne"]["ecart_budgetaire"] if e["mois"] == "2026-06-01")
+        self.assertEqual(juin["epargne_budgetaire"], Decimal("1500.00"))
+        self.assertEqual(juin["versement_reel"], Decimal("400.00"))
+
+    def test_epargne_par_compte_avec_taux(self):
+        """Répartition par livret : encours, versements période, taux."""
+        self._flux("300.00", datetime.date(2026, 5, 5), compte=self.epargne, est_transfert=True)
+        data = calculer_analyse(nb_mois=3, aujourd_hui=self.AUJOURD_HUI)
+        par_compte = {c["nom"]: c for c in data["epargne"]["par_compte"]}
+        self.assertEqual(set(par_compte), {"Livret A", "LDD"})
+        self.assertEqual(par_compte["Livret A"]["taux_annuel"], Decimal("3.00"))
+        self.assertEqual(par_compte["Livret A"]["versements_nets"], Decimal("300.00"))
+        self.assertEqual(par_compte["Livret A"]["encours"], Decimal("800.00"))
+
+    def test_epargne_ignore_comptes_non_epargne(self):
+        """Un transfert vers un compte non-épargne n'est pas un versement d'épargne."""
+        self._flux("300.00", datetime.date(2026, 6, 5), compte=self.compte, est_transfert=True)
+        data = calculer_analyse(nb_mois=3, aujourd_hui=self.AUJOURD_HUI)
+        totaux = sum(v["versement_net"] for v in data["epargne"]["versements_par_mois"])
+        self.assertEqual(totaux, Decimal("0.00"))
+
     def test_saisonnalite_yoy_de_base(self):
         """Chaque mois clôturé est comparé au même mois un an avant."""
         self._flux("-100.00", datetime.date(2025, 5, 10), self.enfant)
@@ -821,7 +886,7 @@ class AnalyseAPITest(_AnalyseTestMixin, TestCase):
         from django.urls import reverse
         response = self.client.get(reverse("analyse"))
         self.assertEqual(response.status_code, 200)
-        for bloc in ("tendances", "titulaires", "categories", "rythme", "saisonnalite"):
+        for bloc in ("tendances", "epargne", "titulaires", "categories", "rythme", "saisonnalite"):
             self.assertIn(bloc, response.data)
 
     def test_nb_mois_parametrable(self):

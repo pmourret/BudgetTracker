@@ -61,6 +61,7 @@ class AnalyseSerializer(serializers.Serializer):
     mois_fin = serializers.CharField()
     fiabilite = serializers.CharField()
     tendances = serializers.DictField()
+    epargne = serializers.DictField()
     titulaires = serializers.DictField()
     categories = serializers.DictField()
     rythme = serializers.DictField()

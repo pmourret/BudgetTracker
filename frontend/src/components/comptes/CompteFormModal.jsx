@@ -81,6 +81,8 @@ export default function CompteFormModal({ isOpen, onClose, compte = null }) {
   const [soldeInitial, setSoldeInitial] = useState('0')
   const [actif, setActif] = useState(true)
   const [estCommun, setEstCommun] = useState(false)
+  const [estEpargne, setEstEpargne] = useState(false)
+  const [tauxAnnuel, setTauxAnnuel] = useState('')
   const [dateOuverture, setDateOuverture] = useState('')
   const [notes, setNotes] = useState('')
   const [errors, setErrors] = useState({})
@@ -109,6 +111,8 @@ export default function CompteFormModal({ isOpen, onClose, compte = null }) {
       setSoldeInitial(String(compte.solde_initial ?? '0'))
       setActif(compte.actif ?? true)
       setEstCommun(compte.est_commun ?? false)
+      setEstEpargne(compte.est_epargne ?? false)
+      setTauxAnnuel(compte.taux_annuel != null ? String(compte.taux_annuel) : '')
       setDateOuverture(compte.date_ouverture ?? '')
       setNotes(compte.notes ?? '')
     } else {
@@ -121,6 +125,8 @@ export default function CompteFormModal({ isOpen, onClose, compte = null }) {
       setSoldeInitial('0')
       setActif(true)
       setEstCommun(false)
+      setEstEpargne(false)
+      setTauxAnnuel('')
       setDateOuverture('')
       setNotes('')
     }
@@ -155,6 +161,10 @@ export default function CompteFormModal({ isOpen, onClose, compte = null }) {
       solde_initial: parseDecimal(soldeInitial).toFixed(2),
       actif,
       est_commun: estCommun,
+      est_epargne: estEpargne,
+      taux_annuel: estEpargne && String(tauxAnnuel).trim()
+        ? parseDecimal(tauxAnnuel).toFixed(2)
+        : null,
       date_ouverture: dateOuverture || null,
       notes,
     }
@@ -297,6 +307,25 @@ export default function CompteFormModal({ isOpen, onClose, compte = null }) {
           />
           <span className="text-sm text-content">Compte commun (partagé du foyer)</span>
         </label>
+
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={estEpargne}
+            onChange={(e) => setEstEpargne(e.target.checked)}
+            className="w-4 h-4 accent-purple-600"
+          />
+          <span className="text-sm text-content">Compte d'épargne (livret, PEL, PEA…)</span>
+        </label>
+
+        {estEpargne && (
+          <Input
+            label="Taux annuel (%)" type="text" inputMode="decimal"
+            value={tauxAnnuel} onChange={setTauxAnnuel}
+            placeholder="Ex : 3,00"
+            error={errors.taux_annuel}
+          />
+        )}
 
         {isEdit && (
           <label className="flex items-center gap-2 cursor-pointer">

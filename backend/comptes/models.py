@@ -78,6 +78,19 @@ class Compte(BaseModel):
         default=False,
         help_text="Compte partagé du foyer (joint) — affiché avec un indicateur dédié."
     )
+    est_epargne = models.BooleanField(
+        default=False,
+        help_text="Compte d'épargne (livret, PEL, PEA…) — alimenté par transferts, "
+                  "suivi dans l'analyse de l'épargne. Purement informatif pour les soldes."
+    )
+    taux_annuel = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Taux d'intérêt annuel en % (ex. 3.00 pour un Livret A). "
+                  "Informatif au MVP ; destiné à la projection des intérêts (prévisionnel, à venir)."
+    )
     date_ouverture = models.DateField(null=True, blank=True)
     date_fermeture = models.DateField(null=True, blank=True)
     notes = models.TextField(blank=True)

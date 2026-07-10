@@ -56,6 +56,8 @@ class CompteSerializer(serializers.ModelSerializer):
             "ecart_solde",       # read_only
             "actif",
             "est_commun",
+            "est_epargne",
+            "taux_annuel",
             "date_ouverture",
             "date_fermeture",
             "notes",
