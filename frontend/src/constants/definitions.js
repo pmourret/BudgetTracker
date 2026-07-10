@@ -186,7 +186,7 @@ export const DEFINITIONS = {
   abo_par_categorie: {
     titre: 'Abonnements par catégorie',
     texte:
-      "Coût mensuel et annuel de vos abonnements regroupés par catégorie majeure (les sous-catégories sont regroupées sous leur parent). Estimatif.",
+      "Coût mensuel et annuel de vos abonnements regroupés par catégorie majeure (les sous-catégories sont regroupées sous leur parent). Cliquez sur une catégorie pour voir le détail de ses abonnements. Estimatif.",
     formule: 'Σ des coûts mensuels normalisés, par catégorie.',
   },
   abo_par_titulaire: {

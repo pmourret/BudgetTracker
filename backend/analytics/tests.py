@@ -1044,6 +1044,17 @@ class AbonnementsServiceTest(_AbonnementsTestMixin, TestCase):
         self.assertEqual(par_cat[0]["id"], "sans")
         self.assertEqual(par_cat[0]["nom"], "Sans catégorie")
 
+    def test_par_categorie_detail_abonnements(self):
+        """Chaque catégorie embarque le détail de ses abonnements (pour le modal)."""
+        self._abo("Netflix", "-15.99", self.mensuel, self.streaming, self.compte_pierre)
+        self._abo("Spotify", "-9.99", self.mensuel, self.streaming, self.compte_pierre)
+        par_cat = self._calculer()["par_categorie"]["par_categorie"]
+
+        loisirs = next(c for c in par_cat if c["nom"] == "Loisirs")
+        self.assertEqual(len(loisirs["abonnements"]), 2)
+        # Trié par coût mensuel décroissant → Netflix avant Spotify.
+        self.assertEqual(loisirs["abonnements"][0]["nom"], "Netflix")
+
     def test_par_titulaire_commun_separe(self):
         """Le compte joint forme un bucket « Commun », jamais rattaché à Pierre."""
         self._abo("Netflix", "-15.99", self.mensuel, self.streaming, self.compte_pierre)

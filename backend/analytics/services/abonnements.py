@@ -172,16 +172,18 @@ def _bloc_par_categorie(abos_actifs: list, normalises_par_id: dict) -> dict:
         maj = majeures.setdefault(
             key,
             {"id": key, "nom": nom, "total_mensuel": ZERO,
-             "total_annuel": ZERO, "nb": 0},
+             "total_annuel": ZERO, "nb": 0, "abonnements": []},
         )
         maj["total_mensuel"] += norm["cout_mensuel"]
         maj["total_annuel"] += norm["cout_annuel"]
         maj["nb"] += 1
+        maj["abonnements"].append(norm)
 
     total_mensuel = sum((m["total_mensuel"] for m in majeures.values()), ZERO)
 
     par_categorie = []
     for maj in sorted(majeures.values(), key=lambda x: x["total_mensuel"], reverse=True):
+        maj["abonnements"].sort(key=lambda a: a["cout_mensuel"] or ZERO, reverse=True)
         par_categorie.append({
             **maj,
             "part_pct": _part(maj["total_mensuel"], total_mensuel),
@@ -191,7 +193,8 @@ def _bloc_par_categorie(abos_actifs: list, normalises_par_id: dict) -> dict:
         "definition": (
             "Coût mensuel et annuel des abonnements actifs regroupés par "
             "catégorie majeure (mineures agrégées sous leur parent). Répond à "
-            "« combien je paye en streaming / télécoms / assurances ». "
+            "« combien je paye en streaming / télécoms / assurances ». Chaque "
+            "catégorie embarque le détail de ses abonnements (modal). "
             "Fiabilité estimative (référentiel)."
         ),
         "fiabilite": "estimatif",

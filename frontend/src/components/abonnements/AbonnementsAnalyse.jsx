@@ -12,12 +12,24 @@ import { Loading, ErrorState, EmptyState } from '../ui/States'
 import BarChart from '../charts/BarChart'
 import { CAT_PALETTE } from '../charts/DepensesCategories'
 import AbonnementFormModal from './AbonnementFormModal'
-import { AlertTriangle, TrendingUp, CheckCircle2, Pencil, ChevronRight, Users } from 'lucide-react'
+import {
+  AlertTriangle, TrendingUp, CheckCircle2, Pencil, ChevronRight,
+  Users, Tag, LayoutGrid,
+} from 'lucide-react'
 
 const RAISON_LABEL = {
   en_retard: { label: 'En retard', variant: 'avertissement' },
   divergence_montant: { label: 'Montant divergent', variant: 'critique' },
   jamais_genere: { label: 'Jamais généré', variant: 'neutre' },
+}
+
+// Stats communes d'un bucket (personne / catégorie / global) pour l'en-tête du modal.
+function statsOf(bucket, nbKey = 'nb') {
+  return [
+    { label: 'Mensuel', value: formatEuro(bucket.total_mensuel) },
+    { label: 'Annuel', value: formatEuro(bucket.total_annuel) },
+    { label: 'Nombre', value: String(bucket[nbKey]) },
+  ]
 }
 
 // Petit libellé de fiabilité (estimatif = référentiel, réel = flux générés).
@@ -42,12 +54,24 @@ function SectionTitle({ children, def, fiabilite }) {
   )
 }
 
+function EditBtn({ onClick, title = 'Modifier (changer de compte, résilier…)' }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="p-1.5 rounded-md text-content-2 hover:text-content hover:bg-surface-3 cursor-pointer shrink-0"
+    >
+      <Pencil size={14} />
+    </button>
+  )
+}
+
 export default function AbonnementsAnalyse() {
   const [nbMois, setNbMois] = useState(6)
   const { data, isLoading, isError, refetch } = useAbonnementsAnalyse(nbMois)
 
-  // Détail « qui paye quoi » + édition (bascule d'un abo vers un compte commun).
-  const [bucketDetail, setBucketDetail] = useState(null)
+  // Un seul modal de détail (config-driven) + le modal d'édition d'un abo.
+  const [detail, setDetail] = useState(null)
   const [editAbo, setEditAbo] = useState(null)
   const { data: abosData } = useResourceList('abonnements', { page_size: 1000 })
   const abosById = useMemo(() => {
@@ -58,8 +82,39 @@ export default function AbonnementsAnalyse() {
 
   const handleEdit = (id) => {
     const full = abosById[id]
-    if (full) { setBucketDetail(null); setEditAbo(full) }
+    if (full) { setDetail(null); setEditAbo(full) }
   }
+
+  const openTitulaire = (b) => setDetail({
+    title: `Abonnements — ${b.nom}`,
+    icon: Users,
+    badge: b.est_commun ? <Badge variant="info">Commun</Badge> : null,
+    hint: b.est_commun
+      ? null
+      : 'Ces abonnements sont prélevés sur des comptes personnels. Pour en basculer un sur un compte commun, éditez-le et changez le compte.',
+    stats: statsOf(b),
+    items: b.abonnements,
+  })
+
+  const openCategorie = (c) => setDetail({
+    title: `Abonnements — ${c.nom}`,
+    icon: Tag,
+    hint: 'Détail des abonnements de cette catégorie — repérez lesquels résilier.',
+    stats: statsOf(c),
+    items: c.abonnements,
+  })
+
+  const openTous = (synthese) => setDetail({
+    title: 'Tous les abonnements',
+    icon: LayoutGrid,
+    hint: 'Vue complète, triée par coût — le haut de la liste est le plus « rentable » à résilier.',
+    stats: [
+      { label: 'Mensuel', value: formatEuro(synthese.total_mensuel) },
+      { label: 'Annuel', value: formatEuro(synthese.total_annuel) },
+      { label: 'Nombre', value: String(synthese.nb_recurrents) },
+    ],
+    items: synthese.abonnements,
+  })
 
   return (
     <div className="flex flex-col gap-4">
@@ -81,35 +136,88 @@ export default function AbonnementsAnalyse() {
           <EmptyState icon="📊" message="Aucun abonnement actif à analyser pour l'instant." />
         ) : (
           <>
-            <Synthese synthese={data.synthese} />
+            <Synthese synthese={data.synthese} onOpenAll={openTous} onEdit={handleEdit} />
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <ParCategorie bloc={data.par_categorie} />
-              <ParTitulaire bloc={data.par_titulaire} onSelect={setBucketDetail} />
+              <ParCategorie bloc={data.par_categorie} onSelect={openCategorie} />
+              <ParTitulaire bloc={data.par_titulaire} onSelect={openTitulaire} />
             </div>
-            <DerivePrix bloc={data.derive_prix} />
-            <ARisque bloc={data.a_risque} />
+            <DerivePrix bloc={data.derive_prix} onEdit={handleEdit} />
+            <ARisque bloc={data.a_risque} onEdit={handleEdit} />
           </>
         )
       )}
 
-      <TitulaireAbonnementsModal
-        bucket={bucketDetail}
-        onClose={() => setBucketDetail(null)}
-        onEdit={handleEdit}
-      />
-      <AbonnementFormModal
-        isOpen={!!editAbo}
-        onClose={() => setEditAbo(null)}
-        abonnement={editAbo}
-      />
+      <AbonnementsDetailModal detail={detail} onClose={() => setDetail(null)} onEdit={handleEdit} />
+      <AbonnementFormModal isOpen={!!editAbo} onClose={() => setEditAbo(null)} abonnement={editAbo} />
     </div>
+  )
+}
+
+// -------------------------------------------------------------------------
+// Modal générique : détail d'un agrégat (liste d'abonnements) + édition
+// -------------------------------------------------------------------------
+function AboLine({ a, onEdit }) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-2.5">
+      <div className="min-w-0">
+        <div className="text-sm text-content truncate">{a.nom}</div>
+        <div className="text-xs text-content-3 truncate">
+          {a.categorie_nom || 'Sans catégorie'} · {a.compte_nom}{a.compte_est_commun ? ' · Commun' : ''} · {a.frequence_libelle}
+        </div>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <div className="text-right">
+          <div className="text-sm text-content tabular-nums">{formatEuro(a.cout_mensuel)}<span className="text-content-3">/mois</span></div>
+          <div className="text-xs text-content-3 tabular-nums">{formatEuro(a.cout_annuel)}/an</div>
+        </div>
+        <EditBtn onClick={() => onEdit(a.id)} />
+      </div>
+    </div>
+  )
+}
+
+function AbonnementsDetailModal({ detail, onClose, onEdit }) {
+  if (!detail) return null
+  const { title, icon: Icon, badge, hint, stats, items = [] } = detail
+
+  return (
+    <Modal
+      isOpen={!!detail}
+      onClose={onClose}
+      title={
+        <span className="flex items-center gap-2">
+          {Icon && <Icon size={16} className="text-content-2" />}
+          {title}
+          {badge}
+        </span>
+      }
+    >
+      <div className="flex flex-col gap-3">
+        {stats && (
+          <div className="flex gap-4 text-sm flex-wrap">
+            {stats.map((s) => (
+              <div key={s.label}>
+                <span className="text-content-3">{s.label} </span>
+                <span className="text-content tabular-nums">{s.value}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {hint && (
+          <p className="text-xs text-content-2 bg-surface-3 rounded-lg px-3 py-2">{hint}</p>
+        )}
+        <div className="flex flex-col divide-y divide-border-app/60 max-h-96 overflow-y-auto">
+          {items.map((a) => <AboLine key={a.id} a={a} onEdit={onEdit} />)}
+        </div>
+      </div>
+    </Modal>
   )
 }
 
 // -------------------------------------------------------------------------
 // Synthèse : coût mensuel/annuel + poids + top abonnements
 // -------------------------------------------------------------------------
-function Synthese({ synthese }) {
+function Synthese({ synthese, onOpenAll, onEdit }) {
   const tiles = [
     { label: 'Total mensuel', value: formatEuro(synthese.total_mensuel), def: DEFINITIONS.abo_total_mensuel },
     { label: 'Total annuel', value: formatEuro(synthese.total_annuel), def: DEFINITIONS.abo_total_annuel },
@@ -117,6 +225,7 @@ function Synthese({ synthese }) {
     { label: 'Poids sur revenus', value: formatPercent(synthese.poids_revenus_pct), def: DEFINITIONS.abo_poids_revenus },
   ]
   const top = synthese.abonnements.slice(0, 8)
+  const reste = synthese.nb_recurrents - top.length
 
   return (
     <Card>
@@ -133,31 +242,50 @@ function Synthese({ synthese }) {
         ))}
       </div>
 
-      <div className="text-xs text-content-2 mb-2">
-        Vos plus gros abonnements ({synthese.nb_recurrents} récurrents)
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs text-content-2">
+          Vos plus gros abonnements ({synthese.nb_recurrents} récurrents)
+        </span>
+        <button
+          onClick={() => onOpenAll(synthese)}
+          className="text-xs text-purple-600 dark:text-purple-400 hover:underline cursor-pointer"
+        >
+          Tout voir
+        </button>
       </div>
       <div className="flex flex-col divide-y divide-border-app/60">
         {top.map((a) => (
           <div key={a.id} className="flex items-center justify-between py-2 gap-3">
             <div className="min-w-0">
               <div className="text-sm text-content truncate">{a.nom}</div>
-              <div className="text-xs text-content-3">{a.frequence_libelle} · {a.compte_nom}</div>
+              <div className="text-xs text-content-3 truncate">{a.categorie_nom || 'Sans catégorie'} · {a.compte_nom} · {a.frequence_libelle}</div>
             </div>
-            <div className="text-right shrink-0">
-              <div className="text-sm text-content tabular-nums">{formatEuro(a.cout_mensuel)}<span className="text-content-3">/mois</span></div>
-              <div className="text-xs text-content-3 tabular-nums">{formatEuro(a.cout_annuel)}/an</div>
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="text-right">
+                <div className="text-sm text-content tabular-nums">{formatEuro(a.cout_mensuel)}<span className="text-content-3">/mois</span></div>
+                <div className="text-xs text-content-3 tabular-nums">{formatEuro(a.cout_annuel)}/an</div>
+              </div>
+              <EditBtn onClick={() => onEdit(a.id)} />
             </div>
           </div>
         ))}
       </div>
+      {reste > 0 && (
+        <button
+          onClick={() => onOpenAll(synthese)}
+          className="text-xs text-content-2 hover:text-content mt-2 cursor-pointer"
+        >
+          + {reste} autre{reste > 1 ? 's' : ''}…
+        </button>
+      )}
     </Card>
   )
 }
 
 // -------------------------------------------------------------------------
-// Répartition par catégorie
+// Répartition par catégorie (chaque catégorie = agrégat cliquable)
 // -------------------------------------------------------------------------
-function ParCategorie({ bloc }) {
+function ParCategorie({ bloc, onSelect }) {
   const rows = bloc.par_categorie
   return (
     <Card>
@@ -177,9 +305,13 @@ function ParCategorie({ bloc }) {
             }]}
             height={200}
           />
-          <div className="flex flex-col gap-2 mt-3">
+          <div className="flex flex-col gap-1 mt-3">
             {rows.map((r, i) => (
-              <div key={r.id} className="flex items-center gap-2">
+              <button
+                key={r.id}
+                onClick={() => onSelect(r)}
+                className="text-left w-full flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-surface-3 cursor-pointer group"
+              >
                 <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: CAT_PALETTE[i % CAT_PALETTE.length] }} />
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between text-sm">
@@ -191,7 +323,8 @@ function ParCategorie({ bloc }) {
                   </div>
                 </div>
                 <span className="text-xs text-content-3 tabular-nums w-12 text-right">{formatPercent(r.part_pct)}</span>
-              </div>
+                <ChevronRight size={15} className="text-content-3 group-hover:text-content-2 shrink-0" />
+              </button>
             ))}
           </div>
         </>
@@ -201,7 +334,7 @@ function ParCategorie({ bloc }) {
 }
 
 // -------------------------------------------------------------------------
-// Qui paye quoi (par titulaire)
+// Qui paye quoi (chaque personne = agrégat cliquable)
 // -------------------------------------------------------------------------
 function ParTitulaire({ bloc, onSelect }) {
   const rows = bloc.par_titulaire
@@ -246,81 +379,9 @@ function ParTitulaire({ bloc, onSelect }) {
 }
 
 // -------------------------------------------------------------------------
-// Modal : détail des abonnements d'une personne (ou du bucket Commun)
+// Dérive de prix (réel) — 1 ligne = 1 abo, éditable
 // -------------------------------------------------------------------------
-function TitulaireAbonnementsModal({ bucket, onClose, onEdit }) {
-  if (!bucket) return null
-  const abos = bucket.abonnements ?? []
-
-  return (
-    <Modal
-      isOpen={!!bucket}
-      onClose={onClose}
-      title={
-        <span className="flex items-center gap-2">
-          <Users size={16} className="text-content-2" />
-          Abonnements — {bucket.nom}
-          {bucket.est_commun && <Badge variant="info">Commun</Badge>}
-        </span>
-      }
-    >
-      <div className="flex flex-col gap-3">
-        <div className="flex gap-4 text-sm">
-          <div>
-            <span className="text-content-3">Mensuel </span>
-            <span className="text-content tabular-nums">{formatEuro(bucket.total_mensuel)}</span>
-          </div>
-          <div>
-            <span className="text-content-3">Annuel </span>
-            <span className="text-content tabular-nums">{formatEuro(bucket.total_annuel)}</span>
-          </div>
-          <div>
-            <span className="text-content-3">Nombre </span>
-            <span className="text-content tabular-nums">{bucket.nb}</span>
-          </div>
-        </div>
-
-        {!bucket.est_commun && (
-          <p className="text-xs text-content-2 bg-surface-3 rounded-lg px-3 py-2">
-            Ces abonnements sont prélevés sur des comptes personnels. Pour en
-            basculer un sur un compte commun, cliquez sur <Pencil size={11} className="inline -mt-0.5" /> et changez le compte.
-          </p>
-        )}
-
-        <div className="flex flex-col divide-y divide-border-app/60 max-h-96 overflow-y-auto">
-          {abos.map((a) => (
-            <div key={a.id} className="flex items-center justify-between gap-3 py-2.5">
-              <div className="min-w-0">
-                <div className="text-sm text-content truncate">{a.nom}</div>
-                <div className="text-xs text-content-3 truncate">
-                  {a.categorie_nom || 'Sans catégorie'} · {a.compte_nom} · {a.frequence_libelle}
-                </div>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <div className="text-right">
-                  <div className="text-sm text-content tabular-nums">{formatEuro(a.cout_mensuel)}<span className="text-content-3">/mois</span></div>
-                  <div className="text-xs text-content-3 tabular-nums">{formatEuro(a.cout_annuel)}/an</div>
-                </div>
-                <button
-                  onClick={() => onEdit(a.id)}
-                  title="Modifier (changer de compte)"
-                  className="p-1.5 rounded-md text-content-2 hover:text-content hover:bg-surface-3 cursor-pointer"
-                >
-                  <Pencil size={14} />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </Modal>
-  )
-}
-
-// -------------------------------------------------------------------------
-// Dérive de prix (réel)
-// -------------------------------------------------------------------------
-function DerivePrix({ bloc }) {
+function DerivePrix({ bloc, onEdit }) {
   const rows = bloc.par_abonnement
   return (
     <Card>
@@ -340,7 +401,8 @@ function DerivePrix({ bloc }) {
                 <th className="py-2 pr-3 font-medium text-right">Attendu</th>
                 <th className="py-2 pr-3 font-medium text-right">Dernier réel</th>
                 <th className="py-2 pr-3 font-medium text-center">Le</th>
-                <th className="py-2 pl-3 font-medium text-right">Écart</th>
+                <th className="py-2 pr-3 font-medium text-right">Écart</th>
+                <th className="py-2 pl-3 font-medium text-right"></th>
               </tr>
             </thead>
             <tbody>
@@ -350,8 +412,11 @@ function DerivePrix({ bloc }) {
                   <td className="py-2 pr-3 text-right tabular-nums text-content-2">{formatEuro(r.montant_attendu)}</td>
                   <td className="py-2 pr-3 text-right tabular-nums text-content">{formatEuro(r.dernier_montant_reel)}</td>
                   <td className="py-2 pr-3 text-center text-content-3 text-xs">{formatDate(r.dernier_date)}</td>
-                  <td className="py-2 pl-3 text-right">
+                  <td className="py-2 pr-3 text-right">
                     <EcartChip ecart={r.ecart_pct} divergence={r.en_divergence} />
+                  </td>
+                  <td className="py-2 pl-3 text-right">
+                    <EditBtn onClick={() => onEdit(r.id)} title="Modifier l'abonnement" />
                   </td>
                 </tr>
               ))}
@@ -374,9 +439,9 @@ function EcartChip({ ecart, divergence }) {
 }
 
 // -------------------------------------------------------------------------
-// À surveiller
+// À surveiller — 1 ligne = 1 abo, éditable
 // -------------------------------------------------------------------------
-function ARisque({ bloc }) {
+function ARisque({ bloc, onEdit }) {
   const rows = bloc.a_risque
   return (
     <Card>
@@ -408,8 +473,11 @@ function ARisque({ bloc }) {
                   })}
                 </div>
               </div>
-              <div className="text-right shrink-0 text-sm text-content-2 tabular-nums">
-                {r.cout_mensuel != null ? `${formatEuro(r.cout_mensuel)}/mois` : formatEuro(r.montant_attendu)}
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-sm text-content-2 tabular-nums">
+                  {r.cout_mensuel != null ? `${formatEuro(r.cout_mensuel)}/mois` : formatEuro(r.montant_attendu)}
+                </span>
+                <EditBtn onClick={() => onEdit(r.id)} title="Modifier l'abonnement" />
               </div>
             </div>
           ))}
