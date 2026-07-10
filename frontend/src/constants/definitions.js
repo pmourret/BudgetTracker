@@ -164,6 +164,50 @@ export const DEFINITIONS = {
     formule: '|montant réel − montant attendu| ÷ montant attendu, comparé au seuil.',
   },
 
+  // ---- Analyse des abonnements ----
+  abo_total_annuel: {
+    titre: 'Coût annuel estimé',
+    texte:
+      "Ce que vos abonnements actifs représentent sur une année entière — souvent plus parlant que le mensuel (un « petit » 12 €/mois = 144 €/an). Estimatif (référentiel).",
+    formule: 'Σ (montant attendu × 365,25 ÷ nombre de jours de la fréquence).',
+  },
+  abo_poids_depenses: {
+    titre: 'Poids sur les dépenses',
+    texte:
+      "Part de vos dépenses réelles moyennes que représentent les abonnements. Croise le total mensuel estimé (référentiel) avec vos dépenses réelles des derniers mois.",
+    formule: 'total mensuel des abonnements ÷ dépenses réelles moyennes par mois × 100.',
+  },
+  abo_poids_revenus: {
+    titre: 'Poids sur les revenus',
+    texte:
+      "Part de vos revenus réels moyens absorbée par les abonnements. Repère quand le récurrent devient lourd face à ce qui rentre.",
+    formule: 'total mensuel des abonnements ÷ revenus réels moyens par mois × 100.',
+  },
+  abo_par_categorie: {
+    titre: 'Abonnements par catégorie',
+    texte:
+      "Coût mensuel et annuel de vos abonnements regroupés par catégorie majeure (les sous-catégories sont regroupées sous leur parent). Estimatif.",
+    formule: 'Σ des coûts mensuels normalisés, par catégorie.',
+  },
+  abo_par_titulaire: {
+    titre: 'Qui paye quoi',
+    texte:
+      "Répartition du coût des abonnements par personne du foyer, selon le propriétaire du compte prélevé. Les comptes communs forment un groupe « Commun » à part. Estimatif.",
+    formule: 'Σ des coûts mensuels des abonnements prélevés sur les comptes de chaque personne.',
+  },
+  abo_derive_prix: {
+    titre: 'Dérive de prix',
+    texte:
+      "Écart entre le dernier montant réellement prélevé et le montant attendu — détecte les hausses de tarif silencieuses. Fiabilité réelle (flux générés).",
+    formule: '(dernier montant réel − montant attendu) ÷ montant attendu × 100.',
+  },
+  abo_a_risque: {
+    titre: 'Abonnements à surveiller',
+    texte:
+      "Abonnements méritant l'attention : en retard de prélèvement, montant divergent, ou jamais matérialisé en flux (potentiellement oublié). Signalétique, sans jugement.",
+    formule: 'Signalement selon retard / divergence / absence de flux.',
+  },
+
   // ---- Patrimoine ----
   patrimoine_total: {
     titre: 'Patrimoine total estimé',

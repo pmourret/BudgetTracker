@@ -13,9 +13,10 @@ const RESOURCE_DEPENDENCIES = {
   transferts:         ['comptes', 'flux', 'analytics'],
   budgets:            ['analytics'],
   'budget-templates': ['budgets', 'analytics'],
-  // Les abonnements ne nourrissent plus le prévisionnel (référentiel pur).
+  // Les abonnements ne nourrissent plus le prévisionnel (référentiel pur),
+  // mais alimentent l'analyse dédiée (/analytics/abonnements/) → 'analytics'.
   // L'action verifier-echeances crée des alertes « en retard ».
-  abonnements:        ['alertes'],
+  abonnements:        ['alertes', 'analytics'],
   comptes:            ['flux', 'analytics'],
   patrimoine:         ['analytics'],
   alertes:            ['analytics'],

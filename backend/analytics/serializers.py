@@ -68,6 +68,22 @@ class AnalyseSerializer(serializers.Serializer):
     saisonnalite = serializers.DictField()
 
 
+class AbonnementsAnalyseSerializer(serializers.Serializer):
+    """
+    Serializer de sortie pour l'analyse des abonnements (lecture seule).
+    synthese / par_categorie / par_titulaire = base référentiel (estimatif) ;
+    derive_prix / a_risque croisent le réel. Chaque bloc porte 'fiabilite'.
+    """
+    date_calcul = serializers.CharField()
+    nb_mois = serializers.IntegerField()
+    fiabilite = serializers.CharField()
+    synthese = serializers.DictField()
+    par_categorie = serializers.DictField()
+    par_titulaire = serializers.DictField()
+    derive_prix = serializers.DictField()
+    a_risque = serializers.DictField()
+
+
 class PointsSerializer(serializers.Serializer):
     """
     Serializer de sortie pour le système de points (mécanique B, socle 12-B-1).

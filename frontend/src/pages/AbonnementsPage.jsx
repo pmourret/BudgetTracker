@@ -18,6 +18,7 @@ import Tooltip from '../components/ui/Tooltip'
 import { DEFINITIONS } from '../constants/definitions'
 import { Loading, ErrorState, EmptyState } from '../components/ui/States'
 import AbonnementFormModal from '../components/abonnements/AbonnementFormModal'
+import AbonnementsAnalyse from '../components/abonnements/AbonnementsAnalyse'
 import FluxFormModal from '../components/flux/FluxFormModal'
 
 function echeanceISO(jour) {
@@ -32,6 +33,7 @@ function echeanceISO(jour) {
 const FILTRES_INITIAUX = { search: '', compte: 'tous', categorie: 'tous', frequence: 'tous', actif: 'tous' }
 
 export default function AbonnementsPage() {
+  const [tab, setTab] = useState('liste')
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedAbonnement, setSelectedAbonnement] = useState(null)
   const [generateFor, setGenerateFor] = useState(null)
@@ -136,6 +138,15 @@ export default function AbonnementsPage() {
         </Button>
       </div>
 
+      <div className="flex gap-1 border-b border-border-app">
+        <TabBtn active={tab === 'liste'} onClick={() => setTab('liste')}>Liste</TabBtn>
+        <TabBtn active={tab === 'analyse'} onClick={() => setTab('analyse')}>Analyse</TabBtn>
+      </div>
+
+      {tab === 'analyse' ? (
+        <AbonnementsAnalyse />
+      ) : (
+      <>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
         <MetricCard label="Total mensuel estimé" value={formatEuro(-totalMensuel)} def={DEFINITIONS.abo_total_mensuel} />
         <MetricCard label="Abonnements actifs" value={String(actifs.length)} />
@@ -202,6 +213,8 @@ export default function AbonnementsPage() {
           />
         )
       )}
+      </>
+      )}
 
       <AbonnementFormModal isOpen={modalOpen} onClose={closeModal} abonnement={selectedAbonnement} />
       <FluxFormModal
@@ -210,6 +223,22 @@ export default function AbonnementsPage() {
         initialValues={generateInitial}
       />
     </div>
+  )
+}
+
+function TabBtn({ active, onClick, children }) {
+  return (
+    <button
+      onClick={onClick}
+      className={[
+        'px-3 py-2 text-sm cursor-pointer border-b-2 -mb-px transition-colors',
+        active
+          ? 'border-purple-600 text-content font-medium'
+          : 'border-transparent text-content-2 hover:text-content',
+      ].join(' ')}
+    >
+      {children}
+    </button>
   )
 }
 

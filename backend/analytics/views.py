@@ -6,11 +6,13 @@ from .services.dashboard import calculer_dashboard
 from .services.compte_dashboard import calculer_compte_dashboard
 from .services.projection import calculer_previsionnel
 from .services.analyse import calculer_analyse
+from .services.abonnements import calculer_abonnements
 from .serializers import (
     DashboardSerializer,
     CompteDashboardSerializer,
     PrevisionnelSerializer,
     AnalyseSerializer,
+    AbonnementsAnalyseSerializer,
     PointsSerializer,
 )
 
@@ -119,6 +121,30 @@ class AnalyseView(APIView):
 
         data = calculer_analyse(nb_mois=nb_mois)
         serializer = AnalyseSerializer(data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class AbonnementsAnalyseView(APIView):
+    """
+    Analyse des abonnements — lecture seule.
+
+    GET /api/v1/analytics/abonnements/?nb_mois=6
+
+    Cinq blocs : synthese (coût mensuel/annuel + poids budget), par_categorie,
+    par_titulaire (qui paye quoi), derive_prix (hausses de tarif), a_risque.
+    Base référentiel (estimatif) ; derive_prix/a_risque croisent le réel.
+    Ne modifie rien, ne crée aucune alerte.
+    """
+
+    def get(self, request):
+        try:
+            nb_mois = int(request.query_params.get("nb_mois", 6))
+        except (TypeError, ValueError):
+            nb_mois = 6
+        nb_mois = max(1, min(nb_mois, 24))  # borné 1-24 mois
+
+        data = calculer_abonnements(nb_mois=nb_mois)
+        serializer = AbonnementsAnalyseSerializer(data)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 

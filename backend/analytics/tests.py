@@ -895,3 +895,223 @@ class AnalyseAPITest(_AnalyseTestMixin, TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["nb_mois"], 12)
         self.assertEqual(len(response.data["tendances"]["series"]), 12)
+
+
+class _AbonnementsTestMixin:
+    """
+    Données communes aux tests de l'analyse des abonnements.
+
+    Date de référence injectée pour le déterminisme. Fréquences avec nb_jours
+    pour la normalisation ; une fréquence ponctuelle (nb_jours=None) sert à
+    vérifier l'exclusion des non-récurrents.
+    """
+
+    AUJOURD_HUI = datetime.date(2026, 3, 15)  # mois comptable courant : 2026-03
+
+    def setUp(self):
+        self.type_compte = TypeCompte.objects.create(code="COURANT", libelle="Courant")
+        self.pierre = Titulaire.objects.create(code="PIERRE", libelle="Pierre")
+        self.marie = Titulaire.objects.create(code="MARIE", libelle="Marie")
+        self.etablissement = Etablissement.objects.create(code="BNP", libelle="BNP")
+        self.devise = Devise.objects.create(
+            code="EUR", libelle="Euro", symbole="EUR", est_defaut=True
+        )
+        self.type_flux = TypeFlux.objects.create(code="DEBIT", libelle="Debit")
+        self.statut = StatutFlux.objects.create(
+            code="VALIDE", libelle="Valide", est_definitif=True
+        )
+        self.mensuel = Frequence.objects.create(
+            code="MENS", libelle="Mensuel", nb_jours=30
+        )
+        self.annuel = Frequence.objects.create(
+            code="ANN", libelle="Annuel", nb_jours=365
+        )
+        self.ponctuel = Frequence.objects.create(
+            code="PONCT", libelle="Ponctuel", nb_jours=None
+        )
+        # Catégories : une majeure avec mineure, une majeure feuille.
+        self.loisirs = Categorie.objects.create(code="LOISIRS", nom="Loisirs")
+        self.streaming = Categorie.objects.create(
+            code="STREAM", nom="Streaming", parent=self.loisirs
+        )
+        self.telecoms = Categorie.objects.create(code="TEL", nom="Télécoms")
+        # Comptes : perso (Pierre) + joint du foyer.
+        self.compte_pierre = Compte.objects.create(
+            code="CPT-0001", nom="Compte Pierre",
+            type_compte=self.type_compte, titulaire=self.pierre,
+            etablissement=self.etablissement, devise=self.devise,
+        )
+        self.compte_commun = Compte.objects.create(
+            code="CPT-0002", nom="Compte joint", est_commun=True,
+            type_compte=self.type_compte, titulaire=self.pierre,
+            etablissement=self.etablissement, devise=self.devise,
+        )
+
+    def _abo(self, nom, montant, frequence, categorie, compte,
+             actif=True, seuil=Decimal("10")):
+        from abonnements.models import Abonnement
+        return Abonnement.objects.create(
+            nom=nom, compte=compte, categorie=categorie,
+            type_flux=self.type_flux, frequence=frequence,
+            montant_attendu=Decimal(str(montant)),
+            seuil_divergence_pct=seuil,
+            date_debut=datetime.date(2026, 1, 1), actif=actif,
+        )
+
+    def _flux(self, montant, date_flux, categorie=None, compte=None,
+              abonnement=None, libelle="Flux"):
+        return Flux.objects.create(
+            compte=compte or self.compte_pierre,
+            categorie=categorie, type_flux=self.type_flux, statut=self.statut,
+            devise=self.devise, montant=Decimal(str(montant)),
+            date_flux=date_flux, libelle=libelle, abonnement=abonnement,
+        )
+
+    def _calculer(self, nb_mois=6):
+        from analytics.services.abonnements import calculer_abonnements
+        return calculer_abonnements(nb_mois=nb_mois, aujourd_hui=self.AUJOURD_HUI)
+
+
+class AbonnementsServiceTest(_AbonnementsTestMixin, TestCase):
+
+    def test_synthese_totaux(self):
+        """Coûts normalisés au mois et à l'année, sommés sur les actifs."""
+        self._abo("Netflix", "-15.99", self.mensuel, self.streaming, self.compte_pierre)
+        self._abo("Assurance", "-240.00", self.annuel, self.telecoms, self.compte_commun)
+        synthese = self._calculer()["synthese"]
+
+        # Netflix : 15.99 × 30.4375 / 30 = 16.22 ; Assurance : 240 × 30.4375 / 365 = 20.01
+        self.assertEqual(synthese["nb_actifs"], 2)
+        self.assertEqual(synthese["nb_recurrents"], 2)
+        self.assertEqual(synthese["total_mensuel"], Decimal("36.23"))
+        # Annuel : 194.68 + 240.16 = 434.84
+        self.assertEqual(synthese["total_annuel"], Decimal("434.84"))
+
+    def test_poids_sur_depenses_reelles(self):
+        """Le poids rapporte le total mensuel aux dépenses réelles moyennes."""
+        self._abo("Netflix", "-15.99", self.mensuel, self.streaming, self.compte_pierre)
+        # 600 € de dépenses réelles sur le mois courant → moyenne 100 €/mois sur 6 mois.
+        self._flux("-600.00", datetime.date(2026, 3, 5), categorie=self.streaming)
+        synthese = self._calculer()["synthese"]
+
+        self.assertEqual(synthese["depenses_mensuelles_moy"], Decimal("100.00"))
+        # 16.22 / 100 × 100 = 16.2 %
+        self.assertEqual(synthese["poids_depenses_pct"], Decimal("16.2"))
+
+    def test_revenus_recurrents_exclus(self):
+        """Un abonnement de revenu (montant positif) n'entre pas dans les coûts."""
+        self._abo("Salaire", "2800.00", self.mensuel, None, self.compte_pierre)
+        self._abo("Netflix", "-15.99", self.mensuel, self.streaming, self.compte_pierre)
+        synthese = self._calculer()["synthese"]
+
+        self.assertEqual(synthese["nb_actifs"], 1)
+
+    def test_ponctuel_exclu_des_totaux(self):
+        """Une fréquence sans nb_jours n'est pas normalisable → hors totaux."""
+        self._abo("Netflix", "-15.99", self.mensuel, self.streaming, self.compte_pierre)
+        self._abo("Achat unique", "-50.00", self.ponctuel, self.telecoms, self.compte_pierre)
+        synthese = self._calculer()["synthese"]
+
+        self.assertEqual(synthese["nb_actifs"], 2)
+        self.assertEqual(synthese["nb_recurrents"], 1)
+        self.assertEqual(synthese["total_mensuel"], Decimal("16.22"))
+
+    def test_inactif_exclu(self):
+        """Un abonnement inactif n'est pas compté."""
+        self._abo("Netflix", "-15.99", self.mensuel, self.streaming,
+                  self.compte_pierre, actif=False)
+        synthese = self._calculer()["synthese"]
+
+        self.assertEqual(synthese["nb_actifs"], 0)
+        self.assertEqual(synthese["total_mensuel"], Decimal("0.00"))
+
+    def test_par_categorie_regroupe_sous_parent(self):
+        """La mineure Streaming est regroupée sous sa majeure Loisirs."""
+        self._abo("Netflix", "-15.99", self.mensuel, self.streaming, self.compte_pierre)
+        self._abo("Spotify", "-9.99", self.mensuel, self.streaming, self.compte_pierre)
+        par_cat = self._calculer()["par_categorie"]["par_categorie"]
+
+        self.assertEqual(len(par_cat), 1)
+        self.assertEqual(par_cat[0]["nom"], "Loisirs")
+        self.assertEqual(par_cat[0]["nb"], 2)
+        self.assertEqual(par_cat[0]["part_pct"], Decimal("100.0"))
+
+    def test_par_categorie_sans_categorie(self):
+        """Un abonnement sans catégorie tombe dans le bucket « Sans catégorie »."""
+        self._abo("Mystère", "-12.00", self.mensuel, None, self.compte_pierre)
+        par_cat = self._calculer()["par_categorie"]["par_categorie"]
+
+        self.assertEqual(par_cat[0]["id"], "sans")
+        self.assertEqual(par_cat[0]["nom"], "Sans catégorie")
+
+    def test_par_titulaire_commun_separe(self):
+        """Le compte joint forme un bucket « Commun », jamais rattaché à Pierre."""
+        self._abo("Netflix", "-15.99", self.mensuel, self.streaming, self.compte_pierre)
+        self._abo("Assurance", "-240.00", self.annuel, self.telecoms, self.compte_commun)
+        buckets = self._calculer()["par_titulaire"]["par_titulaire"]
+
+        noms = {b["nom"]: b for b in buckets}
+        self.assertIn("Pierre", noms)
+        self.assertIn("Commun", noms)
+        self.assertTrue(noms["Commun"]["est_commun"])
+        self.assertFalse(noms["Pierre"]["est_commun"])
+        self.assertEqual(noms["Pierre"]["nb"], 1)
+
+    def test_derive_prix_divergence(self):
+        """Un dernier prélèvement au-delà du seuil est marqué en divergence."""
+        abo = self._abo("Netflix", "-15.99", self.mensuel, self.streaming,
+                        self.compte_pierre, seuil=Decimal("10"))
+        self._flux("-20.00", datetime.date(2026, 3, 3),
+                   categorie=self.streaming, abonnement=abo)
+        par_abo = self._calculer()["derive_prix"]["par_abonnement"]
+
+        self.assertEqual(len(par_abo), 1)
+        # (20 - 15.99) / 15.99 × 100 = 25.1 %
+        self.assertEqual(par_abo[0]["ecart_pct"], Decimal("25.1"))
+        self.assertTrue(par_abo[0]["en_divergence"])
+
+    def test_derive_prix_sans_flux_absent(self):
+        """Un abonnement sans flux réel n'apparaît pas dans la dérive."""
+        self._abo("Netflix", "-15.99", self.mensuel, self.streaming, self.compte_pierre)
+        par_abo = self._calculer()["derive_prix"]["par_abonnement"]
+
+        self.assertEqual(par_abo, [])
+
+    def test_a_risque_jamais_genere(self):
+        """Un abonnement actif sans aucun flux est signalé « jamais_genere »."""
+        self._abo("Netflix", "-15.99", self.mensuel, self.streaming, self.compte_pierre)
+        a_risque = self._calculer()["a_risque"]["a_risque"]
+
+        self.assertEqual(len(a_risque), 1)
+        self.assertIn("jamais_genere", a_risque[0]["raisons"])
+
+    def test_a_risque_en_retard(self):
+        """Un abonnement non prélevé depuis plus d'un cycle est « en_retard »."""
+        abo = self._abo("Netflix", "-15.99", self.mensuel, self.streaming,
+                        self.compte_pierre)
+        # Dernier flux il y a plus de 30 jours (le signal pose derniere_occurrence).
+        self._flux("-15.99", datetime.date(2026, 1, 10),
+                   categorie=self.streaming, abonnement=abo)
+        a_risque = self._calculer()["a_risque"]["a_risque"]
+
+        motifs = a_risque[0]["raisons"]
+        self.assertIn("en_retard", motifs)
+        self.assertNotIn("jamais_genere", motifs)
+
+
+class AbonnementsAnalyseAPITest(_AbonnementsTestMixin, TestCase):
+
+    def test_endpoint_repond(self):
+        from django.urls import reverse
+        self._abo("Netflix", "-15.99", self.mensuel, self.streaming, self.compte_pierre)
+        response = self.client.get(reverse("abonnements-analyse"))
+        self.assertEqual(response.status_code, 200)
+        for bloc in ("synthese", "par_categorie", "par_titulaire",
+                     "derive_prix", "a_risque"):
+            self.assertIn(bloc, response.data)
+
+    def test_nb_mois_parametrable(self):
+        from django.urls import reverse
+        response = self.client.get(reverse("abonnements-analyse"), {"nb_mois": 12})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["nb_mois"], 12)
