@@ -1057,6 +1057,21 @@ class AbonnementsServiceTest(_AbonnementsTestMixin, TestCase):
         self.assertFalse(noms["Pierre"]["est_commun"])
         self.assertEqual(noms["Pierre"]["nb"], 1)
 
+    def test_par_titulaire_detail_abonnements(self):
+        """Chaque bucket embarque le détail de ses abonnements (pour le modal)."""
+        self._abo("Netflix", "-15.99", self.mensuel, self.streaming, self.compte_pierre)
+        self._abo("Spotify", "-9.99", self.mensuel, self.streaming, self.compte_pierre)
+        buckets = self._calculer()["par_titulaire"]["par_titulaire"]
+
+        pierre = next(b for b in buckets if b["nom"] == "Pierre")
+        self.assertEqual(len(pierre["abonnements"]), 2)
+        # Trié par coût mensuel décroissant → Netflix avant Spotify.
+        self.assertEqual(pierre["abonnements"][0]["nom"], "Netflix")
+        detail = pierre["abonnements"][0]
+        self.assertEqual(detail["categorie_nom"], "Streaming")
+        self.assertEqual(detail["compte_nom"], "Compte Pierre")
+        self.assertFalse(detail["compte_est_commun"])
+
     def test_derive_prix_divergence(self):
         """Un dernier prélèvement au-delà du seuil est marqué en divergence."""
         abo = self._abo("Netflix", "-15.99", self.mensuel, self.streaming,

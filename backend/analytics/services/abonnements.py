@@ -67,7 +67,10 @@ def _normaliser(abo) -> dict:
         "montant_attendu": abo.montant_attendu,
         "frequence_libelle": abo.frequence.libelle,
         "categorie_id": str(abo.categorie_id) if abo.categorie_id else None,
+        "categorie_nom": abo.categorie.nom if abo.categorie_id else None,
+        "compte_id": str(abo.compte_id),
         "compte_nom": compte.nom,
+        "compte_est_commun": compte.est_commun,
         "cout_mensuel": _cout_mensuel(montant_abs, nb_jours),
         "cout_annuel": _cout_annuel(montant_abs, nb_jours),
     }
@@ -224,16 +227,21 @@ def _bloc_par_titulaire(abos_actifs: list, normalises_par_id: dict) -> dict:
         bucket = buckets.setdefault(
             key,
             {"id": key, "nom": nom, "est_commun": est_commun,
-             "total_mensuel": ZERO, "total_annuel": ZERO, "nb": 0},
+             "total_mensuel": ZERO, "total_annuel": ZERO, "nb": 0,
+             "abonnements": []},
         )
         bucket["total_mensuel"] += norm["cout_mensuel"]
         bucket["total_annuel"] += norm["cout_annuel"]
         bucket["nb"] += 1
+        bucket["abonnements"].append(norm)
 
     total_mensuel = sum((b["total_mensuel"] for b in buckets.values()), ZERO)
 
     par_titulaire = []
     for bucket in sorted(buckets.values(), key=lambda x: x["total_mensuel"], reverse=True):
+        bucket["abonnements"].sort(
+            key=lambda a: a["cout_mensuel"] or ZERO, reverse=True
+        )
         par_titulaire.append({
             **bucket,
             "part_pct": _part(bucket["total_mensuel"], total_mensuel),
@@ -243,7 +251,8 @@ def _bloc_par_titulaire(abos_actifs: list, normalises_par_id: dict) -> dict:
         "definition": (
             "Coût des abonnements ventilé par personne du foyer (propriétaire "
             "du compte prélevé). Les comptes communs forment un groupe "
-            "« Commun » à part. Fiabilité estimative (référentiel)."
+            "« Commun » à part. Le détail par personne aide à repérer ce qui "
+            "pourrait basculer sur un compte commun. Fiabilité estimative."
         ),
         "fiabilite": "estimatif",
         "total_mensuel": total_mensuel,

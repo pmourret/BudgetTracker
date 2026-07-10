@@ -1,15 +1,18 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import useAbonnementsAnalyse from '../../hooks/useAbonnementsAnalyse'
+import { useResourceList } from '../../hooks/useResource'
 import { formatEuro, formatDate, formatPercent } from '../../utils/format'
 import { DEFINITIONS } from '../../constants/definitions'
 import Card from '../ui/Card'
 import Badge from '../ui/Badge'
 import Tooltip from '../ui/Tooltip'
+import Modal from '../ui/Modal'
 import PeriodSelector from '../ui/PeriodSelector'
 import { Loading, ErrorState, EmptyState } from '../ui/States'
 import BarChart from '../charts/BarChart'
 import { CAT_PALETTE } from '../charts/DepensesCategories'
-import { AlertTriangle, TrendingUp, CheckCircle2 } from 'lucide-react'
+import AbonnementFormModal from './AbonnementFormModal'
+import { AlertTriangle, TrendingUp, CheckCircle2, Pencil, ChevronRight, Users } from 'lucide-react'
 
 const RAISON_LABEL = {
   en_retard: { label: 'En retard', variant: 'avertissement' },
@@ -43,6 +46,21 @@ export default function AbonnementsAnalyse() {
   const [nbMois, setNbMois] = useState(6)
   const { data, isLoading, isError, refetch } = useAbonnementsAnalyse(nbMois)
 
+  // Détail « qui paye quoi » + édition (bascule d'un abo vers un compte commun).
+  const [bucketDetail, setBucketDetail] = useState(null)
+  const [editAbo, setEditAbo] = useState(null)
+  const { data: abosData } = useResourceList('abonnements', { page_size: 1000 })
+  const abosById = useMemo(() => {
+    const map = {}
+    for (const a of abosData?.results ?? []) map[a.id] = a
+    return map
+  }, [abosData])
+
+  const handleEdit = (id) => {
+    const full = abosById[id]
+    if (full) { setBucketDetail(null); setEditAbo(full) }
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
@@ -66,13 +84,24 @@ export default function AbonnementsAnalyse() {
             <Synthese synthese={data.synthese} />
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <ParCategorie bloc={data.par_categorie} />
-              <ParTitulaire bloc={data.par_titulaire} />
+              <ParTitulaire bloc={data.par_titulaire} onSelect={setBucketDetail} />
             </div>
             <DerivePrix bloc={data.derive_prix} />
             <ARisque bloc={data.a_risque} />
           </>
         )
       )}
+
+      <TitulaireAbonnementsModal
+        bucket={bucketDetail}
+        onClose={() => setBucketDetail(null)}
+        onEdit={handleEdit}
+      />
+      <AbonnementFormModal
+        isOpen={!!editAbo}
+        onClose={() => setEditAbo(null)}
+        abonnement={editAbo}
+      />
     </div>
   )
 }
@@ -174,7 +203,7 @@ function ParCategorie({ bloc }) {
 // -------------------------------------------------------------------------
 // Qui paye quoi (par titulaire)
 // -------------------------------------------------------------------------
-function ParTitulaire({ bloc }) {
+function ParTitulaire({ bloc, onSelect }) {
   const rows = bloc.par_titulaire
   return (
     <Card>
@@ -184,17 +213,22 @@ function ParTitulaire({ bloc }) {
       {rows.length === 0 ? (
         <p className="text-sm text-content-3">Aucune donnée.</p>
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-1">
           {rows.map((r) => (
-            <div key={r.id}>
+            <button
+              key={r.id}
+              onClick={() => onSelect(r)}
+              className="text-left w-full rounded-lg px-2 py-2 hover:bg-surface-3 cursor-pointer group"
+            >
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="text-sm text-content truncate">{r.nom}</span>
                   {r.est_commun && <Badge variant="info">Commun</Badge>}
                   <span className="text-xs text-content-3">· {r.nb} abo</span>
                 </div>
-                <div className="text-right shrink-0">
+                <div className="flex items-center gap-1 shrink-0">
                   <span className="text-sm text-content tabular-nums">{formatEuro(r.total_mensuel)}<span className="text-content-3">/mois</span></span>
+                  <ChevronRight size={15} className="text-content-3 group-hover:text-content-2" />
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -203,11 +237,83 @@ function ParTitulaire({ bloc }) {
                 </div>
                 <span className="text-xs text-content-3 tabular-nums w-12 text-right">{formatPercent(r.part_pct)}</span>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       )}
     </Card>
+  )
+}
+
+// -------------------------------------------------------------------------
+// Modal : détail des abonnements d'une personne (ou du bucket Commun)
+// -------------------------------------------------------------------------
+function TitulaireAbonnementsModal({ bucket, onClose, onEdit }) {
+  if (!bucket) return null
+  const abos = bucket.abonnements ?? []
+
+  return (
+    <Modal
+      isOpen={!!bucket}
+      onClose={onClose}
+      title={
+        <span className="flex items-center gap-2">
+          <Users size={16} className="text-content-2" />
+          Abonnements — {bucket.nom}
+          {bucket.est_commun && <Badge variant="info">Commun</Badge>}
+        </span>
+      }
+    >
+      <div className="flex flex-col gap-3">
+        <div className="flex gap-4 text-sm">
+          <div>
+            <span className="text-content-3">Mensuel </span>
+            <span className="text-content tabular-nums">{formatEuro(bucket.total_mensuel)}</span>
+          </div>
+          <div>
+            <span className="text-content-3">Annuel </span>
+            <span className="text-content tabular-nums">{formatEuro(bucket.total_annuel)}</span>
+          </div>
+          <div>
+            <span className="text-content-3">Nombre </span>
+            <span className="text-content tabular-nums">{bucket.nb}</span>
+          </div>
+        </div>
+
+        {!bucket.est_commun && (
+          <p className="text-xs text-content-2 bg-surface-3 rounded-lg px-3 py-2">
+            Ces abonnements sont prélevés sur des comptes personnels. Pour en
+            basculer un sur un compte commun, cliquez sur <Pencil size={11} className="inline -mt-0.5" /> et changez le compte.
+          </p>
+        )}
+
+        <div className="flex flex-col divide-y divide-border-app/60 max-h-96 overflow-y-auto">
+          {abos.map((a) => (
+            <div key={a.id} className="flex items-center justify-between gap-3 py-2.5">
+              <div className="min-w-0">
+                <div className="text-sm text-content truncate">{a.nom}</div>
+                <div className="text-xs text-content-3 truncate">
+                  {a.categorie_nom || 'Sans catégorie'} · {a.compte_nom} · {a.frequence_libelle}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <div className="text-right">
+                  <div className="text-sm text-content tabular-nums">{formatEuro(a.cout_mensuel)}<span className="text-content-3">/mois</span></div>
+                  <div className="text-xs text-content-3 tabular-nums">{formatEuro(a.cout_annuel)}/an</div>
+                </div>
+                <button
+                  onClick={() => onEdit(a.id)}
+                  title="Modifier (changer de compte)"
+                  className="p-1.5 rounded-md text-content-2 hover:text-content hover:bg-surface-3 cursor-pointer"
+                >
+                  <Pencil size={14} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Modal>
   )
 }
 

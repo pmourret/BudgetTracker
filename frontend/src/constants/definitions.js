@@ -192,7 +192,7 @@ export const DEFINITIONS = {
   abo_par_titulaire: {
     titre: 'Qui paye quoi',
     texte:
-      "Répartition du coût des abonnements par personne du foyer, selon le propriétaire du compte prélevé. Les comptes communs forment un groupe « Commun » à part. Estimatif.",
+      "Répartition du coût des abonnements par personne du foyer, selon le propriétaire du compte prélevé. Les comptes communs forment un groupe « Commun » à part. Cliquez sur une personne pour voir le détail et basculer un abonnement en commun. Estimatif.",
     formule: 'Σ des coûts mensuels des abonnements prélevés sur les comptes de chaque personne.',
   },
   abo_derive_prix: {
