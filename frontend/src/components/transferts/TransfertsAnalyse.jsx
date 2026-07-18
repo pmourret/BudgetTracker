@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, lazy, Suspense } from 'react'
 import useTransfertsAnalyse from '../../hooks/useTransfertsAnalyse'
 import { formatEuro } from '../../utils/format'
 import { DEFINITIONS } from '../../constants/definitions'
@@ -8,7 +8,10 @@ import Tooltip from '../ui/Tooltip'
 import PeriodSelector from '../ui/PeriodSelector'
 import { Loading, ErrorState, EmptyState } from '../ui/States'
 import BarChart from '../charts/BarChart'
-import FluxGraph from './FluxGraph'
+
+// React Flow est lourd (~180 kB) : chargé à la demande, uniquement quand
+// l'onglet Analyse est ouvert (il n'est pas l'onglet par défaut).
+const FluxGraph = lazy(() => import('./FluxGraph'))
 
 function moisCourt(iso) {
   return new Date(iso).toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' })
@@ -68,7 +71,9 @@ export default function TransfertsAnalyse() {
                     <Tooltip {...DEFINITIONS.transferts_graphe} />
                   </h3>
                 </div>
-                <FluxGraph noeuds={noeuds} liens={liens} />
+                <Suspense fallback={<Loading message="Chargement du graphe..." />}>
+                  <FluxGraph noeuds={noeuds} liens={liens} />
+                </Suspense>
               </Card>
 
               {/* Volume par mois */}

@@ -17,7 +17,8 @@
       "Bash(curl -s \"http://localhost:8000/api/v1/flux/?search=Lijak\")",
       "Bash(grep -n \"| \\\\`comptes\\\\` | Modèle \\\\`Compte\\\\`\" d:/Projects/Python/BudgetTracker/CLAUDE.md)",
       "Bash(npm run *)",
-      "Bash(curl -s -o /dev/null -w \"frontend HTTP %{http_code}\\\\n\" http://localhost:5173/transferts)"
+      "Bash(curl -s -o /dev/null -w \"frontend HTTP %{http_code}\\\\n\" http://localhost:5173/transferts)",
+      "Bash(curl -s -o /dev/null -w \"frontend /transferts HTTP %{http_code}\\\\n\" http://localhost:5173/transferts)"
     ]
   }
 }
