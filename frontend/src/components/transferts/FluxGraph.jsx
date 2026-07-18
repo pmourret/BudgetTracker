@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   ReactFlow,
   Background,
@@ -8,7 +8,7 @@ import {
   MarkerType,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { PiggyBank } from 'lucide-react'
+import { PiggyBank, Maximize2, X } from 'lucide-react'
 import { useThemeStore } from '../../stores/themeStore'
 import { formatEuro } from '../../utils/format'
 
@@ -59,6 +59,19 @@ const nodeTypes = { compte: CompteNode }
 
 export default function FluxGraph({ noeuds = [], liens = [] }) {
   const isDark = useThemeStore((s) => s.isDark)
+  const [expanded, setExpanded] = useState(false)
+
+  // Overlay plein écran : Échap pour fermer + verrou du scroll de la page.
+  useEffect(() => {
+    if (!expanded) return
+    const onEsc = (e) => { if (e.key === 'Escape') setExpanded(false) }
+    document.addEventListener('keydown', onEsc)
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onEsc)
+      document.body.style.overflow = ''
+    }
+  }, [expanded])
 
   const { nodes, edges } = useMemo(() => {
     if (!noeuds.length) return { nodes: [], edges: [] }
@@ -123,37 +136,78 @@ export default function FluxGraph({ noeuds = [], liens = [] }) {
 
   if (!noeuds.length) return null
 
+  const canvas = (
+    <ReactFlow
+      nodes={nodes}
+      edges={edges}
+      nodeTypes={nodeTypes}
+      colorMode={isDark ? 'dark' : 'light'}
+      fitView
+      fitViewOptions={{ padding: 0.18 }}
+      minZoom={0.3}
+      maxZoom={2}
+      nodesConnectable={false}
+      nodesDraggable
+      elementsSelectable={false}
+      proOptions={{ hideAttribution: false }}
+    >
+      <Background gap={18} size={1} />
+      <Controls showInteractive={false} />
+    </ReactFlow>
+  )
+
+  const legende = (
+    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-content-2 mt-2 px-1">
+      <span className="inline-flex items-center gap-1.5">
+        <span className="inline-block w-4 h-0.5 rounded" style={{ background: PURPLE }} /> Virement
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <span className="inline-block w-4 h-0.5 rounded" style={{ background: TEAL }} /> Vers l'épargne
+      </span>
+      <span className="text-content-3">Épaisseur ∝ montant · gauche = émet, droite = reçoit · glissez les nœuds</span>
+    </div>
+  )
+
   return (
     <div>
-      <div style={{ height: 460 }} className="rounded-lg border border-border-app overflow-hidden">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          nodeTypes={nodeTypes}
-          colorMode={isDark ? 'dark' : 'light'}
-          fitView
-          fitViewOptions={{ padding: 0.18 }}
-          minZoom={0.3}
-          maxZoom={2}
-          nodesConnectable={false}
-          nodesDraggable
-          elementsSelectable={false}
-          proOptions={{ hideAttribution: false }}
+      <div style={{ height: 460 }} className="relative rounded-lg border border-border-app overflow-hidden">
+        {!expanded && canvas}
+        <button
+          onClick={() => setExpanded(true)}
+          title="Agrandir le graphe"
+          aria-label="Agrandir le graphe"
+          className="absolute top-2 right-2 z-10 inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md bg-surface/90 border border-border-app text-xs text-content-2 hover:text-content cursor-pointer backdrop-blur-sm"
         >
-          <Background gap={18} size={1} />
-          <Controls showInteractive={false} />
-        </ReactFlow>
+          <Maximize2 size={14} /> Agrandir
+        </button>
       </div>
 
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-content-2 mt-2 px-1">
-        <span className="inline-flex items-center gap-1.5">
-          <span className="inline-block w-4 h-0.5 rounded" style={{ background: PURPLE }} /> Virement
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="inline-block w-4 h-0.5 rounded" style={{ background: TEAL }} /> Vers l'épargne
-        </span>
-        <span className="text-content-3">Épaisseur ∝ montant · gauche = émet, droite = reçoit · glissez les nœuds</span>
-      </div>
+      {legende}
+
+      {expanded && (
+        <div
+          onClick={() => setExpanded(false)}
+          className="fixed inset-0 z-[70] bg-slate-900/60 flex items-stretch sm:items-center justify-center p-0 sm:p-4"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-surface flex flex-col overflow-hidden w-full h-dvh rounded-none sm:w-[95vw] sm:h-[92dvh] sm:rounded-xl"
+          >
+            <div className="flex justify-between items-center px-5 py-3 border-b border-border-app shrink-0">
+              <span className="text-base font-medium text-content">Graphe des virements</span>
+              <button
+                onClick={() => setExpanded(false)}
+                aria-label="Fermer"
+                className="text-content-2 p-1 cursor-pointer hover:text-content"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="relative flex-1 min-h-0">{canvas}</div>
+            <div className="px-5 py-2.5 border-t border-border-app shrink-0">{legende}</div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
