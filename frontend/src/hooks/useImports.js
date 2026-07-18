@@ -52,6 +52,19 @@ export function useUploadImport() {
   })
 }
 
+export function useDeleteImport() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (lotId) => {
+      await apiClient.delete(`/imports/${lotId}/`)
+      return lotId
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['imports'] })
+    },
+  })
+}
+
 // Valider / rejeter un ambigu, ou relancer un rapprochement. Toutes ces
 // mutations rafraîchissent le rapport du lot (préfixe ['imports']).
 function useLigneAction(build) {

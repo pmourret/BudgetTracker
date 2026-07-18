@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   Upload, RefreshCw, ChevronDown, ChevronRight, Check, X,
-  AlertTriangle, CheckCircle2, FileText,
+  AlertTriangle, CheckCircle2, FileText, Trash2,
 } from 'lucide-react'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
@@ -12,7 +12,7 @@ import { Loading, ErrorState, EmptyState } from '../components/ui/States'
 import { formatEuro, formatDate } from '../utils/format'
 import {
   useImportsList, useRapport, useValiderLigne, useRejeterLigne,
-  useRelancerRapprochement,
+  useRelancerRapprochement, useDeleteImport,
 } from '../hooks/useImports'
 import ImportUploadModal from '../components/imports/ImportUploadModal'
 
@@ -68,6 +68,7 @@ export default function ImportsPage() {
                   lot={lot}
                   selected={selectedLot === lot.id}
                   onSelect={() => setSelectedLot(selectedLot === lot.id ? null : lot.id)}
+                  onDeleted={() => setSelectedLot((cur) => (cur === lot.id ? null : cur))}
                 />
               ))}
             </div>
@@ -86,10 +87,24 @@ export default function ImportsPage() {
   )
 }
 
-function LotCard({ lot, selected, onSelect }) {
+function LotCard({ lot, selected, onSelect, onDeleted }) {
+  const deleteImport = useDeleteImport()
+
+  const handleDelete = (e) => {
+    e.stopPropagation()
+    if (!window.confirm(
+      `Supprimer cet import (${lot.compte_nom} · ${lot.nom_fichier || lot.banque}) ? ` +
+      `Le rapprochement est perdu, mais aucun flux n'est touché.`
+    )) return
+    deleteImport.mutate(lot.id, { onSuccess: () => onDeleted?.() })
+  }
+
   return (
-    <button
+    <div
       onClick={onSelect}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect() } }}
       className={[
         'w-full text-left bg-surface border rounded-xl px-4 py-3 flex items-center gap-3 cursor-pointer transition-colors',
         selected ? 'border-purple-600' : 'border-border-app hover:bg-surface-3',
@@ -109,9 +124,17 @@ function LotCard({ lot, selected, onSelect }) {
         {lot.nb_ambigus > 0 && <Badge variant="info">{lot.nb_ambigus} à valider</Badge>}
         {lot.nb_manquants_app > 0 && <Badge variant="avertissement">{lot.nb_manquants_app} écart(s)</Badge>}
         {lot.nb_rapproches > 0 && <Badge variant="success">{lot.nb_rapproches} ✓</Badge>}
+        <button
+          onClick={handleDelete}
+          disabled={deleteImport.isPending}
+          title="Supprimer l'import"
+          className="p-1.5 rounded-md text-content-2 hover:text-red-600 hover:bg-red-50 cursor-pointer disabled:opacity-50"
+        >
+          <Trash2 size={14} />
+        </button>
         {selected ? <ChevronDown size={16} className="text-content-3" /> : <ChevronRight size={16} className="text-content-3" />}
       </div>
-    </button>
+    </div>
   )
 }
 
