@@ -1,3 +1,4 @@
+import axios from 'axios'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import apiClient from '../api/client'
 
@@ -35,9 +36,14 @@ export function useUploadImport() {
       form.append('compte', compte)
       form.append('banque', banque)
       form.append('fichier', fichier)
-      // axios retire le Content-Type par défaut quand le corps est un FormData
-      // et laisse le navigateur poser le boundary multipart.
-      const { data } = await apiClient.post('/imports/', form)
+      // ⚠️ On n'utilise PAS `apiClient` ici : son défaut `Content-Type:
+      // application/json` fait que axios v1 SÉRIALISE le FormData en JSON
+      // (defaults/index.js : `hasJSONContentType ? JSON.stringify(...) : data`)
+      // → le backend renvoie 415. Un axios nu n'a aucun Content-Type par défaut
+      // → le FormData part tel quel et le navigateur pose le boundary multipart.
+      // Chemin complet car pas de baseURL ; le proxy Vite `/api` reste actif.
+      // L'objet d'erreur conserve `response` → la gestion 400 côté modal marche.
+      const { data } = await axios.post('/api/v1/imports/', form)
       return data
     },
     onSuccess: () => {
