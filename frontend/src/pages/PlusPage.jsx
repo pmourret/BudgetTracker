@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { CreditCard, Repeat, TrendingUp, RefreshCw, Landmark, Tag, Settings, ChartColumn, ChevronRight } from 'lucide-react'
+import { CreditCard, Repeat, TrendingUp, RefreshCw, Landmark, Tag, Settings, ChartColumn, FileUp, ChevronRight } from 'lucide-react'
 import Card from '../components/ui/Card'
 import IconBadge from '../components/ui/IconBadge'
 import ThemeToggle from '../components/layout/ThemeToggle'
@@ -11,6 +11,7 @@ const liens = [
   { to: '/transferts',  label: 'Transferts',  desc: 'Virements entre comptes (ex. épargne)', Icon: Repeat },
   { to: '/abonnements', label: 'Abonnements', desc: 'Récurrences et échéances', Icon: RefreshCw },
   { to: '/patrimoine',  label: 'Patrimoine',  desc: 'Actifs et valorisation',   Icon: Landmark },
+  { to: '/imports',     label: 'Rapprochement', desc: 'Comparer un relevé bancaire à vos flux', Icon: FileUp },
   { to: '/categories',  label: 'Catégories',  desc: 'Majeures et sous-catégories', Icon: Tag },
   { to: '/parametres',  label: 'Paramètres',  desc: 'Mois comptable et réglages du foyer', Icon: Settings },
 ]

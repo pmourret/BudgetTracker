@@ -13,6 +13,7 @@ import PrevisionnelPage from './pages/PrevisionnelPage'
 import AnalysePage from './pages/AnalysePage'
 import CategoriesPage from './pages/CategoriesPage'
 import ParametresPage from './pages/ParametresPage'
+import ImportsPage from './pages/ImportsPage'
 import PlusPage from './pages/PlusPage'
 
 export default function App() {
@@ -32,6 +33,7 @@ export default function App() {
         <Route path="alertes" element={<AlertesPage />} />
         <Route path="patrimoine" element={<PatrimoinePage />} />
         <Route path="categories" element={<CategoriesPage />} />
+        <Route path="imports" element={<ImportsPage />} />
         <Route path="parametres" element={<ParametresPage />} />
         <Route path="plus" element={<PlusPage />} />
       </Route>

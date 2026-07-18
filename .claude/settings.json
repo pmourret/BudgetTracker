@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s -o /dev/null -w \"GET /imports/ -> %{http_code}\\\\n\" http://localhost:8000/api/v1/imports/)",
+      "Bash(curl -s -o /dev/null -w \"GET /imports-lignes/ -> %{http_code}\\\\n\" http://localhost:8000/api/v1/imports-lignes/)",
+      "Bash(docker compose *)",
+      "Bash(curl -s -o /dev/null -w \"frontend / -> %{http_code}\\\\n\" http://localhost:5173/)",
+      "Bash(curl -s -o /dev/null -w \"frontend /imports -> %{http_code}\\\\n\" http://localhost:5173/imports)",
+      "Bash(curl -s -w '\\\\nHTTP %{http_code}\\\\n' -X POST http://localhost:8000/api/v1/imports/ -F compte=5535fc12-f30b-4ed3-abc6-5095f2102d38 -F banque=boursobank -F 'fichier=@/tmp/releve.csv;type=text/csv')",
+      "Bash(curl -s -w \"\\\\nHTTP %{http_code}\\\\n\" \"http://localhost:8000/api/v1/imports/\")",
+      "Bash(curl -s -w '\\\\nHTTP %{http_code}\\\\n' -X POST http://localhost:8000/api/v1/imports/ -F compte=5535fc12-f30b-4ed3-abc6-5095f2102d38 -F banque=boursobank -F fichier=@/tmp/releve.csv)",
+      "Bash(curl -s \"http://localhost:8000/api/v1/imports/7aea7f64-040b-4321-a4ef-783c27775e33/rapport/\")",
+      "Bash(python -c ' *)",
+      "Bash(curl -s -o /dev/null -w \"DELETE lot -> %{http_code}\\\\n\" -X DELETE \"http://localhost:8000/api/v1/imports/7aea7f64-040b-4321-a4ef-783c27775e33/\")",
+      "Bash(grep -n \"Import CSV\\\\|analytics\\\\` | Service\\\\|imports · analytics\\\\|Actions custom :\\\\|Paramètres | \\\\`/parametres\\\\`\" d:/Projects/Python/BudgetTracker/CLAUDE.md)"
+    ]
+  }
+}

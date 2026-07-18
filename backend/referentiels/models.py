@@ -33,6 +33,15 @@ class ParametresBudget(BaseModel):
             "En € : combien d'euros sous/sur-consommés valent un point. Défaut 10 €."
         ),
     )
+    tolerance_jours_rapprochement = models.PositiveSmallIntegerField(
+        default=3,
+        validators=[MinValueValidator(0), MaxValueValidator(31)],
+        help_text=(
+            "Fenêtre de tolérance (en jours) pour rapprocher une ligne de "
+            "relevé bancaire d'un flux de l'app : la date carte diffère souvent "
+            "de la date d'opération. Défaut 3 jours."
+        ),
+    )
 
     class Meta:
         verbose_name = "Paramètres budget"

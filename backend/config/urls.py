@@ -26,6 +26,7 @@ from budgets.views import BudgetViewSet, BudgetTemplateViewSet
 from abonnements.views import AbonnementViewSet
 from alertes.views import AlerteViewSet
 from patrimoine.views import ActifViewSet
+from imports.views import ImportBancaireViewSet, LigneBancaireViewSet
 from referentiels.views import (
     ParametresBudgetView,
     TypeCompteViewSet, TypeFluxViewSet, TitulaireViewSet,
@@ -50,6 +51,8 @@ router.register(r"budget-templates", BudgetTemplateViewSet, basename="budget-tem
 router.register(r"abonnements", AbonnementViewSet, basename="abonnement")
 router.register(r"alertes", AlerteViewSet, basename="alerte")
 router.register(r"patrimoine", ActifViewSet, basename="actif")
+router.register(r"imports", ImportBancaireViewSet, basename="import-bancaire")
+router.register(r"imports-lignes", LigneBancaireViewSet, basename="ligne-bancaire")
 
 # Référentiels (lecture seule)
 router.register(r"referentiels/types-compte", TypeCompteViewSet, basename="type-compte")

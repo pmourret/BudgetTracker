@@ -334,6 +334,15 @@ export const DEFINITIONS = {
       'Dépenses regroupées par libellé (casse et espaces normalisés), gardées si ≥ 2 occurrences, triées par montant cumulé.',
   },
 
+  // ---- Rapprochement bancaire ----
+  controle_solde_import: {
+    titre: 'Solde de contrôle',
+    texte:
+      "Vérification globale : le solde de votre relevé (à la date de la dernière opération importée) comparé au solde réel calculé par l'application à cette même date. Un écart signale des opérations non saisies ou mal saisies — le détail figure dans les sections d'écarts. Fiabilité : contrôle (le solde réel de l'app reste la vérité).",
+    formule:
+      "Solde app à la date = solde initial + Σ (flux définitifs jusqu'à cette date). Écart = solde app − solde relevé (comparé au centime).",
+  },
+
   // ---- Paramètres du foyer ----
   mois_comptable: {
     titre: 'Mois comptable',

@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, CreditCard, ArrowLeftRight, Repeat, Target,
   TrendingUp, RefreshCw, Bell, Landmark, Wallet, Tag, Settings, ChartColumn,
+  FileUp,
 } from 'lucide-react'
 import ThemeToggle from './ThemeToggle'
 
@@ -16,6 +17,7 @@ const navItems = [
   { to: '/abonnements', label: 'Abonnements', Icon: RefreshCw },
   { to: '/alertes',     label: 'Alertes',     Icon: Bell },
   { to: '/patrimoine',  label: 'Patrimoine',  Icon: Landmark },
+  { to: '/imports',     label: 'Rapprochement', Icon: FileUp },
   { to: '/categories',  label: 'Catégories',  Icon: Tag },
   { to: '/parametres',  label: 'Paramètres',  Icon: Settings },
 ]
