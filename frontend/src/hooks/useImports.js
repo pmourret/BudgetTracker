@@ -88,6 +88,26 @@ export function useValiderLigne() {
   }))
 }
 
+// Création d'un flux depuis une ligne (14-B). Un nouveau flux impacte soldes,
+// budgets, alertes et analytics → on invalide large (comme une mutation de flux).
+export function useCreerFluxDepuisLigne() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ ligneId, categorie, libelle }) => {
+      const { data } = await apiClient.post(
+        `/imports-lignes/${ligneId}/creer-flux/`,
+        { categorie, libelle },
+      )
+      return data
+    },
+    onSuccess: () => {
+      ;['imports', 'flux', 'comptes', 'budgets', 'alertes', 'analytics'].forEach(
+        (key) => queryClient.invalidateQueries({ queryKey: [key] })
+      )
+    },
+  })
+}
+
 export function useRejeterLigne() {
   return useLigneAction(({ ligneId }) => ({
     url: `/imports-lignes/${ligneId}/rejeter/`,

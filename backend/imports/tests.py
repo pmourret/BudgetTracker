@@ -11,8 +11,9 @@ from imports.models import (
     Banque, ImportBancaire, LigneBancaire, StatutRapprochement,
 )
 from imports.services.rapprochement import (
-    ValidationInvalide, apparier, candidats_pour, controle_solde,
-    executer_rapprochement, filtrer_doublons, rejeter_ligne, valider_ligne,
+    CreationFluxInvalide, ValidationInvalide, apparier, candidats_pour,
+    controle_solde, creer_flux_depuis_ligne, executer_rapprochement,
+    filtrer_doublons, flux_ids_deja_pointes, rejeter_ligne, valider_ligne,
 )
 
 # --- Fixture : extrait réel de l'export BoursoBank fourni par le foyer -------
@@ -358,6 +359,65 @@ class RapprochementDBTest(TestCase):
         self.assertEqual(lot.nb_ambigus, 0)
         self.assertEqual(lot.nb_manquants_app, 1)
 
+    # --- 14-B : création de flux + anti-re-match -----------------------------
+
+    def test_creer_flux_depuis_ligne(self):
+        lot = self._lot()
+        ligne = self._ligne_db(lot, "-30.00", 17, "a")
+        executer_rapprochement(lot)          # aucun flux → manquant_app
+        ligne.refresh_from_db()
+        self.assertEqual(ligne.statut, StatutRapprochement.MANQUANT_APP)
+
+        flux = creer_flux_depuis_ligne(ligne, categorie=self.categorie, libelle="Courses")
+        ligne.refresh_from_db()
+        lot.refresh_from_db()
+
+        self.assertEqual(flux.montant, Decimal("-30.00"))
+        self.assertEqual(flux.date_flux, date(2026, 7, 17))
+        self.assertEqual(flux.categorie, self.categorie)
+        self.assertEqual(flux.type_flux.code, "DEBIT")
+        self.assertTrue(flux.statut.est_definitif)
+        self.assertTrue(flux.reference_externe)          # trace bancaire posée
+        self.assertEqual(ligne.flux_id, flux.id)
+        self.assertEqual(ligne.statut, StatutRapprochement.RAPPROCHE)
+        self.assertEqual(lot.nb_rapproches, 1)
+        self.assertEqual(lot.nb_manquants_app, 0)
+
+    def test_creer_flux_refuse_si_deja_rapproche(self):
+        self._flux("-30.00", 17)
+        lot = self._lot()
+        ligne = self._ligne_db(lot, "-30.00", 17, "a")
+        executer_rapprochement(lot)          # rapproché automatiquement
+        ligne.refresh_from_db()
+        with self.assertRaises(CreationFluxInvalide):
+            creer_flux_depuis_ligne(ligne, categorie=self.categorie)
+
+    def test_anti_re_match_entre_lots(self):
+        """Un flux déjà pointé par un lot n'est pas re-proposé à un autre lot."""
+        flux_x = self._flux("-30.00", 17)
+        lot1 = self._lot()
+        l1 = self._ligne_db(lot1, "-30.00", 17, "h1")
+        executer_rapprochement(lot1)
+        l1.refresh_from_db()
+        self.assertEqual(l1.flux_id, flux_x.id)          # lot1 rapproché à X
+
+        lot2 = self._lot()
+        l2 = self._ligne_db(lot2, "-30.00", 17, "h2")
+        executer_rapprochement(lot2)
+        l2.refresh_from_db()
+        # X est déjà pointé par lot1 → exclu du vivier de lot2 → manquant.
+        self.assertEqual(l2.statut, StatutRapprochement.MANQUANT_APP)
+
+    def test_flux_ids_deja_pointes_exclut_lot_courant(self):
+        flux_x = self._flux("-30.00", 17)
+        lot = self._lot()
+        self._ligne_db(lot, "-30.00", 17, "h1")
+        executer_rapprochement(lot)
+        # Vu depuis un autre point de vue, X est pointé…
+        self.assertIn(flux_x.id, flux_ids_deja_pointes(self.compte))
+        # …mais pas si on exclut le lot qui l'a pointé (on le recalcule à neuf).
+        self.assertNotIn(flux_x.id, flux_ids_deja_pointes(self.compte, sauf_lot=lot))
+
     # --- Contrôle de solde ---------------------------------------------------
 
     def test_controle_solde_coherent(self):
@@ -504,6 +564,35 @@ class ImportAPITest(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(len(resp.data["lignes"]), 3)
         self.assertEqual(resp.data["tolerance_jours"], 3)
+
+    def test_creer_flux_via_api_et_badge_pointe(self):
+        from flux.models import Flux
+        # Flux sans rapport → doit rester non pointé.
+        autre = Flux.objects.create(
+            compte=self.compte, type_flux=self.type_flux, statut=self.valide,
+            devise=self.devise, categorie=self.categorie,
+            montant=Decimal("-5.00"), date_flux=date(2026, 1, 1))
+
+        lot_id = self._upload().data["lot"]["id"]
+        rapport = self.client.get(f"/api/v1/imports/{lot_id}/rapport/").data
+        ligne = next(
+            l for l in rapport["lignes"]
+            if l["statut"] == "manquant_app" and l["montant"] == "-2469.63")
+
+        resp = self.client.post(
+            f"/api/v1/imports-lignes/{ligne['id']}/creer-flux/",
+            {"categorie": str(self.categorie.id), "libelle": "Courses Lijak"},
+            format="json")
+        self.assertEqual(resp.status_code, 201, resp.data)
+        self.assertEqual(resp.data["ligne"]["statut"], "rapproche")
+        flux_cree_id = resp.data["flux"]["id"]
+
+        # Badge est_pointe exposé par le FluxViewSet.
+        flux_list = self.client.get("/api/v1/flux/").data
+        results = flux_list.get("results", flux_list)
+        par_id = {f["id"]: f for f in results}
+        self.assertTrue(par_id[flux_cree_id]["est_pointe"])
+        self.assertFalse(par_id[str(autre.id)]["est_pointe"])
 
     def test_validation_ambigu_via_api(self):
         from flux.models import Flux

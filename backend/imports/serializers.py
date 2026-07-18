@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from categories.models import Categorie
 from comptes.models import Compte
 from .models import Banque, ImportBancaire, LigneBancaire
 
@@ -65,3 +66,10 @@ class ValiderLigneSerializer(serializers.Serializer):
     """Entrée de la validation d'un ambigu : le flux choisi par l'utilisateur."""
 
     flux_id = serializers.UUIDField()
+
+
+class CreerFluxSerializer(serializers.Serializer):
+    """Entrée de la création d'un flux depuis une ligne (14-B)."""
+
+    categorie = serializers.PrimaryKeyRelatedField(queryset=Categorie.objects.all())
+    libelle = serializers.CharField(required=False, allow_blank=True)

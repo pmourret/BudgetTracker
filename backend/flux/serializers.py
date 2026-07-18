@@ -14,6 +14,10 @@ class FluxSerializer(serializers.ModelSerializer):
     # Champ calculé — jamais éditable
     mois = serializers.DateField(read_only=True)
 
+    # Pointage bancaire (14-B) : True si le flux est rapproché à une ligne de
+    # relevé (annotation `est_pointe` posée par le FluxViewSet ; False ailleurs).
+    est_pointe = serializers.SerializerMethodField()
+
     class Meta:
         model = Flux
         fields = [
@@ -40,10 +44,15 @@ class FluxSerializer(serializers.ModelSerializer):
             "libelle",
             "notes",
             "reference_externe",
+            "est_pointe",
             "created_at",
             "updated_at",
         ]
         read_only_fields = ["id", "mois", "est_ajustement", "created_at", "updated_at"]
+
+    def get_est_pointe(self, obj):
+        # Lit l'annotation du FluxViewSet ; défaut False hors de ce contexte.
+        return bool(getattr(obj, "est_pointe", False))
 
     def validate_montant(self, montant):
         """Le montant ne peut pas être nul."""

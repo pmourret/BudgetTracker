@@ -253,9 +253,12 @@ function MontantBadge({ montant }) {
   )
 }
 
-function Tag({ label }) {
+function Tag({ label, tone = 'amber' }) {
+  const cls = tone === 'teal'
+    ? 'bg-teal-100 text-teal-700 border-teal-200'
+    : 'bg-amber-100 text-amber-700 border-amber-200'
   return (
-    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200">
+    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${cls}`}>
       {label}
     </span>
   )
@@ -326,6 +329,7 @@ function FluxTable({ flux, onEdit }) {
                   {f.libelle || '—'}
                   {f.est_transfert && <Tag label="Transfert" />}
                   {f.est_ajustement && <Tag label="Ajustement" />}
+                  {f.est_pointe && <Tag label="Pointé" tone="teal" />}
                 </div>
               </td>
               <td className="px-4 py-3 text-content">{f.categorie_nom || '—'}</td>
@@ -355,6 +359,7 @@ function FluxCards({ flux, onEdit }) {
                 <div className="text-sm font-medium text-content truncate">{f.libelle || '—'}</div>
                 {f.est_transfert && <Tag label="Transfert" />}
                 {f.est_ajustement && <Tag label="Ajustement" />}
+                {f.est_pointe && <Tag label="Pointé" tone="teal" />}
               </div>
               <div className="text-xs text-content-2 mt-0.5">
                 {f.categorie_nom || '—'} · {f.compte_nom || '—'} · {formatDate(f.date_flux)}

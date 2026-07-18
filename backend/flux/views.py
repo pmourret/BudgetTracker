@@ -61,12 +61,24 @@ class FluxViewSet(viewsets.ModelViewSet):
     ordering = ["-date_flux"]
 
     def get_queryset(self):
+        # Annotation `est_pointe` (14-B) : le flux est-il rapproché à une ligne
+        # de relevé d'un lot vivant ? Import local pour éviter le couplage au
+        # chargement des apps (imports référence flux).
+        from django.db.models import Exists, OuterRef
+        from imports.models import LigneBancaire, StatutRapprochement
+
+        ligne_pointee = LigneBancaire.objects.filter(
+            flux=OuterRef("pk"),
+            statut=StatutRapprochement.RAPPROCHE,
+            import_lot__is_deleted=False,
+        )
         return (
             Flux.objects
             .select_related(
                 "compte", "categorie", "type_flux",
                 "statut", "titulaire", "devise", "mode_paiement"
             )
+            .annotate(est_pointe=Exists(ligne_pointee))
             .all()
         )
 

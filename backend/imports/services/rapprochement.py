@@ -144,11 +144,36 @@ def _tolerance_jours():
     return ParametresBudget.get_solo().tolerance_jours_rapprochement
 
 
-def _flux_du_compte(compte, date_min, date_max, tolerance):
+def flux_ids_deja_pointes(compte, sauf_lot=None):
+    """
+    Flux du compte DÉJÀ pointés par un rapprochement (14-B, anti-re-match) :
+    ils sont rattachés à une ligne rapprochée d'un lot vivant. On les exclut du
+    vivier des AUTRES lots pour ne pas re-proposer un flux déjà rapproché quand
+    deux relevés se chevauchent. `sauf_lot` retire le lot courant (qu'on
+    recalcule à neuf).
+    """
+    from ..models import LigneBancaire
+
+    qs = (
+        LigneBancaire.objects
+        .filter(
+            import_lot__compte=compte,
+            import_lot__is_deleted=False,
+            statut=StatutRapprochement.RAPPROCHE,
+        )
+        .exclude(flux=None)
+    )
+    if sauf_lot is not None:
+        qs = qs.exclude(import_lot=sauf_lot)
+    return set(qs.values_list("flux_id", flat=True))
+
+
+def _flux_du_compte(compte, date_min, date_max, tolerance, exclure_ids=()):
     """
     Vivier de flux candidats : ceux du compte dans la fenêtre du relevé,
     élargie de la tolérance de part et d'autre. Transferts inclus (règle §14),
-    ajustements exclus. `statut` préchargé pour qualifier les non-appariés.
+    ajustements exclus, flux déjà pointés par un autre lot exclus (14-B).
+    `statut` préchargé pour qualifier les non-appariés.
     """
     from flux.models import Flux
 
@@ -161,6 +186,7 @@ def _flux_du_compte(compte, date_min, date_max, tolerance):
             date_flux__gte=date_min - marge,
             date_flux__lte=date_max + marge,
         )
+        .exclude(id__in=list(exclure_ids))
         .select_related("statut")
     )
 
@@ -180,7 +206,10 @@ def executer_rapprochement(import_lot):
 
     tolerance = _tolerance_jours()
     dates = [l.date_operation for l in lignes]
-    flux = _flux_du_compte(import_lot.compte, min(dates), max(dates), tolerance)
+    exclure = flux_ids_deja_pointes(import_lot.compte, sauf_lot=import_lot)
+    flux = _flux_du_compte(
+        import_lot.compte, min(dates), max(dates), tolerance, exclure_ids=exclure
+    )
 
     resultat = apparier(lignes, flux, tolerance)
 
@@ -215,12 +244,15 @@ def candidats_pour(ligne):
     lot = ligne.import_lot
     tolerance = _tolerance_jours()
     marge = timedelta(days=tolerance)
-    deja_lies = (
+    # Exclure : flux déjà rapprochés dans CE lot + flux pointés par un AUTRE
+    # lot vivant (14-B anti-re-match).
+    deja_lies = set(
         lot.lignes
         .filter(statut=StatutRapprochement.RAPPROCHE)
         .exclude(flux=None)
         .values_list("flux_id", flat=True)
     )
+    deja_lies |= flux_ids_deja_pointes(lot.compte, sauf_lot=lot)
     return list(
         Flux.objects
         .filter(
@@ -266,6 +298,68 @@ def rejeter_ligne(ligne):
     ligne.save(update_fields=["flux", "statut", "updated_at"])
     _resynchroniser_compteurs(ligne.import_lot)
     return ligne
+
+
+class CreationFluxInvalide(Exception):
+    """Création de flux impossible depuis cette ligne (déjà rapprochée, etc.)."""
+
+
+def _reference_bancaire(ligne):
+    """Trace lisible posée dans `Flux.reference_externe` d'un flux créé depuis
+    le relevé (traçabilité ; jamais écrasée pour un flux existant)."""
+    lot = ligne.import_lot
+    return f"Relevé {lot.get_banque_display()} du {ligne.date_operation:%d/%m/%Y}"[:100]
+
+
+def creer_flux_depuis_ligne(ligne, categorie, libelle=None, statut=None):
+    """
+    14-B — crée le flux manquant correspondant à une ligne de relevé, puis
+    rattache la ligne (→ rapproché). **Seule** écriture de flux du module.
+
+    - `categorie` obligatoire (flux normal, jamais transfert : un virement doit
+      passer par /transferts/ — l'UI avertit sur les libellés « VIR »).
+    - type_flux dérivé du signe (négatif → DEBIT, positif → CREDIT).
+    - statut par défaut = définitif (la ligne est sur le relevé = réel).
+    - `reference_externe` reçoit une trace bancaire lisible.
+
+    Atomique. Lève CreationFluxInvalide si la ligne est déjà rapprochée.
+    """
+    from django.db import transaction
+    from flux.models import Flux
+    from referentiels.models import StatutFlux, TypeFlux
+
+    if ligne.statut == StatutRapprochement.RAPPROCHE or ligne.flux_id:
+        raise CreationFluxInvalide("Cette ligne est déjà rapprochée à un flux.")
+
+    code_type = "DEBIT" if ligne.montant < 0 else "CREDIT"
+    type_flux = TypeFlux.objects.filter(code=code_type).first()
+    if type_flux is None:
+        raise CreationFluxInvalide(f"Référentiel TypeFlux « {code_type} » manquant.")
+
+    if statut is None:
+        statut = StatutFlux.objects.filter(est_definitif=True).first()
+    if statut is None:
+        raise CreationFluxInvalide("Aucun statut définitif configuré.")
+
+    compte = ligne.import_lot.compte
+    with transaction.atomic():
+        flux = Flux.objects.create(
+            compte=compte,
+            categorie=categorie,
+            type_flux=type_flux,
+            statut=statut,
+            devise=compte.devise,
+            montant=ligne.montant,
+            date_flux=ligne.date_operation,
+            libelle=(libelle or ligne.libelle_suggere or ligne.libelle)[:255],
+            reference_externe=_reference_bancaire(ligne),
+        )
+        ligne.flux = flux
+        ligne.statut = StatutRapprochement.RAPPROCHE
+        ligne.save(update_fields=["flux", "statut", "updated_at"])
+        _resynchroniser_compteurs(ligne.import_lot)
+
+    return flux
 
 
 def _resynchroniser_compteurs(import_lot):
@@ -356,7 +450,10 @@ def flux_orphelins(import_lot):
         return []
     tolerance = _tolerance_jours()
     dates = [l.date_operation for l in lignes]
-    vivier = _flux_du_compte(import_lot.compte, min(dates), max(dates), tolerance)
+    exclure = flux_ids_deja_pointes(import_lot.compte, sauf_lot=import_lot)
+    vivier = _flux_du_compte(
+        import_lot.compte, min(dates), max(dates), tolerance, exclure_ids=exclure
+    )
     lies = set(
         import_lot.lignes
         .filter(statut=StatutRapprochement.RAPPROCHE)

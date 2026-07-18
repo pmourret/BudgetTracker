@@ -9,15 +9,16 @@ from referentiels.models import ParametresBudget
 from .models import ImportBancaire, LigneBancaire, StatutRapprochement
 from .parsers.boursobank import FormatInvalideError
 from .serializers import (
-    FluxResumeSerializer, ImportBancaireSerializer, ImportUploadSerializer,
-    LigneBancaireSerializer, ValiderLigneSerializer,
+    CreerFluxSerializer, FluxResumeSerializer, ImportBancaireSerializer,
+    ImportUploadSerializer, LigneBancaireSerializer, ValiderLigneSerializer,
 )
 from .services.creation import (
     BanqueNonSupportee, FichierMultiCompteError, creer_import,
 )
 from .services.rapprochement import (
-    ValidationInvalide, candidats_pour, controle_solde, executer_rapprochement,
-    flux_orphelins, rejeter_ligne, valider_ligne,
+    CreationFluxInvalide, ValidationInvalide, candidats_pour, controle_solde,
+    creer_flux_depuis_ligne, executer_rapprochement, flux_orphelins,
+    rejeter_ligne, valider_ligne,
 )
 
 
@@ -172,3 +173,26 @@ class LigneBancaireViewSet(viewsets.ReadOnlyModelViewSet):
         rejeter_ligne(ligne)
         ligne.refresh_from_db()
         return Response(LigneBancaireSerializer(ligne).data)
+
+    @action(detail=True, methods=["post"], url_path="creer-flux")
+    def creer_flux(self, request, pk=None):
+        """14-B — crée le flux manquant correspondant à cette ligne et la rattache."""
+        ligne = self.get_object()
+        entree = CreerFluxSerializer(data=request.data)
+        entree.is_valid(raise_exception=True)
+        try:
+            flux = creer_flux_depuis_ligne(
+                ligne,
+                categorie=entree.validated_data["categorie"],
+                libelle=entree.validated_data.get("libelle") or None,
+            )
+        except CreationFluxInvalide as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        ligne.refresh_from_db()
+        return Response(
+            {
+                "ligne": LigneBancaireSerializer(ligne).data,
+                "flux": FluxResumeSerializer(flux).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   Upload, RefreshCw, ChevronDown, ChevronRight, Check, X,
-  AlertTriangle, CheckCircle2, FileText, Trash2,
+  AlertTriangle, CheckCircle2, FileText, Trash2, FilePlus,
 } from 'lucide-react'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
@@ -15,6 +15,7 @@ import {
   useRelancerRapprochement, useDeleteImport,
 } from '../hooks/useImports'
 import ImportUploadModal from '../components/imports/ImportUploadModal'
+import CreerFluxModal from '../components/imports/CreerFluxModal'
 
 const MONTANT_CLASS = (m) => (Number(m) < 0 ? 'text-red-600' : 'text-teal-600')
 
@@ -141,6 +142,7 @@ function LotCard({ lot, selected, onSelect, onDeleted }) {
 function RapportView({ lotId }) {
   const { data, isLoading, isError, refetch } = useRapport(lotId)
   const relancer = useRelancerRapprochement()
+  const [creerFor, setCreerFor] = useState(null)
 
   if (isLoading) return <Loading message="Analyse du relevé…" />
   if (isError) return <ErrorState message="Impossible de charger le rapport." onRetry={refetch} />
@@ -191,9 +193,13 @@ function RapportView({ lotId }) {
           hint="Différences entre le relevé et l'application.">
           <div className="flex flex-col gap-4">
             {manquants.length > 0 && (
-              <EcartGroupe titre="Sur le relevé, absent de l'application" sousTitre="Oubli de saisie probable — à créer dans vos flux.">
+              <EcartGroupe titre="Sur le relevé, absent de l'application" sousTitre="Oubli de saisie probable — créez le flux en un clic.">
                 {manquants.map((l) => (
-                  <BankLine key={l.id} ligne={l} badge={<Badge variant="avertissement">Absent de l'app</Badge>} />
+                  <BankLine
+                    key={l.id} ligne={l}
+                    badge={<Badge variant="avertissement">Absent de l'app</Badge>}
+                    onCreer={() => setCreerFor(l)}
+                  />
                 ))}
               </EcartGroupe>
             )}
@@ -220,6 +226,13 @@ function RapportView({ lotId }) {
       )}
 
       {rapproches.length > 0 && <Rapproches lignes={rapproches} />}
+
+      <CreerFluxModal
+        ligne={creerFor}
+        compteNom={data.lot.compte_nom}
+        onClose={() => setCreerFor(null)}
+        onCreated={() => setCreerFor(null)}
+      />
     </div>
   )
 }
@@ -281,7 +294,7 @@ function EcartGroupe({ titre, sousTitre, children }) {
 }
 
 // Ligne de relevé bancaire (source = banque)
-function BankLine({ ligne, badge }) {
+function BankLine({ ligne, badge, onCreer }) {
   return (
     <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-surface-3">
       <div className="flex-1 min-w-0">
@@ -292,6 +305,15 @@ function BankLine({ ligne, badge }) {
         {formatEuro(ligne.montant)}
       </div>
       {badge}
+      {onCreer && (
+        <button
+          onClick={onCreer}
+          title="Créer le flux manquant"
+          className="inline-flex items-center gap-1 text-xs font-medium text-purple-600 dark:text-purple-400 hover:underline cursor-pointer bg-transparent border-none shrink-0"
+        >
+          <FilePlus size={14} /> Créer
+        </button>
+      )}
     </div>
   )
 }
