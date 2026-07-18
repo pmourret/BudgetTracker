@@ -13,7 +13,8 @@ from .serializers import (
     ImportUploadSerializer, LigneBancaireSerializer, ValiderLigneSerializer,
 )
 from .services.creation import (
-    BanqueNonSupportee, FichierMultiCompteError, creer_import,
+    BanqueNonSupportee, CompteIntrouvableError, FichierMultiCompteError,
+    creer_import,
 )
 from .services.rapprochement import (
     CreationFluxInvalide, ValidationInvalide, candidats_pour, controle_solde,
@@ -95,7 +96,7 @@ class ImportBancaireViewSet(viewsets.ModelViewSet):
 
         try:
             synthese = creer_import(
-                compte=entree.validated_data["compte"],
+                compte=entree.validated_data.get("compte"),
                 banque=entree.validated_data["banque"],
                 contenu_bytes=fichier.read(),
                 nom_fichier=getattr(fichier, "name", ""),
@@ -103,6 +104,11 @@ class ImportBancaireViewSet(viewsets.ModelViewSet):
         except FichierMultiCompteError as exc:
             return Response(
                 {"detail": str(exc), "comptes": exc.comptes},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except CompteIntrouvableError as exc:
+            return Response(
+                {"detail": str(exc), "compte_num": exc.compte_num},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         except (FormatInvalideError, BanqueNonSupportee) as exc:

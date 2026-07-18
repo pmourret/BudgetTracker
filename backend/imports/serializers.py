@@ -53,9 +53,16 @@ class LigneBancaireSerializer(serializers.ModelSerializer):
 
 
 class ImportUploadSerializer(serializers.Serializer):
-    """Entrée de l'upload multipart : fichier + compte cible + banque."""
+    """
+    Entrée de l'upload multipart : fichier + banque + compte cible OPTIONNEL.
 
-    compte = serializers.PrimaryKeyRelatedField(queryset=Compte.objects.all())
+    Si `compte` est omis, le service résout le compte automatiquement via le
+    numéro de compte (`accountNum`) du fichier = `Compte.code`.
+    """
+
+    compte = serializers.PrimaryKeyRelatedField(
+        queryset=Compte.objects.all(), required=False, allow_null=True
+    )
     banque = serializers.ChoiceField(
         choices=Banque.choices, default=Banque.BOURSOBANK
     )

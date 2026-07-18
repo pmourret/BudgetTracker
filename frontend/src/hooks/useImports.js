@@ -33,7 +33,9 @@ export function useUploadImport() {
   return useMutation({
     mutationFn: async ({ compte, banque, fichier }) => {
       const form = new FormData()
-      form.append('compte', compte)
+      // Compte optionnel : omis → le backend le résout via le N° de compte du
+      // fichier. On n'envoie PAS de chaîne vide (invaliderait le PK).
+      if (compte) form.append('compte', compte)
       form.append('banque', banque)
       form.append('fichier', fichier)
       // ⚠️ On n'utilise PAS `apiClient` ici : son défaut `Content-Type:

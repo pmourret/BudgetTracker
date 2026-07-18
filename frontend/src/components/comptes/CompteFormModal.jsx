@@ -139,7 +139,7 @@ export default function CompteFormModal({ isOpen, onClose, compte = null }) {
 
   const validate = () => {
     const e = {}
-    if (!code.trim()) e.code = 'Code requis.'
+    if (!code.trim()) e.code = 'N° de compte requis.'
     if (!nom.trim()) e.nom = 'Nom requis.'
     if (!typeCompte) e.type_compte = 'Type de compte requis.'
     if (!titulaire) e.titulaire = 'Titulaire requis.'
@@ -245,8 +245,8 @@ export default function CompteFormModal({ isOpen, onClose, compte = null }) {
       <div className="flex flex-col gap-4">
         <div className="grid grid-cols-2 gap-3">
           <Input
-            label="Code" value={code} onChange={setCode}
-            placeholder="CPT-0001" error={errors.code} required
+            label="N° Compte" value={code} onChange={setCode}
+            placeholder="00040553758" error={errors.code} required
           />
           <Input
             label="Nom" value={nom} onChange={setNom}

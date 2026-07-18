@@ -32,7 +32,6 @@ export default function ImportUploadModal({ isOpen, onClose, onImported }) {
 
   const handleSubmit = () => {
     setError('')
-    if (!compte) { setError('Choisissez le compte cible.'); return }
     if (!fichier) { setError('Sélectionnez un fichier CSV.'); return }
 
     upload.mutate(
@@ -48,6 +47,11 @@ export default function ImportUploadModal({ isOpen, onClose, onImported }) {
             setError(
               `Le fichier contient plusieurs comptes (${d.comptes.join(', ')}). ` +
               `Exportez un relevé par compte.`
+            )
+          } else if (d?.compte_num) {
+            setError(
+              `Aucun compte ne porte le numéro « ${d.compte_num} ». ` +
+              `Renseignez ce N° Compte sur le compte concerné, ou choisissez-le ci-dessus.`
             )
           } else {
             setError(d?.detail || 'Import impossible. Vérifiez le fichier.')
@@ -77,10 +81,16 @@ export default function ImportUploadModal({ isOpen, onClose, onImported }) {
           Aucun flux n'est créé ni modifié : l'application reste la seule vérité.
         </p>
 
-        <Select
-          label="Compte cible" value={compte} onChange={setCompte}
-          options={compteOptions} placeholder="Choisir un compte…" required
-        />
+        <div className="flex flex-col gap-1">
+          <Select
+            label="Compte" value={compte} onChange={setCompte}
+            options={compteOptions} placeholder="Détecté automatiquement"
+          />
+          <span className="text-xs text-content-2">
+            Laissé vide, le compte est détecté via le numéro de compte du fichier
+            (= le N° Compte saisi sur vos comptes).
+          </span>
+        </div>
         <Select
           label="Banque" value={banque} onChange={setBanque} options={BANQUES}
         />

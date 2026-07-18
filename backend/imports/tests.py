@@ -443,17 +443,22 @@ class RapprochementDBTest(TestCase):
         self.assertEqual(ctrl["ecart"], Decimal("-6.15"))
         self.assertFalse(ctrl["coherent"])
 
-    def test_controle_solde_borne_a_la_date(self):
-        """Un flux postérieur à la ligne de référence n'entre pas dans le solde."""
+    def test_controle_solde_sur_solde_actuel(self):
+        """
+        On compare le solde ACTUEL (tous les flux définitifs), pas le solde à
+        la date du relevé : un flux postérieur à la ligne de référence compte,
+        ce qui neutralise les décalages de dates de saisie (retour d'usage prod).
+        """
         self.compte.solde_initial = Decimal("0.00")
         self.compte.save(update_fields=["solde_initial"])
         self._flux("-10.00", 17)
-        self._flux("-100.00", 25)          # postérieur → exclu
+        self._flux("-100.00", 25)          # postérieur mais comptabilisé
         lot = self._lot()
-        self._ligne_db(lot, "-10.00", 17, "a", solde="-10.00")
+        # Le relevé (dernier point au 17) a déjà, en solde final, les -110.
+        self._ligne_db(lot, "-10.00", 17, "a", solde="-110.00")
 
         ctrl = controle_solde(lot)
-        self.assertEqual(ctrl["solde_app"], Decimal("-10.00"))
+        self.assertEqual(ctrl["solde_app"], Decimal("-110.00"))
         self.assertTrue(ctrl["coherent"])
 
     def test_controle_solde_none_sans_solde(self):
@@ -519,6 +524,16 @@ class ImportAPITest(TestCase):
             format="multipart",
         )
 
+    def _upload_sans_compte(self, contenu=CSV_ECHANTILLON):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        fichier = SimpleUploadedFile(
+            "releve.csv", contenu.encode("utf-8"), content_type="text/csv")
+        return self.client.post(
+            "/api/v1/imports/",
+            {"banque": "boursobank", "fichier": fichier},
+            format="multipart",
+        )
+
     def test_upload_cree_lot_et_rapproche(self):
         resp = self._upload()
         self.assertEqual(resp.status_code, 201, resp.data)
@@ -526,6 +541,20 @@ class ImportAPITest(TestCase):
         self.assertEqual(lot["nb_lignes"], 3)
         self.assertEqual(lot["nb_rapproches"], 1)   # la ligne Burger King
         self.assertEqual(lot["nb_manquants_app"], 2)
+
+    def test_auto_resolution_compte_par_numero(self):
+        # Le compte porte le numéro du fichier → résolution auto sans `compte`.
+        self.compte.code = "00040553758"
+        self.compte.save(update_fields=["code"])
+        resp = self._upload_sans_compte()
+        self.assertEqual(resp.status_code, 201, resp.data)
+        self.assertEqual(str(resp.data["lot"]["compte"]), str(self.compte.id))
+
+    def test_upload_compte_introuvable_400(self):
+        # Aucun compte ne porte « 00040553758 » (code par défaut = CPT-0001).
+        resp = self._upload_sans_compte()
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.data["compte_num"], "00040553758")
 
     def test_upload_doublons_ignores_au_second_import(self):
         self._upload()

@@ -14,7 +14,8 @@
       "Bash(curl -s -o /dev/null -w \"DELETE lot -> %{http_code}\\\\n\" -X DELETE \"http://localhost:8000/api/v1/imports/7aea7f64-040b-4321-a4ef-783c27775e33/\")",
       "Bash(grep -n \"Import CSV\\\\|analytics\\\\` | Service\\\\|imports · analytics\\\\|Actions custom :\\\\|Paramètres | \\\\`/parametres\\\\`\" d:/Projects/Python/BudgetTracker/CLAUDE.md)",
       "Bash(python -c \"import sys,json;d=json.load\\(sys.stdin\\);print\\('ligne statut:',d['ligne']['statut']\\);print\\('flux:',d['flux']['montant'],d['flux']['libelle']\\)\")",
-      "Bash(curl -s \"http://localhost:8000/api/v1/flux/?search=Lijak\")"
+      "Bash(curl -s \"http://localhost:8000/api/v1/flux/?search=Lijak\")",
+      "Bash(grep -n \"| \\\\`comptes\\\\` | Modèle \\\\`Compte\\\\`\" d:/Projects/Python/BudgetTracker/CLAUDE.md)"
     ]
   }
 }

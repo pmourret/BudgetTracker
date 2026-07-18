@@ -35,14 +35,30 @@ class BanqueNonSupportee(Exception):
     """Aucun parser pour la banque demandée."""
 
 
+class CompteIntrouvableError(Exception):
+    """Aucun compte de l'app ne porte le numéro de compte du fichier."""
+
+    def __init__(self, compte_num):
+        self.compte_num = compte_num
+        super().__init__(
+            f"Aucun compte ne porte le numéro « {compte_num} ». Renseignez ce "
+            "numéro sur le compte concerné (champ N° Compte), ou sélectionnez-le "
+            "manuellement."
+        )
+
+
 def creer_import(compte, banque, contenu_bytes, nom_fichier=""):
     """
-    Crée un lot d'import pour `compte` à partir du fichier `contenu_bytes`
-    et lance le rapprochement. Renvoie un dict de synthèse.
+    Crée un lot d'import et lance le rapprochement. Renvoie un dict de synthèse.
+
+    `compte` peut être None : il est alors résolu automatiquement via le numéro
+    de compte du fichier (`accountNum` = `Compte.code`).
 
     Peut lever : FormatInvalideError (parser), FichierMultiCompteError,
-    BanqueNonSupportee — à traduire en 400 côté vue.
+    BanqueNonSupportee, CompteIntrouvableError — à traduire en 400 côté vue.
     """
+    from comptes.models import Compte
+
     parser = PARSERS.get(banque)
     if parser is None:
         raise BanqueNonSupportee(banque)
@@ -53,6 +69,12 @@ def creer_import(compte, banque, contenu_bytes, nom_fichier=""):
     if len(resultat_parsing.comptes_rencontres) > 1:
         raise FichierMultiCompteError(resultat_parsing.comptes_rencontres)
     compte_num = next(iter(resultat_parsing.comptes_rencontres), "")
+
+    # Résolution automatique du compte par son numéro (code) si non fourni.
+    if compte is None:
+        compte = Compte.objects.filter(code=compte_num).first()
+        if compte is None:
+            raise CompteIntrouvableError(compte_num)
 
     # Anti-doublon : multiset des hash déjà connus pour CE compte (tous lots).
     hashes_existants = Counter(

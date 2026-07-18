@@ -338,9 +338,9 @@ export const DEFINITIONS = {
   controle_solde_import: {
     titre: 'Solde de contrôle',
     texte:
-      "Vérification globale : le solde de votre relevé (à la date de la dernière opération importée) comparé au solde réel calculé par l'application à cette même date. Un écart signale des opérations non saisies ou mal saisies — le détail figure dans les sections d'écarts. Fiabilité : contrôle (le solde réel de l'app reste la vérité).",
+      "Vérification globale : le solde ACTUEL confirmé de l'application comparé au dernier solde connu du relevé. On compare les soldes actuels (et non « à la date du relevé ») pour ne pas se faire piéger par un décalage de dates de saisie. Le contrôle est le plus fiable quand le relevé est à jour ; sinon l'écart reflète les mouvements survenus depuis. Fiabilité : contrôle (le solde réel de l'app reste la vérité).",
     formule:
-      "Solde app à la date = solde initial + Σ (flux définitifs jusqu'à cette date). Écart = solde app − solde relevé (comparé au centime).",
+      "Solde app = solde initial + Σ (tous les flux définitifs du compte) = solde confirmé. Écart = solde app − dernier solde du relevé (comparé au centime).",
   },
 
   // ---- Paramètres du foyer ----

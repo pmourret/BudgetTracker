@@ -246,18 +246,19 @@ function ControleSolde({ ctrl }) {
     <div className={`rounded-lg px-4 py-3 ${cls}`}>
       <div className="flex items-center gap-1.5 text-sm font-medium">
         {coherent ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
-        Solde de contrôle au {formatDate(ctrl.date_reference)}
+        Solde de contrôle
         <Tooltip {...DEFINITIONS.controle_solde_import} align="left" size={13} />
       </div>
       <div className="flex flex-wrap gap-x-6 gap-y-1 mt-1.5 text-xs">
-        <span>Relevé : <strong>{formatEuro(ctrl.solde_banque)}</strong></span>
-        <span>Application : <strong>{formatEuro(ctrl.solde_app)}</strong></span>
+        <span>Application (actuel) : <strong>{formatEuro(ctrl.solde_app)}</strong></span>
+        <span>Relevé (au {formatDate(ctrl.date_reference)}) : <strong>{formatEuro(ctrl.solde_banque)}</strong></span>
         <span>Écart : <strong>{formatEuro(ctrl.ecart)}</strong></span>
       </div>
       {!coherent && (
         <div className="text-[11px] mt-1.5 leading-relaxed">
-          Le solde de l'app à cette date diffère du relevé : certaines opérations
-          sont probablement non saisies ou mal saisies (voir les écarts ci-dessous).
+          Le solde actuel de l'app diffère du dernier solde du relevé : soit une
+          opération est non saisie ou mal saisie (voir les écarts ci-dessous),
+          soit le relevé n'est pas à jour (mouvements survenus depuis le {formatDate(ctrl.date_reference)}).
         </div>
       )}
     </div>

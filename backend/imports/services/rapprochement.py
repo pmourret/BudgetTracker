@@ -383,16 +383,25 @@ def _resynchroniser_compteurs(import_lot):
 
 def controle_solde(import_lot):
     """
-    Contrôle de cohérence globale : compare le solde du relevé (accountbalance
-    de la ligne la plus récente) au solde réel de l'app À CETTE DATE.
+    Contrôle de cohérence globale : compare le **solde actuel confirmé** de
+    l'app au **dernier solde connu du relevé** (accountbalance de la ligne la
+    plus récente).
 
-        solde_app(date) = solde_initial + Σ(flux définitifs, date_flux ≤ date)
+        solde_app = solde_initial + Σ(TOUS les flux définitifs du compte)
+                  = solde_reel actuel
 
-    C'est le pendant « macro » du rapprochement ligne à ligne : si les deux
-    soldes concordent au centime, le journal de l'app est complet sur la
-    période ; un écart pointe des opérations non saisies ou mal saisies (le
-    détail est dans les sections d'écarts). Fiabilité : **contrôle** — le
-    solde réel de l'app reste la vérité, l'écart n'est pas une erreur en soi.
+    ⚠️ On compare au solde ACTUEL, pas au solde de l'app « à la date du relevé ».
+    Raison (retour d'usage prod) : un contrôle ancré à la date du relevé est
+    faussé par le **décalage de dates de saisie** — une opération que la banque
+    a passée avant la date du relevé mais saisie plus tard dans l'app crée un
+    faux écart, alors que les soldes finaux concordent. Comparer le solde
+    actuel neutralise ce bruit tout en détectant un vrai manque (une opération
+    jamais saisie fait diverger le solde actuel). Le contrôle est donc le plus
+    fiable quand le relevé est à jour (dernier point ≈ aujourd'hui) ; pour un
+    relevé ancien, l'écart reflète simplement les mouvements survenus depuis.
+
+    Fiabilité : **contrôle** — le solde réel de l'app reste la vérité, l'écart
+    n'est pas une erreur en soi ; le détail est dans les sections d'écarts.
 
     Renvoie None si aucune ligne du relevé ne porte de solde bancaire.
     """
@@ -411,11 +420,7 @@ def controle_solde(import_lot):
     compte = import_lot.compte
     total_definitifs = (
         Flux.objects
-        .filter(
-            compte=compte,
-            statut__est_definitif=True,
-            date_flux__lte=ligne.date_operation,
-        )
+        .filter(compte=compte, statut__est_definitif=True)
         .aggregate(t=Sum("montant"))["t"]
     ) or Decimal("0.00")
 

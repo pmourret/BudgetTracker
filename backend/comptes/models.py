@@ -13,11 +13,14 @@ class Compte(BaseModel):
     - Ces deux champs sont calculés par le service, jamais éditables.
     """
 
-    # Identification
+    # Identification — sert de NUMÉRO DE COMPTE bancaire : il permet le
+    # rapprochement automatique d'un relevé (accountNum du CSV = ce code).
+    # Longueur large pour accepter un IBAN. Reste unique.
     code = models.CharField(
-        max_length=20,
+        max_length=34,
         unique=True,
-        help_text="Code unique du compte (ex: CPT-0001)"
+        help_text="Numéro de compte (ex: 00040553758 ou IBAN). "
+                  "Sert au rapprochement automatique des relevés bancaires."
     )
     nom = models.CharField(max_length=100)
 
