@@ -12,10 +12,28 @@ class TransfertSerializer(serializers.ModelSerializer):
     compte_source_nom = serializers.CharField(
         source="flux_debit.compte.nom", read_only=True
     )
+    compte_source_id = serializers.UUIDField(
+        source="flux_debit.compte.id", read_only=True
+    )
+    compte_source_etablissement = serializers.CharField(
+        source="flux_debit.compte.etablissement.libelle", read_only=True, default=None
+    )
     compte_destination_nom = serializers.CharField(
         source="flux_credit.compte.nom", read_only=True
     )
+    compte_destination_id = serializers.UUIDField(
+        source="flux_credit.compte.id", read_only=True
+    )
+    compte_destination_etablissement = serializers.CharField(
+        source="flux_credit.compte.etablissement.libelle", read_only=True, default=None
+    )
     date_flux = serializers.DateField(source="flux_debit.date_flux", read_only=True)
+    statut_libelle = serializers.CharField(
+        source="flux_debit.statut.libelle", read_only=True
+    )
+    est_definitif = serializers.BooleanField(
+        source="flux_debit.statut.est_definitif", read_only=True
+    )
 
     # Écriture uniquement
     compte_source = serializers.PrimaryKeyRelatedField(
@@ -44,11 +62,17 @@ class TransfertSerializer(serializers.ModelSerializer):
             "id",
             "compte_source",
             "compte_source_nom",
+            "compte_source_id",
+            "compte_source_etablissement",
             "compte_destination",
             "compte_destination_nom",
+            "compte_destination_id",
+            "compte_destination_etablissement",
             "montant",
             "date",
             "date_flux",
+            "statut_libelle",
+            "est_definitif",
             "type_flux_debit",
             "type_flux_credit",
             "statut",

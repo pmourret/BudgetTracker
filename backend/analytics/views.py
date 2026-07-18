@@ -13,6 +13,7 @@ from .serializers import (
     PrevisionnelSerializer,
     AnalyseSerializer,
     AbonnementsAnalyseSerializer,
+    TransfertsAnalyseSerializer,
     PointsSerializer,
 )
 
@@ -145,6 +146,31 @@ class AbonnementsAnalyseView(APIView):
 
         data = calculer_abonnements(nb_mois=nb_mois)
         serializer = AbonnementsAnalyseSerializer(data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class TransfertsAnalyseView(APIView):
+    """
+    Analyse des transferts internes — lecture seule, fiabilité RÉELLE.
+
+    GET /api/v1/analytics/transferts/?nb_mois=6
+
+    Agrège les virements entre comptes sur une fenêtre glissante de mois
+    comptables : graphe nœud-lien (liens source→destination), volume par mois,
+    synthèse. Ne modifie rien, ne crée aucune alerte.
+    """
+
+    def get(self, request):
+        from .services.transferts import calculer_transferts
+
+        try:
+            nb_mois = int(request.query_params.get("nb_mois", 6))
+        except (TypeError, ValueError):
+            nb_mois = 6
+        nb_mois = max(1, min(nb_mois, 24))  # borné 1-24 mois
+
+        data = calculer_transferts(nb_mois=nb_mois)
+        serializer = TransfertsAnalyseSerializer(data)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 

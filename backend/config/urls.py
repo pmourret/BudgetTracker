@@ -36,7 +36,7 @@ from referentiels.views import (
 
 from analytics.views import (
     DashboardView, CompteDashboardView, PrevisionnelView, AnalyseView,
-    AbonnementsAnalyseView, PointsView
+    AbonnementsAnalyseView, PointsView, TransfertsAnalyseView
 )
 
 router = DefaultRouter()
@@ -72,6 +72,7 @@ urlpatterns = [
     path("api/v1/analytics/previsionnel/", PrevisionnelView.as_view(), name="previsionnel"),
     path("api/v1/analytics/analyse/", AnalyseView.as_view(), name="analyse"),
     path("api/v1/analytics/abonnements/", AbonnementsAnalyseView.as_view(), name="abonnements-analyse"),
+    path("api/v1/analytics/transferts/", TransfertsAnalyseView.as_view(), name="transferts-analyse"),
     path("api/v1/analytics/points/", PointsView.as_view(), name="points"),
     path("api/v1/referentiels/parametres-budget/", ParametresBudgetView.as_view(), name="parametres-budget"),
     path("api/v1/", include(router.urls)),

@@ -84,6 +84,19 @@ class AbonnementsAnalyseSerializer(serializers.Serializer):
     a_risque = serializers.DictField()
 
 
+class TransfertsAnalyseSerializer(serializers.Serializer):
+    """
+    Serializer de sortie pour l'analyse des transferts internes (lecture seule).
+    Fiabilité RÉELLE : basé sur les paires Transfert réellement enregistrées.
+    """
+    periode = serializers.DictField()
+    synthese = serializers.DictField()
+    noeuds = serializers.ListField()
+    liens = serializers.ListField()
+    par_mois = serializers.ListField()
+    fiabilite = serializers.CharField()
+
+
 class PointsSerializer(serializers.Serializer):
     """
     Serializer de sortie pour le système de points (mécanique B, socle 12-B-1).

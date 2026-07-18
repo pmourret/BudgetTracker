@@ -1,9 +1,10 @@
-from rest_framework import viewsets, mixins, status
+from rest_framework import viewsets, mixins, status, filters
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 
 from .models import Transfert
 from .serializers import TransfertSerializer
+from .filters import TransfertFilterSet
 
 
 class TransfertViewSet(
@@ -25,15 +26,27 @@ class TransfertViewSet(
     il se supprime et se recrée.
     """
     serializer_class = TransfertSerializer
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = ["flux_debit__compte", "flux_credit__compte"]
+    filter_backends = [
+        DjangoFilterBackend,
+        filters.SearchFilter,
+        filters.OrderingFilter,
+    ]
+    filterset_class = TransfertFilterSet
+    search_fields = [
+        "notes",
+        "flux_debit__compte__nom",
+        "flux_credit__compte__nom",
+    ]
+    ordering_fields = ["flux_debit__date_flux", "montant"]
+    ordering = ["-flux_debit__date_flux"]
 
     def get_queryset(self):
         return (
             Transfert.objects
             .select_related(
-                "flux_debit__compte",
-                "flux_credit__compte",
+                "flux_debit__compte__etablissement",
+                "flux_debit__statut",
+                "flux_credit__compte__etablissement",
             )
             .all()
         )

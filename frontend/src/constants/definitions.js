@@ -254,6 +254,27 @@ export const DEFINITIONS = {
     formule: 'Budgets du mois − déjà consommé.',
   },
 
+  // ---- Analyse des transferts internes ----
+  transferts_volume: {
+    titre: 'Volume transféré',
+    texte:
+      "Somme de tous les virements internes entre vos comptes sur la période. Fiabilité réelle : basé sur les transferts réellement enregistrés. Un transfert n'est ni une dépense ni un revenu — c'est de l'argent qui circule dans votre patrimoine bancaire.",
+    formule: 'Σ des montants de tous les transferts sur la fenêtre de mois choisie.',
+  },
+  transferts_moyenne: {
+    titre: 'Moyenne par mois',
+    texte:
+      'Volume transféré ramené au mois, pour lisser les à-coups (ex. un gros virement isolé). Fiabilité réelle.',
+    formule: 'Volume total transféré ÷ nombre de mois de la période.',
+  },
+  transferts_graphe: {
+    titre: 'Graphe des virements',
+    texte:
+      "Chaque compte est un nœud, chaque flèche va du compte source vers le compte destination ; son épaisseur est proportionnelle au montant cumulé sur la période. Le solde net d'un compte = ce qu'il a reçu moins ce qu'il a envoyé. Fiabilité réelle.",
+    formule:
+      'Par paire (source → destination) : total = Σ montants, épaisseur ∝ total / plus gros flux. Solde net = entrant − sortant.',
+  },
+
   // ---- Analyse rétrospective (Phase 13) ----
   analyse_tendances: {
     titre: 'Tendances',
