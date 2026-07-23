@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Pencil, Trash2, Search, X } from 'lucide-react'
+import { Pencil, Trash2, Search, X, Undo2 } from 'lucide-react'
 import {
   useInfiniteResource,
   useDeleteResource,
@@ -16,6 +16,28 @@ import Input from '../ui/Input'
 import Select from '../ui/Select'
 import { Loading, ErrorState, EmptyState } from '../ui/States'
 import FluxFormModal from './FluxFormModal'
+import RemboursementModal from './RemboursementModal'
+
+// État de remboursement d'un flux (uniquement pour une dépense).
+// Retourne null (rien), 'partiel' ou 'total' selon Σ remboursements vs |montant|.
+function statutRemboursement(f) {
+  if (Number(f.montant) >= 0) return null
+  const rembourse = Number(f.montant_rembourse || 0)
+  if (rembourse <= 0) return null
+  const total = Math.abs(Number(f.montant))
+  return rembourse + 0.001 >= total ? 'total' : 'partiel'
+}
+
+// Une dépense non-transfert/ajustement, pas encore totalement remboursée,
+// peut recevoir un remboursement.
+function peutEtreRembourse(f) {
+  return (
+    Number(f.montant) < 0 &&
+    !f.est_transfert &&
+    !f.est_ajustement &&
+    statutRemboursement(f) !== 'total'
+  )
+}
 
 const EMPTY_FILTERS = {
   search: '',
@@ -51,6 +73,8 @@ export default function FluxSearchPanel({
   const openCreate = () => { setSelectedFlux(null); setModalOpen(true) }
   const openEdit = (f) => { setSelectedFlux(f); setModalOpen(true) }
   const closeModal = () => { setModalOpen(false); setSelectedFlux(null) }
+
+  const [rembourseFlux, setRembourseFlux] = useState(null)
 
   const set = (key, value) => setFilters((f) => ({ ...f, [key]: value }))
   const reset = () => setFilters(EMPTY_FILTERS)
@@ -222,8 +246,8 @@ export default function FluxSearchPanel({
 
       {!query.isLoading && !query.isError && flux.length > 0 && (
         isMobile
-          ? <FluxCards flux={flux} onEdit={openEdit} />
-          : <FluxTable flux={flux} onEdit={openEdit} />
+          ? <FluxCards flux={flux} onEdit={openEdit} onRembourser={setRembourseFlux} />
+          : <FluxTable flux={flux} onEdit={openEdit} onRembourser={setRembourseFlux} />
       )}
 
       {/* Sentinelle + bouton de chargement */}
@@ -240,6 +264,11 @@ export default function FluxSearchPanel({
       )}
 
       <FluxFormModal isOpen={modalOpen} onClose={closeModal} flux={selectedFlux} />
+      <RemboursementModal
+        flux={rembourseFlux}
+        onClose={() => setRembourseFlux(null)}
+        onDone={() => setRembourseFlux(null)}
+      />
     </div>
   )
 }
@@ -253,10 +282,14 @@ function MontantBadge({ montant }) {
   )
 }
 
+const TAG_TONES = {
+  amber: 'bg-amber-100 text-amber-700 border-amber-200',
+  teal: 'bg-teal-100 text-teal-700 border-teal-200',
+  green: 'bg-green-100 text-green-700 border-green-200',
+}
+
 function Tag({ label, tone = 'amber' }) {
-  const cls = tone === 'teal'
-    ? 'bg-teal-100 text-teal-700 border-teal-200'
-    : 'bg-amber-100 text-amber-700 border-amber-200'
+  const cls = TAG_TONES[tone] ?? TAG_TONES.amber
   return (
     <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${cls}`}>
       {label}
@@ -264,11 +297,24 @@ function Tag({ label, tone = 'amber' }) {
   )
 }
 
-function FluxActions({ flux, onEdit, inline = false }) {
+// Badges liés au remboursement : « Remboursé » / « Remboursé partiellement »
+// sur la dépense, « Remboursement » sur le contre-flux recette.
+function RemboursementTag({ f }) {
+  if (f.flux_rembourse) return <Tag label="Remboursement" tone="teal" />
+  const statut = statutRemboursement(f)
+  if (statut === 'total') return <Tag label="Remboursé" tone="green" />
+  if (statut === 'partiel') return <Tag label="Remboursé partiellement" tone="amber" />
+  return null
+}
+
+function FluxActions({ flux, onEdit, onRembourser, inline = false }) {
   const deleteFlux = useDeleteResource('flux')
 
   const handleDelete = () => {
-    if (!window.confirm(`Supprimer « ${flux.libelle} » ? Le solde du compte sera recalculé.`)) return
+    const message = flux.flux_rembourse
+      ? `Annuler ce remboursement ? Le solde du compte sera recalculé.`
+      : `Supprimer « ${flux.libelle} » ? Le solde du compte sera recalculé.`
+    if (!window.confirm(message)) return
     deleteFlux.mutate(flux.id)
   }
 
@@ -290,6 +336,14 @@ function FluxActions({ flux, onEdit, inline = false }) {
 
   return (
     <div className={wrap}>
+      {onRembourser && peutEtreRembourse(flux) && (
+        <button
+          onClick={() => onRembourser(flux)} title="Enregistrer un remboursement"
+          className="p-1.5 rounded-md text-content-2 hover:text-teal-600 hover:bg-teal-50 cursor-pointer"
+        >
+          <Undo2 size={13} />
+        </button>
+      )}
       <button
         onClick={() => onEdit(flux)} title="Modifier"
         className="p-1.5 rounded-md text-content-2 hover:text-content hover:bg-surface-3 cursor-pointer"
@@ -297,7 +351,9 @@ function FluxActions({ flux, onEdit, inline = false }) {
         <Pencil size={13} />
       </button>
       <button
-        onClick={handleDelete} title="Supprimer" disabled={deleteFlux.isPending}
+        onClick={handleDelete}
+        title={flux.flux_rembourse ? 'Annuler le remboursement' : 'Supprimer'}
+        disabled={deleteFlux.isPending}
         className="p-1.5 rounded-md text-content-2 hover:text-red-600 hover:bg-red-50 cursor-pointer disabled:opacity-50"
       >
         <Trash2 size={13} />
@@ -306,7 +362,7 @@ function FluxActions({ flux, onEdit, inline = false }) {
   )
 }
 
-function FluxTable({ flux, onEdit }) {
+function FluxTable({ flux, onEdit, onRembourser }) {
   return (
     <Card bodyClassName="p-0">
       <table className="w-full border-collapse text-sm">
@@ -325,11 +381,12 @@ function FluxTable({ flux, onEdit }) {
             <tr key={f.id} className="border-b border-border-app last:border-b-0 group">
               <td className="px-4 py-3 text-content">{formatDate(f.date_flux)}</td>
               <td className="px-4 py-3 text-content">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   {f.libelle || '—'}
                   {f.est_transfert && <Tag label="Transfert" />}
                   {f.est_ajustement && <Tag label="Ajustement" />}
                   {f.est_pointe && <Tag label="Pointé" tone="teal" />}
+                  <RemboursementTag f={f} />
                 </div>
               </td>
               <td className="px-4 py-3 text-content">{f.categorie_nom || '—'}</td>
@@ -337,7 +394,7 @@ function FluxTable({ flux, onEdit }) {
               <td className="px-4 py-3 text-right"><MontantBadge montant={f.montant} /></td>
               <td className="px-4 py-3">
                 <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                  <FluxActions flux={f} onEdit={onEdit} inline />
+                  <FluxActions flux={f} onEdit={onEdit} onRembourser={onRembourser} inline />
                 </div>
               </td>
             </tr>
@@ -348,18 +405,19 @@ function FluxTable({ flux, onEdit }) {
   )
 }
 
-function FluxCards({ flux, onEdit }) {
+function FluxCards({ flux, onEdit, onRembourser }) {
   return (
     <div className="flex flex-col gap-2">
       {flux.map((f) => (
         <Card key={f.id} bodyClassName="px-4 py-3.5">
           <div className="flex justify-between items-start gap-2">
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <div className="text-sm font-medium text-content truncate">{f.libelle || '—'}</div>
                 {f.est_transfert && <Tag label="Transfert" />}
                 {f.est_ajustement && <Tag label="Ajustement" />}
                 {f.est_pointe && <Tag label="Pointé" tone="teal" />}
+                <RemboursementTag f={f} />
               </div>
               <div className="text-xs text-content-2 mt-0.5">
                 {f.categorie_nom || '—'} · {f.compte_nom || '—'} · {formatDate(f.date_flux)}
@@ -367,7 +425,7 @@ function FluxCards({ flux, onEdit }) {
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <MontantBadge montant={f.montant} />
-              <FluxActions flux={f} onEdit={onEdit} />
+              <FluxActions flux={f} onEdit={onEdit} onRembourser={onRembourser} />
             </div>
           </div>
         </Card>

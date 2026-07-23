@@ -1,10 +1,23 @@
-from rest_framework import viewsets, filters, status
+from decimal import Decimal
+
+from rest_framework import viewsets, filters, serializers, status
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from django_filters import rest_framework as django_filters
 
 from .models import Flux
 from .serializers import FluxSerializer
+from .services.remboursement import RemboursementInvalide, rembourser_flux
+
+
+class RembourserSerializer(serializers.Serializer):
+    """Entrée de l'action `rembourser` : montant reçu, date du crédit, libellé optionnel."""
+    montant = serializers.DecimalField(
+        max_digits=12, decimal_places=2, min_value=Decimal("0.01")
+    )
+    date = serializers.DateField()
+    libelle = serializers.CharField(required=False, allow_blank=True)
 
 
 class FluxFilterSet(django_filters.FilterSet):
@@ -64,7 +77,8 @@ class FluxViewSet(viewsets.ModelViewSet):
         # Annotation `est_pointe` (14-B) : le flux est-il rapproché à une ligne
         # de relevé d'un lot vivant ? Import local pour éviter le couplage au
         # chargement des apps (imports référence flux).
-        from django.db.models import Exists, OuterRef
+        from django.db.models import Exists, OuterRef, Q, Sum, Value
+        from django.db.models.functions import Coalesce
         from imports.models import LigneBancaire, StatutRapprochement
 
         ligne_pointee = LigneBancaire.objects.filter(
@@ -78,8 +92,51 @@ class FluxViewSet(viewsets.ModelViewSet):
                 "compte", "categorie", "type_flux",
                 "statut", "titulaire", "devise", "mode_paiement"
             )
-            .annotate(est_pointe=Exists(ligne_pointee))
+            .annotate(
+                est_pointe=Exists(ligne_pointee),
+                # Σ des remboursements (recettes liées) non supprimés. Le front
+                # dérive « Remboursé » (Σ ≥ |montant|) vs « partiellement ».
+                montant_rembourse=Coalesce(
+                    Sum(
+                        "remboursements__montant",
+                        filter=Q(remboursements__is_deleted=False),
+                    ),
+                    Value(Decimal("0")),
+                ),
+            )
             .all()
+        )
+
+    @action(detail=True, methods=["post"])
+    def rembourser(self, request, pk=None):
+        """
+        Crée le contre-flux recette qui rembourse (tout ou partie de) cette dépense.
+
+        Body : {montant, date, libelle?}. Renvoie 201 {flux, contre_flux}.
+        L'annulation d'un remboursement = suppression normale du contre-flux.
+        """
+        flux = self.get_object()
+        entree = RembourserSerializer(data=request.data)
+        entree.is_valid(raise_exception=True)
+        try:
+            contre_flux = rembourser_flux(
+                flux,
+                montant=entree.validated_data["montant"],
+                date=entree.validated_data["date"],
+                libelle=entree.validated_data.get("libelle") or None,
+            )
+        except RemboursementInvalide as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        flux.refresh_from_db()
+        return Response(
+            {
+                "flux": FluxSerializer(self.get_queryset().get(pk=flux.pk)).data,
+                "contre_flux": FluxSerializer(
+                    self.get_queryset().get(pk=contre_flux.pk)
+                ).data,
+            },
+            status=status.HTTP_201_CREATED,
         )
 
     def destroy(self, request, *args, **kwargs):

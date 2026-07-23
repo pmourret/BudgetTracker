@@ -66,6 +66,18 @@ class Flux(BaseModel):
         blank=True,
         help_text="Abonnement d'origine si ce flux a été généré depuis le référentiel.",
     )
+    # Remboursement : contre-flux (recette) rattaché à la dépense qu'il rembourse.
+    # Plusieurs remboursements partiels possibles sur une même dépense
+    # (related_name au pluriel). SET_NULL : supprimer la dépense d'origine ne
+    # détruit pas la recette de remboursement (donnée financière historique).
+    flux_rembourse = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        related_name="remboursements",
+        null=True,
+        blank=True,
+        help_text="Dépense d'origine remboursée par ce flux (contre-flux recette).",
+    )
     devise = models.ForeignKey(
         Devise,
         on_delete=models.PROTECT,

@@ -148,3 +148,23 @@ export function useResourceAction(resource) {
     },
   })
 }
+
+// Remboursement d'une dépense : crée un contre-flux recette lié
+// (POST /flux/{id}/rembourser/). Un nouveau flux impacte soldes, budgets,
+// alertes et analytics → l'invalidation `flux` couvre déjà ces dépendances.
+export function useRembourserFlux() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ fluxId, montant, date, libelle }) => {
+      const { data } = await apiClient.post(`/flux/${fluxId}/rembourser/`, {
+        montant,
+        date,
+        libelle,
+      })
+      return data
+    },
+    onSuccess: () => {
+      invalidateWithDependencies(queryClient, 'flux')
+    },
+  })
+}

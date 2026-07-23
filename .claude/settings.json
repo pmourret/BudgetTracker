@@ -18,7 +18,17 @@
       "Bash(grep -n \"| \\\\`comptes\\\\` | Modèle \\\\`Compte\\\\`\" d:/Projects/Python/BudgetTracker/CLAUDE.md)",
       "Bash(npm run *)",
       "Bash(curl -s -o /dev/null -w \"frontend HTTP %{http_code}\\\\n\" http://localhost:5173/transferts)",
-      "Bash(curl -s -o /dev/null -w \"frontend /transferts HTTP %{http_code}\\\\n\" http://localhost:5173/transferts)"
+      "Bash(curl -s -o /dev/null -w \"frontend /transferts HTTP %{http_code}\\\\n\" http://localhost:5173/transferts)",
+      "Read(//c/Users/Pierre Mourret/.claude/**)",
+      "Read(//c/Users/Pierre Mourret/.claude/projects/d--Projects-Python-BudgetTracker/memory/**)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" -X OPTIONS http://localhost:8000/api/v1/flux/)",
+      "Bash(grep -n \"Champ \\\\`est_ajustement\\\\`\\\\|est_pointe\\\\|badge \\\\`est_pointe\\\\`\\\\|415 tests\\\\|Badges « Transfert »\\\\|CRUD ressources : \\\\|/flux/{id}/creer-flux\\\\|reste à faire\\\\|Pointé.*teal\\\\|est_pointe.*annoté\" CLAUDE.md)",
+      "Bash(grep -n \"Tailwind v4\\\\*\\\\* : après un rebuild\\\\|vérifier que \\\\`tailwindcss\\\\`\" CLAUDE.md)",
+      "Bash(OLD=\"C:/Users/Pierre Mourret/.claude/projects/d--Projects-Python-BudgetTracker\"; NEW=\"C:/Users/Pierre Mourret/.claude/projects/d--Projects-Python-FamilyToolsSuite-BudgetTracker\"; echo \"=== OLD contents \\(recursive\\) ===\"; ls -laR \"$OLD\" 2>/dev/null; echo \"=== NEW contents \\(recursive\\) ===\"; ls -laR \"$NEW\" 2>/dev/null)",
+      "Read(//c/Users/Pierre Mourret/.claude/projects/d--Projects-Python-BudgetTracker/**)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\Pierre Mourret\\.claude\\projects\\d--Projects-Python-BudgetTracker\\memory"
     ]
   }
 }

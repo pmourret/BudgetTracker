@@ -18,6 +18,11 @@ class FluxSerializer(serializers.ModelSerializer):
     # relevé (annotation `est_pointe` posée par le FluxViewSet ; False ailleurs).
     est_pointe = serializers.SerializerMethodField()
 
+    # Remboursement : Σ des remboursements (recettes liées) — annotation posée
+    # par le FluxViewSet (0 hors de ce contexte). Le front dérive le badge
+    # « Remboursé » (Σ ≥ |montant|) vs « Remboursé partiellement ».
+    montant_rembourse = serializers.SerializerMethodField()
+
     class Meta:
         model = Flux
         fields = [
@@ -45,14 +50,23 @@ class FluxSerializer(serializers.ModelSerializer):
             "notes",
             "reference_externe",
             "est_pointe",
+            "flux_rembourse",
+            "montant_rembourse",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "mois", "est_ajustement", "created_at", "updated_at"]
+        read_only_fields = [
+            "id", "mois", "est_ajustement", "flux_rembourse",
+            "created_at", "updated_at",
+        ]
 
     def get_est_pointe(self, obj):
         # Lit l'annotation du FluxViewSet ; défaut False hors de ce contexte.
         return bool(getattr(obj, "est_pointe", False))
+
+    def get_montant_rembourse(self, obj):
+        # Lit l'annotation du FluxViewSet ; défaut 0 hors de ce contexte.
+        return str(getattr(obj, "montant_rembourse", 0) or 0)
 
     def validate_montant(self, montant):
         """Le montant ne peut pas être nul."""

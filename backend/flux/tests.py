@@ -648,3 +648,172 @@ class MoisComptableFluxTest(TestCase):
 
         flux.refresh_from_db()
         self.assertEqual(flux.mois, datetime.date(2026, 7, 1))
+
+
+class RemboursementAPITest(APITestCase):
+    """
+    Remboursement d'une dépense = contre-flux recette lié (flux_rembourse).
+    Gère partiels + annulation ; refuse les cas invalides ; n'impacte pas
+    le rapprochement (annotation est_pointe conservée).
+    """
+
+    def setUp(self):
+        type_compte = TypeCompte.objects.create(code="COURANT_RB", libelle="Courant")
+        titulaire = Titulaire.objects.create(code="PIERRE_RB", libelle="Pierre")
+        etab = Etablissement.objects.create(code="BOURSO_RB", libelle="BoursoBank")
+        self.devise = Devise.objects.create(
+            code="EUR_RB", libelle="Euro", symbole="E", est_defaut=False
+        )
+        self.type_debit = TypeFlux.objects.create(code="DEBIT", libelle="Debit")
+        self.type_credit = TypeFlux.objects.create(code="CREDIT", libelle="Credit")
+        self.statut = StatutFlux.objects.create(
+            code="VALIDE_RB", libelle="Valide", est_definitif=True
+        )
+        self.categorie = Categorie.objects.create(code="SANTE_RB", nom="Sante")
+        self.compte = Compte.objects.create(
+            code="CPT-RB01", nom="Compte remboursement",
+            type_compte=type_compte, titulaire=titulaire,
+            etablissement=etab, devise=self.devise,
+            solde_initial=Decimal("1000.00"), solde_reel=Decimal("1000.00"),
+        )
+        self.depense = Flux.objects.create(
+            compte=self.compte, categorie=self.categorie,
+            type_flux=self.type_debit, statut=self.statut, devise=self.devise,
+            montant=Decimal("-100.00"), date_flux=datetime.date(2024, 3, 15),
+            libelle="Consultation medecin",
+        )
+
+    def _url(self, flux):
+        return reverse("flux-rembourser", args=[flux.id])
+
+    def test_remboursement_total_cree_contre_flux(self):
+        response = self.client.post(
+            self._url(self.depense),
+            {"montant": "100.00", "date": "2024-03-20"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        contre = response.data["contre_flux"]
+        self.assertEqual(Decimal(contre["montant"]), Decimal("100.00"))
+        self.assertEqual(str(contre["compte"]), str(self.compte.id))
+        self.assertEqual(str(contre["categorie"]), str(self.categorie.id))
+        self.assertEqual(str(contre["flux_rembourse"]), str(self.depense.id))
+        self.assertEqual(contre["type_flux_code"], "CREDIT")
+        self.assertIn("Remboursement", contre["libelle"])
+        self.assertEqual(
+            Decimal(response.data["flux"]["montant_rembourse"]), Decimal("100.00")
+        )
+
+    def test_remboursement_recalcule_solde(self):
+        self.compte.refresh_from_db()
+        self.assertEqual(self.compte.solde_reel, Decimal("900.00"))
+        self.client.post(
+            self._url(self.depense),
+            {"montant": "100.00", "date": "2024-03-20"},
+            format="json",
+        )
+        self.compte.refresh_from_db()
+        self.assertEqual(self.compte.solde_reel, Decimal("1000.00"))
+
+    def test_remboursement_partiel_puis_solde_du_reste(self):
+        r1 = self.client.post(
+            self._url(self.depense),
+            {"montant": "40.00", "date": "2024-03-20"},
+            format="json",
+        )
+        self.assertEqual(r1.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(
+            Decimal(r1.data["flux"]["montant_rembourse"]), Decimal("40.00")
+        )
+        r2 = self.client.post(
+            self._url(self.depense),
+            {"montant": "60.00", "date": "2024-03-25"},
+            format="json",
+        )
+        self.assertEqual(r2.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(
+            Decimal(r2.data["flux"]["montant_rembourse"]), Decimal("100.00")
+        )
+        self.assertEqual(self.depense.remboursements.count(), 2)
+
+    def test_remboursement_depasse_le_reste_refuse(self):
+        response = self.client.post(
+            self._url(self.depense),
+            {"montant": "150.00", "date": "2024-03-20"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(self.depense.remboursements.exists())
+
+    def test_remboursement_partiel_puis_depassement_refuse(self):
+        self.client.post(
+            self._url(self.depense),
+            {"montant": "70.00", "date": "2024-03-20"},
+            format="json",
+        )
+        response = self.client.post(
+            self._url(self.depense),
+            {"montant": "40.00", "date": "2024-03-25"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(self.depense.remboursements.count(), 1)
+
+    def test_remboursement_sur_recette_refuse(self):
+        recette = Flux.objects.create(
+            compte=self.compte, categorie=self.categorie,
+            type_flux=self.type_credit, statut=self.statut, devise=self.devise,
+            montant=Decimal("200.00"), date_flux=datetime.date(2024, 3, 1),
+            libelle="Salaire",
+        )
+        response = self.client.post(
+            self._url(recette),
+            {"montant": "50.00", "date": "2024-03-20"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_remboursement_sur_transfert_refuse(self):
+        transfert = Flux.objects.create(
+            compte=self.compte, categorie=None,
+            type_flux=self.type_debit, statut=self.statut, devise=self.devise,
+            montant=Decimal("-80.00"), date_flux=datetime.date(2024, 3, 5),
+            est_transfert=True,
+        )
+        response = self.client.post(
+            self._url(transfert),
+            {"montant": "80.00", "date": "2024-03-20"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_annulation_remboursement_recalcule_et_retombe_le_badge(self):
+        r = self.client.post(
+            self._url(self.depense),
+            {"montant": "100.00", "date": "2024-03-20"},
+            format="json",
+        )
+        contre_id = r.data["contre_flux"]["id"]
+        d = self.client.delete(reverse("flux-detail", args=[contre_id]))
+        self.assertEqual(d.status_code, status.HTTP_204_NO_CONTENT)
+        detail = self.client.get(reverse("flux-detail", args=[self.depense.id]))
+        self.assertEqual(Decimal(detail.data["montant_rembourse"]), Decimal("0"))
+        self.compte.refresh_from_db()
+        self.assertEqual(self.compte.solde_reel, Decimal("900.00"))
+
+    def test_montant_rembourse_expose_sur_la_liste(self):
+        self.client.post(
+            self._url(self.depense),
+            {"montant": "30.00", "date": "2024-03-20"},
+            format="json",
+        )
+        response = self.client.get(
+            reverse("flux-list"), {"compte": str(self.compte.id)}
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        depense = next(
+            f for f in response.data["results"] if f["id"] == str(self.depense.id)
+        )
+        self.assertEqual(Decimal(depense["montant_rembourse"]), Decimal("30.00"))
+        self.assertIn("est_pointe", depense)
+        self.assertFalse(depense["est_pointe"])
