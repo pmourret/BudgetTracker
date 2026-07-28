@@ -1,7 +1,9 @@
+# Le client HTTP utilise une baseURL relative ('/api/v1', voir src/api/client.js) :
+# front et API sont servis par le même hôte via nginx → aucune URL d'API à
+# injecter au build. Ne pas réintroduire de VITE_API_URL : elle figerait le
+# domaine dans le bundle, et un changement de domaine imposerait un rebuild.
 FROM node:20-alpine AS build
 WORKDIR /app
-ARG VITE_API_URL
-ENV VITE_API_URL=$VITE_API_URL
 COPY package*.json ./
 RUN npm ci
 COPY . .

@@ -37,8 +37,6 @@ services:
         build:
             context: ./frontend
             dockerfile: Dockerfile.prod
-            args:
-                VITE_API_URL: http://budgets.core.home.arpa/api/v1
         container_name: budgets-frontend
         restart: unless-stopped
         volumes:
