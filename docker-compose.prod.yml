@@ -50,7 +50,8 @@ services:
             - traefik.enable=true
             - traefik.docker.network=proxy
             - traefik.http.routers.budgets.rule=Host(`budgets.sternum-lab.duckdns.org`)
-            - traefik.http.routers.budgets.entrypoints=web
+            - traefik.http.routers.budgets.entrypoints=websecure
+            - traefik.http.routers.budgets.tls.certresolver=duckdns
             - traefik.http.services.budgets.loadbalancer.server.port=80
 
 networks:
