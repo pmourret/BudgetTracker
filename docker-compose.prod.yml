@@ -49,7 +49,7 @@ services:
         labels:
             - traefik.enable=true
             - traefik.docker.network=proxy
-            - traefik.http.routers.budgets.rule=Host(`budgets.core.home.arpa`)
+            - traefik.http.routers.budgets.rule=Host(`budgets.sternum-lab.duckdns.org`)
             - traefik.http.routers.budgets.entrypoints=web
             - traefik.http.services.budgets.loadbalancer.server.port=80
 

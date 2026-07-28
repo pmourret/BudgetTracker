@@ -25,7 +25,11 @@
       "Bash(grep -n \"Champ \\\\`est_ajustement\\\\`\\\\|est_pointe\\\\|badge \\\\`est_pointe\\\\`\\\\|415 tests\\\\|Badges « Transfert »\\\\|CRUD ressources : \\\\|/flux/{id}/creer-flux\\\\|reste à faire\\\\|Pointé.*teal\\\\|est_pointe.*annoté\" CLAUDE.md)",
       "Bash(grep -n \"Tailwind v4\\\\*\\\\* : après un rebuild\\\\|vérifier que \\\\`tailwindcss\\\\`\" CLAUDE.md)",
       "Bash(OLD=\"C:/Users/Pierre Mourret/.claude/projects/d--Projects-Python-BudgetTracker\"; NEW=\"C:/Users/Pierre Mourret/.claude/projects/d--Projects-Python-FamilyToolsSuite-BudgetTracker\"; echo \"=== OLD contents \\(recursive\\) ===\"; ls -laR \"$OLD\" 2>/dev/null; echo \"=== NEW contents \\(recursive\\) ===\"; ls -laR \"$NEW\" 2>/dev/null)",
-      "Read(//c/Users/Pierre Mourret/.claude/projects/d--Projects-Python-BudgetTracker/**)"
+      "Read(//c/Users/Pierre Mourret/.claude/projects/d--Projects-Python-BudgetTracker/**)",
+      "Bash(cp -rp 'C:/Users/Pierre Mourret/.claude/projects/d--Projects-Python-BudgetTracker/memory/.' 'C:/Users/Pierre Mourret/.claude/projects/d--Projects-Python-FamilyToolsSuite-BudgetTracker/memory/')",
+      "Read(//c/Users/Pierre Mourret/.claude/projects/d--Projects-Python-FamilyToolsSuite-BudgetTracker/**)",
+      "Bash(OLD=\"C:/Users/Pierre Mourret/.claude/projects/d--Projects-Python-BudgetTracker/memory\"; NEW=\"C:/Users/Pierre Mourret/.claude/projects/d--Projects-Python-FamilyToolsSuite-BudgetTracker/memory\"; diff -rq \"$OLD\" \"$NEW\" && echo \"IDENTIQUES — ok pour retirer l'ancien\")",
+      "Bash(rm -rf 'C:/Users/Pierre Mourret/.claude/projects/d--Projects-Python-BudgetTracker/memory')"
     ],
     "additionalDirectories": [
       "C:\\Users\\Pierre Mourret\\.claude\\projects\\d--Projects-Python-BudgetTracker\\memory"
