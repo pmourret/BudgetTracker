@@ -27,7 +27,7 @@ Tu cumules sept casquettes : architecte logiciel senior, expert backend Django/D
 | Graphiques | chart.js + react-chartjs-2 |
 | BDD | PostgreSQL 16 |
 | Orchestration | Docker Compose (services : `backend`, `frontend`, `db`) |
-| Auth | Désactivée en dev (MVP) — `DEFAULT_AUTHENTICATION_CLASSES: []` dans `dev.py`. À réactiver (JWT) en phase de durcissement. |
+| Auth | **JWT (`djangorestframework-simplejwt`), actif partout depuis août 2026.** Défaut fermé dans `base.py` (`IsAuthenticated`) ; **plus aucune dérogation dans `dev.py` ni `prod.py`**. Voir §5 « Durcissement ». |
 
 **Environnement de dev :** Windows + PowerShell 5.1 + VS Code + Docker Desktop.
 
@@ -74,6 +74,242 @@ analytics · audit · accounts
 ---
 
 ## 5. ÉTAT D'AVANCEMENT
+
+### 🔒 Durcissement — étape 1 : authentification JWT (backend) — LIVRÉE (août 2026)
+
+Première étape du chantier d'interop (cf. §6). **Elle vaut pour elle-même** : elle
+solde une dette de sécurité qui n'attendait pas FoyerOS.
+
+**Ce qui n'allait pas :** `DEFAULT_AUTHENTICATION_CLASSES: []` + `AllowAny`
+étaient posés dans `dev.py` **et recopiés tels quels dans `prod.py`**. L'API
+entière était donc ouverte en écriture à qui atteignait le domaine — n'importe
+qui pouvait créer un flux. C'est le mécanisme qui compte, pas l'oubli : **une
+dérogation de sécurité vivant dans les fichiers d'environnement finit toujours
+par être recopiée dans le mauvais.** Le défaut est désormais fermé dans
+`base.py`, et ni `dev.py` ni `prod.py` ne dérogent plus à quoi que ce soit.
+
+- **`simplejwt`** ajouté ; `SIMPLE_JWT` **aligné sur FoyerOS** (access 30 min,
+  refresh 7 j, rotation) — les deux applications convergeront vers un service
+  d'identité commun, deux politiques de session divergentes seraient une dette
+  à payer au moment de la fusion.
+- **JWT seul, pas de `SessionAuthentication`** : elle imposerait la vérification
+  CSRF sur toutes les écritures d'un client de navigateur, ce que la dérogation
+  d'origine cherchait justement à éviter. L'admin Django garde sa session à lui.
+- **Routes** — `POST /api/v1/auth/token/`, `POST /api/v1/auth/token/refresh/`,
+  `GET /api/v1/auth/me/`. Mêmes chemins que FoyerOS, volontairement.
+- **`accounts`** cesse d'être une coquille vide (aucun modèle, aucune vue, aucun
+  test depuis l'origine) : `MoiView` + `UtilisateurSerializer`, qui **n'expose ni
+  `is_staff` ni `is_superuser`** — un écran qui lit un droit dans l'API finit par
+  le croire garanti ; la garantie est au serveur. Test de régression dédié.
+- ⚠️ **`AUTH_USER_MODEL` n'a pas bougé** — `User` de Django, identifié par
+  `username`. Le basculer sur un modèle sur mesure alors que l'app tourne sur des
+  données réelles est l'opération la plus risquée de Django, pour un gain nul :
+  rien ici ne rattache d'objet métier à un compte de connexion
+  (`Compte.titulaire` pointe un *référentiel*). Divergence avec FoyerOS (email)
+  **assumée**, à charge du futur service d'identité.
+- **`manage.py creer_utilisateur --nom … --mot-de-passe … [--email] [--admin]`** —
+  non interactive, donc utilisable en déploiement, et **idempotente** (relancée,
+  elle repose le mot de passe : c'est la porte de secours). Sans elle,
+  l'application se verrouillait elle-même dehors au moment où l'API se ferme.
+  Elle passe par `AUTH_PASSWORD_VALIDATORS`, jusqu'ici réglés mais **jamais
+  appelés** puisque rien ne créait de compte.
+  - ⚠️ **`validate_password(user=…)`, jamais sans.** Corrigé après coup :
+    `UserAttributeSimilarityValidator` compare le mot de passe aux attributs du
+    compte, donc **sans instance il ne compare rien et s'abstient en silence** —
+    « pmourret_adm » passait comme mot de passe du compte « pmourret_adm ». La
+    moitié du réglage était inopérante sans que rien ne le signale. On passe une
+    instance non enregistrée, comme `FoyerOS/accounts/services/comptes.py`.
+  - **`--nom` et `--email` permettent tous deux de se connecter** (voir
+    « Connexion par email » ci-dessous). L'email reste facultatif ; un compte
+    sans adresse ne se connecte que par son identifiant. Relancer la commande
+    avec `--email` **ajoute** l'adresse à un compte créé sans.
+- **Connexion par email *ou* identifiant** (`accounts/serializers.py::
+  ConnexionSerializer`, ajouté à la première mise en service — le premier compte
+  créé s'est fait refuser parce que son propriétaire tapait son email). Personne
+  ne retient un identifiant technique quand FoyerOS, l'autre application de la
+  suite, se connecte par email.
+  - **`AUTH_USER_MODEL` n'a toujours pas bougé** : on traduit l'email en
+    identifiant *avant* de laisser SimpleJWT authentifier. Rien d'autre ne change.
+  - ⚠️ **On ne devine pas à la présence d'un `@`** : un identifiant peut en
+    contenir (c'était le cas du compte en question). Règle : si un compte porte
+    cette adresse, on prend son identifiant ; sinon la saisie est essayée telle
+    quelle. Les deux voies restent ouvertes. Test de régression dédié.
+  - **Aucune fuite** : une adresse inconnue tombe en 401 comme un mot de passe
+    faux. On ne dit jamais qu'un compte n'existe pas.
+  - **L'unicité de l'email est garantie en base** — `accounts/0001_email_unique`,
+    index **partiel** et **insensible à la casse**
+    (`LOWER(email) WHERE email <> ''`). Sans elle, « se connecter avec son
+    email » n'aurait pas de sens : le serveur devrait choisir un compte. Posée en
+    base et pas seulement à la création, sinon l'admin Django ou un shell la
+    contournent. Partielle parce que l'email est facultatif : un index total
+    interdirait un **second** compte sans adresse. `RunSQL` plutôt
+    qu'`AddConstraint`, le modèle appartenant à `django.contrib.auth`.
+    ⚠️ La migration **échoue s'il existe déjà des doublons** — volontaire :
+    lesquels fusionner n'est pas une question qu'une migration peut trancher.
+- ⚠️ **`SECRET_KEY` change de nature.** Tant que l'API était ouverte et sans
+  session, elle ne protégeait rien ; elle signe désormais **tous les jetons**.
+  D'où **`core/checks.py`**, qui la contrôle au démarrage.
+  - **Durci en août 2026 : bloquant hors `DEBUG`** (`core.E001`/`E002`),
+    simple avertissement en développement (`W001`/`W002`). ⚠️ Le niveau devait
+    changer avec l'environnement : un *warning* passe
+    `check --deploy --fail-level ERROR`, donc les **20 octets** de cette
+    application seraient partis en production sans que rien ne les arrête.
+    Bloquer en développement, à l'inverse, n'aurait fait qu'empêcher de
+    travailler. Quatre tests fixent la propriété (`core/tests_checks.py`).
+  - La clé de dev a été renouvelée (64 caractères). **`.env.prod` reste à
+    faire** — le contrôle refusera désormais de démarrer sans.
+  - ⚠️ **`core/checks.py` est volontairement dupliqué** dans les trois dépôts :
+    la règle de suite interdit de partager du code par copie ou symlink. Un
+    paquet versionné sera la bonne réponse quand il y aura plus à mutualiser.
+- **`requirements.txt` reconverti en UTF-8** — il était en **UTF-16LE**, soit
+  exactement le piège d'encodage listé au §7.
+
+**Tests : 444 (430 + 14).** Le passage a demandé de traiter **33 classes** qui
+appelaient l'API :
+
+- **`core/tests_base.py::APIAuthTestCase`** authentifie le client dans
+  **`_pre_setup`**, pas dans `setUp`. Délibéré : ces classes définissent déjà
+  leur `setUp` et **n'appellent pas `super()`** — une authentification posée dans
+  un `setUp` de base aurait été silencieusement inopérante partout. `_pre_setup`
+  est appelé par Django avant `setUp` quoi que fasse la sous-classe.
+- **Sa limite, rencontrée pour de vrai** : trois `setUp` faisaient
+  `self.client = APIClient()`, écrasant le client authentifié — sans effet tant
+  que l'API était ouverte. Retiré. Chercher `self.client` ne suffisait pas non
+  plus : une classe appelait `APIClient().get(...)` sans jamais passer par
+  `self.client`. **Balayer les deux motifs** si l'exercice se répète.
+- L'authentification réelle (refus anonyme, jeton, expiration, rotation) est
+  testée **dans `accounts/tests.py` et nulle part ailleurs** : le reste de la
+  suite utilise `force_authenticate`, qui court-circuite les classes d'auth.
+
+### 🔒 Durcissement — étape 2 : connexion et session côté front — LIVRÉE (août 2026)
+
+L'interface reçoit désormais un jeton et sait le renouveler. L'application
+redevient utilisable ; les étapes 1 et 2 se déploient **ensemble**.
+
+- **`stores/authStore.js`** (zustand + `persist`) — jetons en `localStorage`,
+  même forme que celui de FoyerOS, moins le foyer courant (ici, une instance
+  *est* un foyer). ⚠️ **`refresh` fait foi pour « suis-je connecté ? »**, pas
+  `access` : ce dernier expire en 30 minutes, s'y fier renverrait sur l'écran de
+  connexion une session parfaitement valide à chaque retour sur l'onglet.
+- **`api/client.js`** — injection du `Bearer`, renouvellement **une fois** sur
+  401 puis rejeu de la requête. Deux propriétés à ne pas défaire :
+  - ⚠️ **Seul un rejet explicite (401/403) ferme la session.** Leçon prise sur
+    FoyerOS *avant* d'avoir eu à la réapprendre ici : un `catch` qui attrape
+    toute erreur attrape aussi un 502 de redéploiement, et efface les jetons
+    pour une panne de deux secondes. Tout le reste est passager — la requête
+    échoue, React Query réessaiera.
+  - **Le renouvellement est mis en commun** entre les appels parallèles
+    (`renouvellement`). Voir l'avertissement sur le blacklistage ci-dessous :
+    c'est une économie aujourd'hui, une condition de correction demain.
+  - Un 401 sur `/auth/token/` n'est **pas** traité comme une expiration : c'est
+    un mot de passe faux, il doit remonter à l'écran.
+- **`pages/ConnexionPage.jsx`** — la seule surface accessible sans jeton.
+  **Aucune inscription** : un compte naît de `manage.py creer_utilisateur`, côté
+  serveur. L'écran distingue « mot de passe refusé » de « serveur injoignable » :
+  le premier appelle à retaper, le second à attendre.
+- **`App.jsx` : pas de route `/connexion`.** Sans session, l'arbre des pages
+  n'est simplement pas construit — une route de plus laisserait les URL profondes
+  monter leurs écrans et partir en dix 401 avant la redirection.
+- **Déconnexion : jetons effacés *et* `queryClient.clear()`.** Sans le vidage,
+  React Query resservirait les comptes et les flux de la session précédente le
+  temps que les requêtes se rejouent. Atteignable en bas de la sidebar (desktop)
+  **et** dans une carte de `PlusPage` (mobile — la sidebar n'y existe pas, la
+  déconnexion serait sinon inatteignable au téléphone).
+- **`hooks/useAuth.js`** — `useMoi`, `useConnexion`, `useDeconnexion`. La
+  connexion passe par `axios` nu et non `apiClient` : la route qui *crée* la
+  session ne doit pas dépendre de l'intercepteur qui suppose une session.
+
+> ⚠️ **Trouvé en vérifiant le contrat : la rotation ne révoque rien.**
+> `ROTATE_REFRESH_TOKENS` est actif, mais **`BLACKLIST_AFTER_ROTATION` n'est pas
+> posé et l'app `token_blacklist` n'est pas installée**. Constaté, pas supposé :
+> rejouer un ancien jeton de rafraîchissement après rotation renvoie **200**. Un
+> jeton fuité reste donc valable ses 7 jours pleins, et **se déconnecter ne
+> l'invalide pas côté serveur**. FoyerOS a exactement la même limite, assumée et
+> documentée chez lui. **À trancher au niveau de la suite** (les deux
+> applications doivent décider ensemble) : installer `token_blacklist` donnerait
+> une révocation réelle, au prix d'une table de jetons et d'une migration.
+> Le jour où c'est fait, la mise en commun du renouvellement dans `client.js`
+> devient **obligatoire** — ne pas la retirer d'ici là en la croyant décorative.
+
+> ℹ️ **Non vérifié en navigateur** : l'environnement de développement n'a pas
+> d'automatisation. Le contrat HTTP (connexion, rotation, `/auth/me/`, refus
+> anonyme) a été validé bout en bout contre le backend réel, et le front
+> compile ; le parcours à l'écran reste à cliquer.
+
+### 🔗 Identité partagée — étape 4 : BudgetTracker vérifie (août 2026)
+
+Cadrage : `FamilyToolSuite/FoyerOS/docs/cadrage-identite-partagee.md`.
+BudgetTracker devient **vérificateur** des jetons émis par le service
+`Identite`. Objectif du chantier atteint : **un compte, un mot de passe, trois
+services.**
+
+- **`accounts/annuaire.py::JetonAnnuaire`** — vérifie les jetons **RS256** avec
+  la clé **publique** de l'annuaire. ⚠️ **Renvoie `None`** sur tout ce qui n'est
+  pas RS256 : DRF s'arrête à la première classe qui **lève**, donc refuser ce
+  qu'on ne reconnaît pas empêcherait `JWTAuthentication` d'examiner les jetons
+  locaux — et déconnecterait tout le monde.
+- **Aucun appel réseau pour vérifier** : la clé est lue au démarrage. C'est ce
+  qui permet à BudgetTracker de tourner quand l'annuaire est éteint.
+- ⚠️ **`IDENTITE_FOYER` — de quel foyer cette instance est-elle celle ?** Une
+  instance par foyer (décision de suite du 2026-08-01) : le claim `foyers` est
+  la **seule** chose qui permette de refuser un membre du foyer voisin.
+  **Sans ce réglage, aucun jeton d'annuaire n'est accepté** — fermé par défaut
+  plutôt qu'ouvert « au cas où ». Test de régression dédié.
+- **Provisionnement à la volée, trivial ici** : BudgetTracker n'a **aucune clé
+  étrangère vers `User`** — un compte n'y est qu'une porte, le créer ne laisse
+  aucune donnée orpheline. ⚠️ **Le rapprochement se fait sur l'email**, pas sur
+  `sub` : `auth.User` a une clé primaire entière et ne peut pas porter l'UUID de
+  l'annuaire. L'email est unique (index CI partiel, cf. connexion par email) —
+  un compte local existant est donc **retrouvé**, jamais dupliqué.
+- **`IDENTITE_AUTORITE`** relaie `/auth/token/` et `/refresh/` vers l'annuaire au
+  lieu de signer. **Le front n'a pas changé d'une ligne** : envoyer le navigateur
+  vers l'annuaire aurait imposé du CORS et une seconde origine pour le même
+  résultat. Sous autorité, l'identifiant est **l'email**.
+- **Panne ≠ refus** : annuaire injoignable → **503**, jamais 401.
+- **`providers/identite.py` ne sait qu'émettre.** ⚠️ Pas de compte de service,
+  pas de fonction d'écriture : **BudgetTracker n'administre pas l'annuaire**, les
+  comptes naissent dans FoyerOS. Ne pas en ajouter sans rouvrir la décision.
+- ⚠️ **`cryptography` ajoutée aux dépendances** : PyJWT ne fait pas de RS256 sans
+  elle et **ne le dit qu'à l'exécution** (`InvalidAlgorithmError`, sans nommer le
+  paquet). Reconstruire l'image — un `pip install` ne survit pas à `up -d`.
+- ⚠️ **`ALLOWED_HOSTS` doit contenir `host.docker.internal`** côté annuaire *et*
+  FoyerOS : les piles ont des réseaux Docker distincts, et Django répond sinon un
+  **400 DisallowedHost** qui ressemble à un mauvais mot de passe. Rencontré deux
+  fois.
+- **`core/test_runner.py`** neutralise ces réglages pendant les tests : un test ne
+  décrit jamais l'état d'un déploiement. *(Leçon prise côté FoyerOS, où poser
+  `IDENTITE_AUTORITE=True` dans un `.env` avait fait échouer 48 tests d'un coup
+  en les envoyant sur le réseau.)*
+- **17 tests** dédiés, **471 au total**. ✅ Vérifié en réel : un **seul** jeton de
+  l'annuaire ouvre l'annuaire, FoyerOS *et* BudgetTracker.
+
+##### Défaut trouvé en usage réel, corrigé le 2026-08-02
+
+🐛 **Un compte d'un autre foyer se connectait, puis tout tombait en 401.**
+L'annuaire ne connaît pas `IDENTITE_FOYER` : il délivrait des jetons
+parfaitement valides à un membre du foyer voisin, la connexion réussissait, et
+**chaque** appel était ensuite refusé — un écran qui s'ouvre, ne charge rien, et
+n'explique rien.
+
+- `_refuser_si_autre_foyer` **relit le claim à la connexion** et répond **403**
+  avec un message lisible. ⚠️ Ce n'est **pas** la garantie — celle-ci reste à
+  l'authentification, qui vérifie la signature à chaque requête. Ce contrôle ne
+  fait que le dire **au moment où on peut encore comprendre**.
+- Il est donc **tolérant** : un jeton illisible ne bloque pas la connexion.
+  Faire échouer une amélioration de confort sur une réponse inattendue en ferait
+  une panne. Test dédié.
+- L'écran de connexion rend le `detail` du serveur sur un 403, au lieu de son
+  message générique « serveur injoignable » — trois refus, trois gestes
+  différents : retaper, s'adresser ailleurs, attendre.
+- ⚠️ **Le lanceur de tests neutralise TOUT le bloc identité**, pas seulement
+  l'interrupteur : `IDENTITE_FOYER` et `IDENTITE_CLE_PUBLIQUE` aussi. Les
+  oublier laissait des tests passer **pour de mauvaises raisons**, ou échouer
+  selon le `.env` de la machine.
+
+**Reste** : le front de BudgetTracker ne dit pas encore que le mot de passe se
+gère dans l'annuaire, et l'écran de connexion parle toujours d'« identifiant ».
+Secours si l'annuaire est éteint : **admin Django** (session et mot de passe
+locaux) — ne pas supprimer les comptes `pierre` / `pmourret_adm`.
 
 ### ✅ Backend — Phases 1 à 8 COMPLÈTES
 
@@ -388,7 +624,64 @@ Module de **rapprochement** (réconciliation), pas d'import brut : confronter un
 - **Objectifs** (`objectifs`) : objectifs d'épargne, suivi de progression.
 - **Import Excel** (`imports`) : migration du classeur `SUIVI_BUDGET.xlsx` (l'import bancaire CSV = rapprochement, ci-dessus, livré).
 - **Market data** (`market_data`) : providers isolés, fallback manuel, sécurité des clés (env), valorisation estimative des actifs de marché. **Jamais** vérité comptable.
-- **Durcissement** : réactiver l'auth (JWT), permissions, multi-foyer, audit (`audit`), tests de charge.
+- **Durcissement** : ~~réactiver l'auth (JWT)~~ **livrée, back + front (août 2026,
+  §5 étapes 1 et 2)** ; ~~**révocation des jetons**~~ **livrée** —
+  `token_blacklist` vit dans le dépôt `Identite`, seul émetteur ; BudgetTracker
+  relaie `POST /auth/deconnexion/` ; ~~renouveler **`SECRET_KEY`**~~ (fait en
+  dev, `.env.prod` restant ; contrôle **bloquant hors DEBUG**) ; permissions ;
+  ~~multi-foyer~~ (**retiré**, voir la décision de suite ci-dessous) ; audit
+  (`audit`) ; tests de charge.
+
+### 🔗 Décision de suite — interopérabilité avec FoyerOS (arbitrée le 2026-08-01)
+
+> **Rien n'est développé côté BudgetTracker.** Contrat complet :
+> `FamilyToolSuite/FoyerOS/docs/interop-budgettracker.md`. Le chantier touche les
+> deux applications ; **chaque étape tient dans un seul dépôt**, aucun commit ne
+> mélange les deux (`FamilyToolSuite/CLAUDE.md` §2 et §8).
+
+FoyerOS poussera les dépenses de courses ici. Quatre décisions engagent **ce
+dépôt**, et il ne faut pas les redécouvrir :
+
+1. **Pas de multi-foyer dans BudgetTracker — une instance par foyer.** C'est
+   FoyerOS qui est multi-tenant ; ici, un déploiement = un foyer. L'item est donc
+   sorti de la feuille de route ci-dessus, il n'est pas « à faire plus tard ».
+2. **Le durcissement de l'auth passe en tête, et il est complet.** ✅ **Livré,
+   back et front (§5, étapes 1 et 2).** N'authentifier que la route d'ingestion
+   n'aurait rien protégé tant que `POST /flux/` restait ouvert.
+   - Le **compte de service `foyeros`** n'est **volontairement pas créé** à
+     l'étape 1. Avec `IsAuthenticated` seul et aucune permission par objet, il
+     aurait accès à toute l'API — un identifiant dormant à pleins droits, des
+     mois avant d'avoir un travail. Il naîtra **avec l'endpoint qu'il sert**
+     (étape 3), et sa restriction se décidera là.
+3. ⚠️ **Ne pas changer `AUTH_USER_MODEL` à cette occasion.** L'app tourne sur des
+   données réelles ; basculer sur un `User` custom après migrations est
+   l'opération la plus risquée de Django, pour un gain nul ici. FoyerOS
+   s'identifie par email, BudgetTracker par `username` — divergence **assumée**,
+   que le futur service d'identité partagé résoudra.
+4. **L'ingestion est une route dédiée, pas `POST /flux/`** :
+   `POST /api/v1/integrations/depenses/`, charge **sémantique**
+   (`source`, `nature`, `reference`, `date`, `montant`, `libelle`, `notes`).
+   - **C'est BudgetTracker qui résout** `compte` et `categorie`, via un nouveau
+     référentiel administrable **`RegleIngestion(source, nature, compte,
+     categorie, actif)`** (règle 1 — rien en dur), semé avec `(foyeros, courses)`.
+     Le reste se dérive des `code` des référentiels : `TypeFlux` débit,
+     `StatutFlux` définitif, `Devise.est_defaut`. *Motif : choisir une catégorie
+     budgétaire est une décision financière, elle ne peut pas vivre dans FoyerOS.*
+   - ⚠️ **`montant` arrive POSITIF ; le signe est posé ici.** La convention
+     « négatif = dépense » est une règle de ce dépôt : la faire appliquer par
+     l'appelant serait la dupliquer, et une inversion de signe ne se voit pas.
+   - **Idempotent par `Flux.reference_externe`** (`foyeros:sortie:<uuid>`) :
+     `201` à la création, **`200` + le flux existant** si la référence est déjà
+     connue. La passe de rattrapage de FoyerOS rejoue par nature — sans cette
+     clé, un redémarrage au mauvais moment double une dépense.
+   - **`400` si aucune `RegleIngestion` ne correspond.** FoyerOS distingue 4xx
+     (refus, pas de rejeu) de 5xx (panne, repris plus tard) : ne pas renvoyer un
+     5xx sur une erreur de configuration, ce serait une boucle de rejeu.
+
+**Granularité arbitrée : un flux par sortie**, jamais par ligne ni par rayon — un
+débit = un passage en caisse, donc rapprochable 1 pour 1 avec le relevé bancaire
+(phase 14). Le détail par produit reste dans FoyerOS. **BudgetTracker n'appelle
+jamais FoyerOS** : le sens est unidirectionnel (suite §4).
 
 ---
 

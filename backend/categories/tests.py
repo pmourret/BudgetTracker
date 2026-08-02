@@ -5,6 +5,7 @@ from django.urls import reverse
 from unittest.mock import MagicMock, patch
 
 from categories.models import Categorie
+from core.tests_base import APIAuthTestCase
 
 
 # ---------------------------------------------------------------------------
@@ -73,7 +74,7 @@ class CategorieModelTest(TestCase):
 # Tests API
 # ---------------------------------------------------------------------------
 
-class CategorieAPITest(APITestCase):
+class CategorieAPITest(APIAuthTestCase):
 
     def setUp(self):
         self.racine = Categorie.objects.create(
@@ -185,7 +186,7 @@ class CategorieAPITest(APITestCase):
         self.assertEqual(response.data["count"], 1)
         self.assertEqual(response.data["results"][0]["code"], "CARBURANT")
 
-class CategorieCodeSoftDeleteTest(APITestCase):
+class CategorieCodeSoftDeleteTest(APIAuthTestCase):
     """
     Régression : le code auto-généré doit éviter les collisions avec les
     catégories soft-deletées (la contrainte d'unicité en base les compte aussi).
@@ -227,7 +228,7 @@ class CategorieCodeSoftDeleteTest(APITestCase):
 # Tests pagination (?page_size) — régression bug prod « catégorie > 50 invisible »
 # ---------------------------------------------------------------------------
 
-class CategoriePaginationTest(APITestCase):
+class CategoriePaginationTest(APIAuthTestCase):
     """
     Régression : au-delà de PAGE_SIZE (50), les catégories tombaient en page 2,
     jamais chargée par l'UI. Le front demande maintenant ?page_size=1000 pour
@@ -298,7 +299,7 @@ class ReordonnerServiceTest(TestCase):
         self.assertEqual(reordonner_categories([]), 0)
 
 
-class ReordonnerAPITest(APITestCase):
+class ReordonnerAPITest(APIAuthTestCase):
 
     def setUp(self):
         self.a = Categorie.objects.create(code="A", nom="Alimentation")

@@ -1,5 +1,7 @@
 from django.test import TestCase
 from django.db.utils import IntegrityError
+
+from core.tests_base import APIAuthTestCase
 from referentiels.models import (
     TypeCompte, Devise, StatutFlux, Frequence
 )
@@ -64,13 +66,12 @@ class FrequenceTest(TestCase):
         )
         self.assertIsNone(f.nb_jours)
 
-class ParametresBudgetAPITest(TestCase):
+class ParametresBudgetAPITest(APIAuthTestCase):
     """Endpoint singleton + remap automatique des flux au changement de jour."""
 
     def setUp(self):
         import datetime
         from decimal import Decimal
-        from rest_framework.test import APIClient
         from referentiels.models import (
             Titulaire, Etablissement, TypeFlux, StatutFlux as SF,
         )
@@ -78,7 +79,6 @@ class ParametresBudgetAPITest(TestCase):
         from categories.models import Categorie
         from flux.models import Flux
 
-        self.client = APIClient()
         self.url = "/api/v1/referentiels/parametres-budget/"
 
         tc = TypeCompte.objects.create(code="COURANT", libelle="Compte courant")

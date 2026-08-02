@@ -1,5 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/layout/Layout'
+import ConnexionPage from './pages/ConnexionPage'
+import { estConnecte, useAuthStore } from './stores/authStore'
 import ComptesPage from './pages/ComptesPage'
 import CompteDetailPage from './pages/CompteDetailPage'
 import FluxPage from './pages/FluxPage'
@@ -17,6 +19,18 @@ import ImportsPage from './pages/ImportsPage'
 import PlusPage from './pages/PlusPage'
 
 export default function App() {
+  const connecte = useAuthStore(estConnecte)
+
+  // Pas de route `/connexion` : tant qu'il n'y a pas de session, **rien d'autre
+  // n'existe**. Une route de plus laisserait les URL profondes atteignables au
+  // rendu — un écran monté, ses requêtes parties, et dix 401 avant la
+  // redirection. Ici, l'arbre des pages n'est simplement pas construit.
+  //
+  // Le test porte sur le jeton de **rafraîchissement**, jamais sur l'accès :
+  // celui-ci expire en 30 minutes, et le client sait le renouveler seul. S'y
+  // fier renverrait sur cet écran une session parfaitement valide.
+  if (!connecte) return <ConnexionPage />
+
   return (
     <Routes>
       <Route path="/" element={<Layout />}>

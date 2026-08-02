@@ -320,9 +320,10 @@ class MiseAJourDerniereOccurrenceTest(TestCase):
 from django.urls import reverse
 from rest_framework.test import APITestCase
 from rest_framework import status as drf_status
+from core.tests_base import APIAuthTestCase
 
 
-class AbonnementAPITest(APITestCase):
+class AbonnementAPITest(APIAuthTestCase):
 
     def setUp(self):
         type_compte = TypeCompte.objects.create(
@@ -552,7 +553,7 @@ class FluxAbonnementSignalTest(TestCase):
         self.assertEqual(Alerte.objects.count(), 0)
 
 
-class VerifierEcheancesActionTest(APITestCase):
+class VerifierEcheancesActionTest(APIAuthTestCase):
     """L'action verifier-echeances génère les alertes 'en retard'."""
 
     def setUp(self):

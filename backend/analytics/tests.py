@@ -18,6 +18,7 @@ from analytics.services.projection import (
 )
 from analytics.services.trajectoire import calculer_trajectoire
 from analytics.services.analyse import calculer_analyse
+from core.tests_base import APIAuthTestCase
 
 
 class DashboardServiceTest(TestCase):
@@ -200,7 +201,7 @@ class DashboardServiceTest(TestCase):
         self.assertEqual(data["metriques"]["solde_total"], Decimal("800.00"))
 
 
-class DashboardAPITest(TestCase):
+class DashboardAPITest(APIAuthTestCase):
     """Teste l'endpoint HTTP du dashboard."""
 
     def test_endpoint_repond(self):
@@ -419,7 +420,7 @@ class TrajectoireServiceTest(_PrevisionnelTestMixin, TestCase):
         self.assertEqual(data["points"][1]["depenses_attendues"], Decimal("300.00"))
 
 
-class PrevisionnelAPITest(TestCase):
+class PrevisionnelAPITest(APIAuthTestCase):
     """Teste l'endpoint HTTP du prévisionnel."""
 
     def test_endpoint_renvoie_les_trois_blocs(self):
@@ -548,7 +549,7 @@ class CompteDashboardServiceTest(TestCase):
             calculer_compte_dashboard(uuid.uuid4())
 
 
-class CompteDashboardAPITest(TestCase):
+class CompteDashboardAPITest(APIAuthTestCase):
     """Teste l'endpoint HTTP du dashboard compte."""
 
     def setUp(self):
@@ -880,7 +881,7 @@ class AnalyseServiceTest(_AnalyseTestMixin, TestCase):
         self.assertEqual(recurrents[0]["moyenne"], Decimal("30.00"))
 
 
-class AnalyseAPITest(_AnalyseTestMixin, TestCase):
+class AnalyseAPITest(_AnalyseTestMixin, APIAuthTestCase):
 
     def test_endpoint_repond(self):
         from django.urls import reverse
@@ -1125,7 +1126,7 @@ class AbonnementsServiceTest(_AbonnementsTestMixin, TestCase):
         self.assertNotIn("jamais_genere", motifs)
 
 
-class AbonnementsAnalyseAPITest(_AbonnementsTestMixin, TestCase):
+class AbonnementsAnalyseAPITest(_AbonnementsTestMixin, APIAuthTestCase):
 
     def test_endpoint_repond(self):
         from django.urls import reverse

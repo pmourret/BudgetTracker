@@ -9,6 +9,7 @@ from comptes.models import Compte
 from flux.models import Flux
 from transferts.models import Transfert
 from transferts.services import creer_transfert
+from core.tests_base import APIAuthTestCase
 
 
 class TransfertServiceTest(TestCase):
@@ -140,12 +141,10 @@ class TransfertServiceTest(TestCase):
         self.assertFalse(Flux.objects.filter(id=transfert.flux_credit.id).exists())
 
 
-class TransfertFiltresAPITest(TestCase):
+class TransfertFiltresAPITest(APIAuthTestCase):
     """Filtres et tri de la liste des transferts (volet lisibilité)."""
 
     def setUp(self):
-        from rest_framework.test import APIClient
-        self.client = APIClient()
         base = TransfertServiceTest.setUp
         base(self)  # réutilise le décor (comptes, référentiels)
         # Un 3e compte pour croiser les filtres source/destination.
@@ -194,7 +193,7 @@ class TransfertFiltresAPITest(TestCase):
         self.assertTrue(ligne["est_definitif"])
 
 
-class AnalyseTransfertsTest(TestCase):
+class AnalyseTransfertsTest(APIAuthTestCase):
     """Agrégation du graphe nœud-lien des transferts (analytics)."""
 
     def setUp(self):
@@ -261,9 +260,8 @@ class AnalyseTransfertsTest(TestCase):
         self.assertEqual(d["liens"], [])
 
     def test_api_endpoint(self):
-        from rest_framework.test import APIClient
         self._creer(self.compte_source, self.compte_c, "100.00", datetime.date(2026, 6, 1))
-        res = APIClient().get("/api/v1/analytics/transferts/", {"nb_mois": 6})
+        res = self.client.get("/api/v1/analytics/transferts/", {"nb_mois": 6})
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.data["fiabilite"], "reelle")
         self.assertIn("liens", res.data)

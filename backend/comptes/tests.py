@@ -7,6 +7,7 @@ from rest_framework import status
 
 from comptes.services.solde import _calculer_solde_avec_model
 from referentiels.models import TypeCompte, Titulaire, Etablissement, Devise
+from core.tests_base import APIAuthTestCase
 
 
 class CalculSoldeServiceTest(TestCase):
@@ -85,7 +86,7 @@ class CalculSoldeServiceTest(TestCase):
         )
 
 
-class CompteAPITest(APITestCase):
+class CompteAPITest(APIAuthTestCase):
 
     def setUp(self):
         self.type_compte = TypeCompte.objects.create(
@@ -171,7 +172,7 @@ class CompteAPITest(APITestCase):
         self.assertEqual(liste.data["count"], 0)
 
 
-class CompteCodeSoftDeleteTest(APITestCase):
+class CompteCodeSoftDeleteTest(APIAuthTestCase):
     """
     Régression : recréer un compte avec le code d'un compte soft-deleté
     doit renvoyer un 400 propre (avant : IntegrityError 500, car la

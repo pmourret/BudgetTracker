@@ -195,9 +195,10 @@ class MiseAJourValorisationTest(TestCase):
 from django.urls import reverse
 from rest_framework.test import APITestCase
 from rest_framework import status as drf_status
+from core.tests_base import APIAuthTestCase
 
 
-class ActifAPITest(APITestCase):
+class ActifAPITest(APIAuthTestCase):
 
     def setUp(self):
         self.devise = Devise.objects.create(

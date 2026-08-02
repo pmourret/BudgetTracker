@@ -17,6 +17,12 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
+from accounts.views import (
+    ConnexionView,
+    DeconnexionView,
+    MoiView,
+    RafraichissementView,
+)
 
 from comptes.views import CompteViewSet
 from categories.views import CategorieViewSet
@@ -67,6 +73,23 @@ router.register(r"referentiels/statuts-flux", StatutFluxViewSet, basename="statu
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    # --- Authentification (durcissement, août 2026) ----------------------- #
+    # Mêmes chemins que FoyerOS : les deux applications convergeront vers un
+    # service d'identité commun, autant que le contrat soit déjà le même.
+    path("api/v1/auth/token/", ConnexionView.as_view(), name="token"),
+    # Ces deux vues **relaient** vers l'annuaire sous `IDENTITE_AUTORITE`,
+    # sinon elles émettent localement. Le front appelle la même URL.
+    path(
+        "api/v1/auth/token/refresh/",
+        RafraichissementView.as_view(),
+        name="token-refresh",
+    ),
+    path(
+        "api/v1/auth/deconnexion/",
+        DeconnexionView.as_view(),
+        name="deconnexion",
+    ),
+    path("api/v1/auth/me/", MoiView.as_view(), name="moi"),
     path("api/v1/analytics/dashboard/", DashboardView.as_view(), name="dashboard"),
     path("api/v1/analytics/compte/<uuid:compte_id>/", CompteDashboardView.as_view(), name="compte-dashboard"),
     path("api/v1/analytics/previsionnel/", PrevisionnelView.as_view(), name="previsionnel"),

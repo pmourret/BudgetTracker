@@ -30,6 +30,13 @@ services:
                 condition: service_healthy
         volumes:
             - /var/lib/docker/hiatus/budgets/static:/app/staticfiles
+            # Clé PUBLIQUE de l'annuaire (`IDENTITE_CLE_PUBLIQUE_FICHIER`).
+            # Un PEM ne rentre pas dans une variable d'environnement : plusieurs
+            # lignes, et l'aplatir en `\n` échappés rate silencieusement.
+            # En lecture seule — ce conteneur n'a aucune raison d'y écrire.
+            # ⚠️ Sans ce montage, BudgetTracker n'accepte AUCUN jeton de
+            # l'annuaire, et personne ne peut plus se connecter sous autorité.
+            - /var/lib/docker/hiatus/identite/cles/public.pem:/run/cles/annuaire_public.pem:ro
         networks:
             - backend
 

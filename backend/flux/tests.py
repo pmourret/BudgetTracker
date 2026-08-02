@@ -212,9 +212,10 @@ class SignalRecalculSoldeTest(TestCase):
 
 from rest_framework.test import APITestCase
 from django.urls import reverse
+from core.tests_base import APIAuthTestCase
 
 
-class FluxAPITest(APITestCase):
+class FluxAPITest(APIAuthTestCase):
 
     def setUp(self):
         self.type_compte = TypeCompte.objects.create(
@@ -311,7 +312,7 @@ class FluxAPITest(APITestCase):
         self.assertEqual(response.data["count"], 1)
 
 
-class FluxRechercheFiltresAPITest(APITestCase):
+class FluxRechercheFiltresAPITest(APIAuthTestCase):
     """Filtres de recherche de la FluxPage : libellé, propriétaire du compte,
     statut (prévisionnel/validé), sens (montant)."""
 
@@ -385,7 +386,7 @@ class FluxRechercheFiltresAPITest(APITestCase):
         self.assertEqual(r_rec.data["count"], 1)
         self.assertEqual(r_rec.data["results"][0]["libelle"], "Recette")
 
-class FluxChangementRecalculTest(APITestCase):
+class FluxChangementRecalculTest(APIAuthTestCase):
     """
     Régression : quand un flux change de compte, de catégorie ou de mois,
     l'ANCIEN compte et les ANCIENS budgets doivent aussi être recalculés.
@@ -500,7 +501,7 @@ class FluxChangementRecalculTest(APITestCase):
         self.assertEqual(self.compte1.solde_theorique, Decimal("850.00"))
 
 
-class FluxProtectionAPITest(APITestCase):
+class FluxProtectionAPITest(APIAuthTestCase):
     """
     Les flux de transfert et d'ajustement sont protégés :
     pas de création directe, pas de modification, pas de suppression unitaire.
@@ -650,7 +651,7 @@ class MoisComptableFluxTest(TestCase):
         self.assertEqual(flux.mois, datetime.date(2026, 7, 1))
 
 
-class RemboursementAPITest(APITestCase):
+class RemboursementAPITest(APIAuthTestCase):
     """
     Remboursement d'une dépense = contre-flux recette lié (flux_rembourse).
     Gère partiels + annulation ; refuse les cas invalides ; n'impacte pas

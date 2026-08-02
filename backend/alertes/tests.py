@@ -317,9 +317,10 @@ class DetectionAlerteAbonnementTest(TestCase):
 from django.urls import reverse
 from rest_framework.test import APITestCase
 from rest_framework import status as drf_status
+from core.tests_base import APIAuthTestCase
 
 
-class AlerteAPITest(APITestCase):
+class AlerteAPITest(APIAuthTestCase):
 
     def setUp(self):
         self.compte = Compte.objects.create(

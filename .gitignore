@@ -103,3 +103,6 @@ $RECYCLE.BIN/
 # CLAUDE CODE (paramètres utilisateur locaux, non partageables)
 # ============================================================
 .claude/settings.local.json
+
+# Clé publique de l'annuaire — propre à l'environnement, pas au dépôt.
+backend/annuaire_public.pem

@@ -162,9 +162,10 @@ class SignalBudgetTest(TestCase):
 from django.urls import reverse
 from rest_framework.test import APITestCase
 from rest_framework import status as drf_status
+from core.tests_base import APIAuthTestCase
 
 
-class BudgetAPITest(APITestCase):
+class BudgetAPITest(APIAuthTestCase):
 
     def setUp(self):
         self.categorie = Categorie.objects.create(
@@ -247,7 +248,7 @@ class BudgetAPITest(APITestCase):
         self.assertEqual(response.data["count"], 1)
 
 
-class BudgetMajeurAPITest(APITestCase):
+class BudgetMajeurAPITest(APIAuthTestCase):
     """Tests pour la logique des budgets de catégorie majeure (phase 11b-2)."""
 
     def setUp(self):
@@ -444,7 +445,7 @@ class BudgetMajeurConsommationTest(TestCase):
         self.assertEqual(budget_min.montant_consomme, Decimal("80.00"))
 
 
-class BudgetTemplateAPITest(APITestCase):
+class BudgetTemplateAPITest(APIAuthTestCase):
     """Tests CRUD pour les modèles de budget récurrents."""
 
     def setUp(self):
@@ -599,7 +600,7 @@ class ReconduireServiceTest(TestCase):
         )
 
 
-class ReconduireAPITest(APITestCase):
+class ReconduireAPITest(APIAuthTestCase):
     """Tests de l'endpoint POST /budget-templates/reconduire/."""
 
     def setUp(self):
@@ -635,7 +636,7 @@ class ReconduireAPITest(APITestCase):
         self.assertEqual(response.status_code, drf_status.HTTP_400_BAD_REQUEST)
 
 
-class SoftDeleteUniciteTest(APITestCase):
+class SoftDeleteUniciteTest(APIAuthTestCase):
     """
     Régression : la contrainte d'unicité ne doit porter que sur les lignes
     non soft-deletées. Supprimer un budget/template puis le recréer sur la
@@ -689,7 +690,7 @@ class SoftDeleteUniciteTest(APITestCase):
         self.assertEqual(recreate.status_code, drf_status.HTTP_201_CREATED)
 
 
-class CategoriesInclusesValidationTest(APITestCase):
+class CategoriesInclusesValidationTest(APIAuthTestCase):
     """Les categories_incluses doivent être des sous-catégories de la majeure."""
 
     def setUp(self):
@@ -794,7 +795,7 @@ class AlerteBudgetMajeurTest(TestCase):
         )
 
 
-class BudgetThematiqueAPITest(APITestCase):
+class BudgetThematiqueAPITest(APIAuthTestCase):
     """
     Budgets thématiques (phase 11b-3) : enveloppe regroupant des feuilles
     appartenant à des arbres différents (ex. Assurances = santé + habitation).
@@ -961,7 +962,7 @@ class BudgetThematiqueConsommationTest(TestCase):
         self.assertEqual(self.budget.montant_consomme, Decimal("160.00"))
 
 
-class BudgetTemplateThematiqueTest(APITestCase):
+class BudgetTemplateThematiqueTest(APIAuthTestCase):
     """Modèle thématique + reconduction vers un mois."""
 
     def setUp(self):
@@ -1169,7 +1170,7 @@ class PointsAllocationTest(TestCase):
             allouer(juin, 1, aujourd_hui=self.aujourd)
 
 
-class PointsAllocationAPITest(APITestCase):
+class PointsAllocationAPITest(APIAuthTestCase):
     """Endpoint POST /budgets/{id}/allouer/."""
 
     def test_allouer_endpoint(self):
@@ -1205,7 +1206,7 @@ class PointsAllocationAPITest(APITestCase):
         self.assertEqual(resp2.status_code, drf_status.HTTP_400_BAD_REQUEST)
 
 
-class PointsAPITest(APITestCase):
+class PointsAPITest(APIAuthTestCase):
     """L'endpoint /analytics/points/ répond avec la structure attendue."""
 
     def test_endpoint_points(self):

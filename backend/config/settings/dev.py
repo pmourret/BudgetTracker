@@ -9,14 +9,14 @@ CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:5173",
 ]
 
-# --- Authentification désactivée en dev (pas d'auth avant la phase 14) ---
-# On surcharge REST_FRAMEWORK hérité de base.py pour retirer
-# SessionAuthentication, qui impose la vérification CSRF sur les POST/PATCH/DELETE.
-REST_FRAMEWORK = {
-    **REST_FRAMEWORK,  # garde filtres + pagination de base.py
-    "DEFAULT_AUTHENTICATION_CLASSES": [],
-    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"],
-}
+# --- Authentification : plus aucune dérogation ici (durcissement, août 2026) ---
+# `base.py` ferme l'API par défaut (JWT + IsAuthenticated). Dev et prod sont
+# désormais **identiques sur ce point**, volontairement : la surcharge qui vivait
+# ici avait été recopiée telle quelle dans `prod.py`, et une API ouverte tournait
+# en production. Un réglage de sécurité qui diffère entre environnements finit
+# toujours par être testé dans le mauvais.
+#
+# Pour se connecter en dev : `python manage.py creer_utilisateur --email … `.
 
 # Logs SQL en dev — pratique pour vérifier les requêtes générées
 LOGGING = {

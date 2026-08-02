@@ -40,12 +40,11 @@ SECURE_SSL_REDIRECT = False
 # domaine, sans retour arrière possible côté navigateur.
 SECURE_HSTS_SECONDS = 0
 
-# --- Authentification désactivée (dette assumée — Alpha) ---
-# On reproduit le comportement de dev : pas d'auth, AllowAny. À réactiver
-# (JWT) en phase de durcissement. Sans cette surcharge, SessionAuthentication
-# imposerait la vérification CSRF sur les écritures côté API.
-REST_FRAMEWORK = {
-    **REST_FRAMEWORK,  # garde filtres + pagination de base.py
-    "DEFAULT_AUTHENTICATION_CLASSES": [],
-    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"],
-}
+# --- Authentification : dette soldée (durcissement, août 2026) ---
+# Cette surcharge reproduisait `AllowAny` **en production** : l'API entière était
+# ouverte en écriture à qui atteignait le domaine. Elle est retirée ; `base.py`
+# fait foi (JWT + IsAuthenticated), et prod ne déroge plus à rien.
+#
+# ⚠️ Ne pas réintroduire de surcharge `REST_FRAMEWORK` ici. Si un besoin d'accès
+# non authentifié apparaît (sonde, webhook), il se traite par une permission
+# explicite **sur la vue concernée**, jamais en rouvrant le défaut global.

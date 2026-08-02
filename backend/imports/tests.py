@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 from django.test import SimpleTestCase, TestCase
 
+from core.tests_base import APIAuthTestCase
 from imports.parsers import decoder_fichier, parser_boursobank
 from imports.parsers.boursobank import FormatInvalideError, _nettoyer_montant
 from imports.models import (
@@ -482,10 +483,9 @@ class RapprochementDBTest(TestCase):
 
 # --- API : upload multipart + rapport + validation --------------------------
 
-class ImportAPITest(TestCase):
+class ImportAPITest(APIAuthTestCase):
 
     def setUp(self):
-        from rest_framework.test import APIClient
         from referentiels.models import (
             TypeCompte, Titulaire, Etablissement, Devise, TypeFlux, StatutFlux,
         )
@@ -493,7 +493,6 @@ class ImportAPITest(TestCase):
         from categories.models import Categorie
         from flux.models import Flux
 
-        self.client = APIClient()
         self.devise = Devise.objects.create(
             code="EUR", libelle="Euro", symbole="€", est_defaut=True)
         self.type_flux = TypeFlux.objects.create(code="DEBIT", libelle="Débit")

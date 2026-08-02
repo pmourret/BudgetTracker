@@ -1,8 +1,10 @@
 import { Link } from 'react-router-dom'
-import { CreditCard, Repeat, TrendingUp, RefreshCw, Landmark, Tag, Settings, ChartColumn, FileUp, ChevronRight } from 'lucide-react'
+import { CreditCard, Repeat, TrendingUp, RefreshCw, Landmark, Tag, Settings, ChartColumn, FileUp, ChevronRight, LogOut } from 'lucide-react'
 import Card from '../components/ui/Card'
+import Button from '../components/ui/Button'
 import IconBadge from '../components/ui/IconBadge'
 import ThemeToggle from '../components/layout/ThemeToggle'
+import { useDeconnexion, useMoi } from '../hooks/useAuth'
 
 const liens = [
   { to: '/analyse',     label: 'Analyse',     desc: 'Où part l\'argent, quand et comment', Icon: ChartColumn },
@@ -17,6 +19,9 @@ const liens = [
 ]
 
 export default function PlusPage() {
+  const { data: moi } = useMoi()
+  const deconnecter = useDeconnexion()
+
   return (
     <div className="flex flex-col gap-4">
       <div>
@@ -51,6 +56,30 @@ export default function PlusPage() {
           <span className="text-sm text-content-2">Thème</span>
           <ThemeToggle variant="light" />
         </div>
+      </Card>
+
+      {/* En mobile, la sidebar n'existe pas : sans cette carte, la déconnexion
+          serait tout simplement inatteignable au téléphone. */}
+      <Card title="Compte">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-sm text-content-2 truncate">
+            {moi?.nom_affiche ?? '—'}
+          </span>
+          <Button variant="secondary" onClick={deconnecter}>
+            <span className="inline-flex items-center gap-1.5">
+              <LogOut size={16} /> Se déconnecter
+            </span>
+          </Button>
+        </div>
+        {/* BudgetTracker n'a pas d'écran de mot de passe, et n'en aura pas :
+            il ne détient plus le mot de passe. Le dire, plutôt que de laisser
+            chercher un réglage qui n'existe pas ici. */}
+        {moi?.identite_partagee && (
+          <p className="mt-3 border-t border-border-app pt-3 text-xs text-content-3">
+            Votre mot de passe est commun à toutes les applications du foyer. Il
+            se modifie depuis <strong>FoyerOS</strong>, écran « Mon compte ».
+          </p>
+        )}
       </Card>
     </div>
   )
