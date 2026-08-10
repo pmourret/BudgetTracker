@@ -146,13 +146,32 @@ REST_FRAMEWORK = {
 # Clé **publique** de l'annuaire. Fournie par **fichier** de préférence : un PEM
 # tient sur huit lignes, un `.env` ne porte pas de multiligne, et l'aplatir en
 # `\n` échappés rate silencieusement (vécu côté FoyerOS).
-_CHEMIN_CLE = config("IDENTITE_CLE_PUBLIQUE_FICHIER", default="")
-if _CHEMIN_CLE and Path(_CHEMIN_CLE).exists():
-    IDENTITE_CLE_PUBLIQUE = Path(_CHEMIN_CLE).read_text(encoding="utf-8")
-else:
-    IDENTITE_CLE_PUBLIQUE = config("IDENTITE_CLE_PUBLIQUE", default="").replace(
-        "\\n", "\n"
-    )
+def _lire_cle_publique():
+    """La clé publique de l'annuaire, ou `""` si elle est indisponible.
+
+    ⚠️ **Ne lève jamais.** Une clé absente ou illisible doit désactiver la
+    vérification des jetons de l'annuaire — pas empêcher BudgetTracker de
+    démarrer.
+
+    Vécu en production le 2026-08-10 : le compose monte la clé, mais le fichier
+    hôte n'existait pas encore. **Docker crée alors un répertoire** à sa place ;
+    `Path.exists()` répondait vrai, `read_text()` levait `IsADirectoryError`, et
+    l'application refusait de démarrer. Deux applications en production sont
+    tombées pour une clé qui n'était même pas encore nécessaire.
+
+    D'où `is_file()` et non `exists()`, et le filet autour de la lecture.
+    """
+    chemin = config("IDENTITE_CLE_PUBLIQUE_FICHIER", default="")
+    if chemin:
+        try:
+            if Path(chemin).is_file():
+                return Path(chemin).read_text(encoding="utf-8")
+        except OSError:
+            pass  # illisible, permissions, montage à moitié fait…
+    return config("IDENTITE_CLE_PUBLIQUE", default="").replace("\\n", "\n")
+
+
+IDENTITE_CLE_PUBLIQUE = _lire_cle_publique()
 
 # ⚠️ **De quel foyer cette instance est-elle celle ?** Une instance BudgetTracker
 # par foyer (décision de suite du 2026-08-01) : sans cet identifiant, impossible
