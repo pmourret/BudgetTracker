@@ -3,7 +3,7 @@ import { Eye, EyeOff, Wallet } from 'lucide-react'
 
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
-import { useConnexion } from '../hooks/useAuth'
+import { useConnexion, useContexteAuth } from '../hooks/useAuth'
 
 /**
  * Écran de connexion — la seule surface accessible sans jeton.
@@ -12,12 +12,23 @@ import { useConnexion } from '../hooks/useAuth'
  * serveur : BudgetTracker est l'application d'un foyer sur son propre homelab,
  * pas un service ouvert. Même parti que FoyerOS, où la création de compte est
  * réservée aux administrateurs et où l'accueil n'offre que la connexion.
+ *
+ * ⚠️ **L'écran s'adapte à qui authentifie** (`/auth/contexte/`). Sous autorité
+ * de l'annuaire, BudgetTracker ne connaît plus le mot de passe : il ne peut ni
+ * le vérifier, ni le changer, ni le réinitialiser. Continuer à demander un
+ * « identifiant » enverrait chercher au mauvais endroit — c'est la dette que
+ * cet écran soldait le moins bien.
  */
 export default function ConnexionPage() {
   const [identifiant, setIdentifiant] = useState('')
   const [motDePasse, setMotDePasse] = useState('')
   const [visible, setVisible] = useState(false)
   const connexion = useConnexion()
+
+  // Défaut prudent : sans réponse, on garde la formulation neutre, qui reste
+  // vraie dans les deux modes. Un libellé absent ne bloque jamais l'accès.
+  const contexte = useContexteAuth()
+  const sousAutorite = contexte.data?.autorite_externe === true
 
   const soumettre = (e) => {
     e.preventDefault()
@@ -33,7 +44,9 @@ export default function ConnexionPage() {
   const detail = connexion.error?.response?.data?.detail
   const message =
     statut === 401
-      ? 'Identifiant ou mot de passe incorrect.'
+      ? sousAutorite
+        ? 'Email ou mot de passe incorrect.'
+        : 'Identifiant ou mot de passe incorrect.'
       : statut === 403
         ? detail || "Ce compte n'a pas accès à cette instance."
         : connexion.isError
@@ -56,11 +69,14 @@ export default function ConnexionPage() {
           </div>
         </div>
 
-        {/* Les deux marchent (`ConnexionSerializer`). Le dire évite d'avoir à
-            se souvenir lequel a été choisi à la création du compte — c'est
-            exactement ce qui a bloqué la première mise en service. */}
+        {/* Hors autorité, les deux marchent (`ConnexionSerializer`) et le dire
+            évite d'avoir à se souvenir lequel a été choisi à la création — ce
+            qui a bloqué la première mise en service. Sous autorité, seul
+            l'email a cours : l'annuaire ne connaît que lui, proposer encore un
+            « identifiant » ferait essayer une saisie condamnée d'avance. */}
         <Input
-          label="Email ou identifiant"
+          label={sousAutorite ? 'Email' : 'Email ou identifiant'}
+          type={sousAutorite ? 'email' : 'text'}
           value={identifiant}
           onChange={setIdentifiant}
           autoComplete="username"
@@ -103,6 +119,19 @@ export default function ConnexionPage() {
         >
           {connexion.isPending ? 'Connexion…' : 'Se connecter'}
         </Button>
+
+        {/* La seule information vraiment actionnable de cet écran : il n'y a
+            **rien** ici pour changer ou récupérer un mot de passe, et il n'y en
+            aura pas. Le taire laisse chercher un lien « mot de passe oublié »
+            qui ne peut pas exister. Les écrans de compte vivent dans FoyerOS
+            (le service d'identité n'a volontairement pas de front). */}
+        {sousAutorite && (
+          <p className="text-xs text-content-3 text-center border-t border-border-app pt-4 -mt-1">
+            Compte de famille commun aux applications du foyer.
+            <br />
+            Le mot de passe se gère dans FoyerOS, pas ici.
+          </p>
+        )}
       </form>
     </div>
   )

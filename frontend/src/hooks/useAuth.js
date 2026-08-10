@@ -27,6 +27,27 @@ export function useMoi() {
 }
 
 /**
+ * Qui authentifie cette instance — donc **où se gère le mot de passe**.
+ *
+ * Lu avant toute connexion, par `axios` nu : il n'y a pas encore de jeton, et
+ * l'intercepteur d'`apiClient` n'a rien à faire sur une route anonyme.
+ *
+ * ⚠️ **Ne jamais faire dépendre la connexion de cette réponse.** Elle n'ajuste
+ * qu'un libellé : `retry: false`, et l'écran retombe sur sa formulation neutre
+ * si l'appel échoue. Bloquer le formulaire parce qu'un texte d'aide n'est pas
+ * arrivé transformerait un détail de confort en panne d'accès.
+ */
+export function useContexteAuth() {
+  return useQuery({
+    queryKey: ['auth', 'contexte'],
+    queryFn: async () => (await axios.get('/api/v1/auth/contexte/')).data,
+    // Un réglage de déploiement : il ne bouge pas en cours de session.
+    staleTime: Infinity,
+    retry: false,
+  })
+}
+
+/**
  * Connexion. **Passe par `axios` nu, pas par `apiClient`.**
  *
  * L'intercepteur d'`apiClient` interprète les 401 comme « jeton expiré » et

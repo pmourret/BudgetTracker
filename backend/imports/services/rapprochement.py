@@ -405,19 +405,29 @@ def controle_solde(import_lot):
 
     Renvoie None si aucune ligne du relevé ne porte de solde bancaire.
     """
-    from django.db.models import Sum
-    from flux.models import Flux
-
     ligne = (
         import_lot.lignes
         .exclude(solde_apres=None)
         .order_by("-date_operation", "-created_at")
         .first()
     )
+    return _comparer_au_releve(import_lot.compte, ligne)
+
+
+def _comparer_au_releve(compte, ligne):
+    """Cœur du contrôle : le solde actuel du compte face à un point de relevé.
+
+    Extrait de `controle_solde` quand le contrôle a dû être exposé **hors de la
+    page d'import** (`dernier_controle_pour_compte`). Les deux appelants
+    diffèrent par la ligne de référence qu'ils choisissent, pas par le calcul —
+    le dupliquer aurait laissé deux réponses possibles à la même question.
+    """
+    from django.db.models import Sum
+    from flux.models import Flux
+
     if ligne is None:
         return None
 
-    compte = import_lot.compte
     total_definitifs = (
         Flux.objects
         .filter(compte=compte, statut__est_definitif=True)
@@ -434,6 +444,55 @@ def controle_solde(import_lot):
         # Comparaison exacte au centime : concordance = fait arithmétique,
         # pas un seuil arbitraire (règle 1). Pas de tolérance codée en dur.
         "coherent": ecart == Decimal("0.00"),
+    }
+
+
+def dernier_controle_pour_compte(compte, aujourd_hui=None):
+    """Le contrôle de solde d'un compte, **sans passer par un lot d'import**.
+
+    Ajouté en août 2026 : le contrôle n'existait que dans la page d'import,
+    c'est-à-dire visible seulement le jour où l'on charge un relevé. Or c'est
+    la question qu'on se pose devant un compte — « mon solde est-il juste ? » —
+    pas devant un fichier.
+
+    ⚠️ **La référence est le point de relevé le plus récent du compte, tous
+    lots confondus**, et non « le dernier lot importé ». Importer un vieux
+    relevé après un récent est banal (rattrapage d'un mois oublié) ; ancrer le
+    contrôle sur le dernier import ferait alors *reculer* la référence et
+    afficherait un faux écart, en donnant toutes les apparences d'un problème
+    nouveau.
+
+    ⚠️ **`anciennete_jours` fait partie de la réponse, pas de la décoration.**
+    Le contrôle compare au solde ACTUEL (voir `controle_solde`) : sur un relevé
+    ancien, un écart ne signale rien d'autre que les mouvements survenus
+    depuis. Sans l'âge affiché, le widget crierait à l'erreur chaque fois qu'on
+    n'a pas importé de relevé depuis deux semaines. **Aucun seuil ici** (règle
+    1) : on donne le nombre de jours, la lecture reste humaine.
+
+    Renvoie None si ce compte n'a aucun relevé portant un solde bancaire.
+    """
+    from datetime import date
+
+    from imports.models import LigneBancaire
+
+    ligne = (
+        LigneBancaire.objects
+        .filter(import_lot__compte=compte)
+        .exclude(solde_apres=None)
+        .order_by("-date_operation", "-created_at")
+        .select_related("import_lot")
+        .first()
+    )
+    controle = _comparer_au_releve(compte, ligne)
+    if controle is None:
+        return None
+
+    # Jour injecté (règle de suite : dépendance temporelle testable).
+    reference = aujourd_hui or date.today()
+    return {
+        **controle,
+        "anciennete_jours": (reference - ligne.date_operation).days,
+        "import_id": str(ligne.import_lot_id),
     }
 
 

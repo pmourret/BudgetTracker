@@ -364,6 +364,14 @@ export const DEFINITIONS = {
       "Solde app = solde initial + Σ (tous les flux définitifs du compte) = solde confirmé. Écart = solde app − dernier solde du relevé (comparé au centime).",
   },
 
+  controle_solde_compte: {
+    titre: 'Confrontation au relevé',
+    texte:
+      "Le même contrôle que dans la page Rapprochement, mais rendu ici : la question « mon solde est-il juste ? » se pose devant un compte, pas devant un fichier. La référence est le point de relevé le plus récent connu pour ce compte, tous imports confondus — importer un vieux relevé après un récent ne fait donc pas reculer le contrôle. L'ancienneté est affichée parce qu'elle change la lecture : sur un relevé qui date, un écart ne signale rien d'autre que les mouvements survenus depuis.",
+    formule:
+      "Solde app = solde initial + Σ (tous les flux définitifs du compte). Écart = solde app − solde du dernier point de relevé (comparé au centime, sans tolérance).",
+  },
+
   // ---- Paramètres du foyer ----
   mois_comptable: {
     titre: 'Mois comptable',

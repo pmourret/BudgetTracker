@@ -175,6 +175,34 @@ class RafraichissementView(APIView):
         )
 
 
+class ContexteView(APIView):
+    """`GET /api/v1/auth/contexte/` — **qui signe ici**, avant toute connexion.
+
+    Ajoutée en août 2026 pour solder une dette d'interface : l'écran de
+    connexion parlait d'« identifiant » et laissait croire que le mot de passe
+    se changeait dans BudgetTracker, alors que sous `IDENTITE_AUTORITE` c'est
+    l'annuaire qui l'authentifie — on ne peut ni le changer ni le récupérer
+    ici. Un écran qui se trompe de porte envoie chercher au mauvais endroit.
+
+    ⚠️ **Le front ne peut pas déduire ce fait tout seul** : c'est un réglage
+    serveur, et le déduire d'une variable de build recréerait la même vérité à
+    deux endroits — un front en désaccord avec son back mentirait sans que rien
+    ne le signale.
+
+    Anonyme par construction : elle est lue **avant** d'avoir un jeton. Elle
+    n'expose que le booléen — ni `IDENTITE_URL`, ni `IDENTITE_FOYER`. Le
+    navigateur ne parle jamais à l'annuaire (c'est tout l'intérêt du relais),
+    il n'a donc aucun usage de son adresse, et la publier à un appelant anonyme
+    dessinerait la topologie interne pour rien.
+    """
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request):
+        return Response({"autorite_externe": bool(settings.IDENTITE_AUTORITE)})
+
+
 class MoiView(APIView):
     """`GET /api/v1/auth/me/` — qui porte ce jeton.
 

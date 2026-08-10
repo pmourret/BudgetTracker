@@ -8,7 +8,7 @@ propriété « une requête anonyme est refusée » est réellement vérifiée.
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.core.management.base import CommandError
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -126,6 +126,43 @@ class MoiTest(APIAuthTestCase):
         self.assertNotIn("is_staff", reponse.data)
         self.assertNotIn("is_superuser", reponse.data)
         self.assertNotIn("password", reponse.data)
+
+
+class ContexteTest(APITestCase):
+    """`/auth/contexte/` — l'écran de connexion doit savoir qui authentifie.
+
+    Sinon il continue de demander un « identifiant » et laisse croire que le
+    mot de passe se gère ici, alors que sous autorité de l'annuaire il ne peut
+    ni être changé ni être réinitialisé dans BudgetTracker.
+    """
+
+    def test_lisible_sans_jeton(self):
+        """Elle est lue **avant** la connexion : l'exiger authentifiée la rendrait
+        inutilisable au seul moment où elle sert."""
+        reponse = self.client.get("/api/v1/auth/contexte/")
+        self.assertEqual(reponse.status_code, status.HTTP_200_OK)
+        self.assertIn("autorite_externe", reponse.data)
+
+    @override_settings(IDENTITE_AUTORITE=True)
+    def test_signale_l_autorite_externe(self):
+        reponse = self.client.get("/api/v1/auth/contexte/")
+        self.assertIs(reponse.data["autorite_externe"], True)
+
+    @override_settings(IDENTITE_AUTORITE=False)
+    def test_signale_la_signature_locale(self):
+        reponse = self.client.get("/api/v1/auth/contexte/")
+        self.assertIs(reponse.data["autorite_externe"], False)
+
+    @override_settings(IDENTITE_AUTORITE=True, IDENTITE_URL="http://interne:8003")
+    def test_ne_divulgue_rien_d_autre(self):
+        """Anonyme : elle dit quelle porte signe, jamais où elle est.
+
+        Le navigateur ne parle jamais à l'annuaire (c'est l'intérêt du relais),
+        il n'a donc aucun usage de son adresse — la publier dessinerait la
+        topologie interne à un appelant non authentifié, pour rien.
+        """
+        reponse = self.client.get("/api/v1/auth/contexte/")
+        self.assertEqual(set(reponse.data), {"autorite_externe"})
 
 
 class CreerUtilisateurCommandeTest(APITestCase):

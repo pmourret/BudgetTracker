@@ -28,6 +28,31 @@ export function useRapport(lotId) {
   })
 }
 
+/**
+ * Le contrôle de solde d'un **compte**, hors de la page d'import.
+ *
+ * ⚠️ **`204` = « ce compte n'a jamais été rapproché »**, et se traduit par
+ * `null`, pas par une erreur : axios rend alors `data === ''`, qui passerait
+ * pour un objet vide et ferait afficher un widget rempli de « — ». Le compte
+ * jamais rapproché n'affiche simplement rien.
+ *
+ * Clé sous le préfixe `['imports']` : importer un relevé, supprimer un lot ou
+ * créer un flux depuis une ligne invalide déjà ce préfixe — le widget suit
+ * sans qu'aucune de ces mutations ait à le connaître.
+ */
+export function useControleSoldeCompte(compteId) {
+  return useQuery({
+    queryKey: ['imports', 'controle-compte', compteId],
+    queryFn: async () => {
+      const reponse = await apiClient.get('/imports/controle-compte/', {
+        params: { compte: compteId },
+      })
+      return reponse.status === 204 ? null : reponse.data
+    },
+    enabled: !!compteId,
+  })
+}
+
 export function useUploadImport() {
   const queryClient = useQueryClient()
   return useMutation({

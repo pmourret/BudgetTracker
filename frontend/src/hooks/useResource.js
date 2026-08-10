@@ -6,18 +6,26 @@ import {
 } from '@tanstack/react-query'
 import apiClient from '../api/client'
 
+// ⚠️ `imports` figure dans les dépendances de tout ce qui change un solde.
+// Le contrôle de solde par compte (`useControleSoldeCompte`, clé
+// `['imports', 'controle-compte', …]`) compare l'application au relevé
+// bancaire : il devient faux dès qu'un flux bouge. Or son bandeau cohabite
+// avec le panneau de flux sur `/comptes/:id` — sans cette dépendance, éditer
+// un flux laissait le bandeau annoncer « solde concordant » jusqu'à cinq
+// minutes après avoir créé l'écart (`staleTime` global).
 const RESOURCE_DEPENDENCIES = {
   // Un flux met à jour derniere_occurrence de son abonnement (statut du
   // tableau abonnements) et peut créer une alerte de divergence.
-  flux:               ['comptes', 'budgets', 'alertes', 'analytics', 'abonnements'],
-  transferts:         ['comptes', 'flux', 'analytics'],
+  flux:               ['comptes', 'budgets', 'alertes', 'analytics', 'abonnements', 'imports'],
+  transferts:         ['comptes', 'flux', 'analytics', 'imports'],
   budgets:            ['analytics'],
   'budget-templates': ['budgets', 'analytics'],
   // Les abonnements ne nourrissent plus le prévisionnel (référentiel pur),
   // mais alimentent l'analyse dédiée (/analytics/abonnements/) → 'analytics'.
   // L'action verifier-echeances crée des alertes « en retard ».
   abonnements:        ['alertes', 'analytics'],
-  comptes:            ['flux', 'analytics'],
+  // `solde_initial` entre dans le solde applicatif comparé au relevé.
+  comptes:            ['flux', 'analytics', 'imports'],
   patrimoine:         ['analytics'],
   alertes:            ['analytics'],
   categories:         ['flux', 'budgets', 'abonnements', 'budget-templates'],

@@ -13,8 +13,9 @@ from imports.models import (
 )
 from imports.services.rapprochement import (
     CreationFluxInvalide, ValidationInvalide, apparier, candidats_pour,
-    controle_solde, creer_flux_depuis_ligne, executer_rapprochement,
-    filtrer_doublons, flux_ids_deja_pointes, rejeter_ligne, valider_ligne,
+    controle_solde, creer_flux_depuis_ligne, dernier_controle_pour_compte,
+    executer_rapprochement, filtrer_doublons, flux_ids_deja_pointes,
+    rejeter_ligne, valider_ligne,
 )
 
 # --- Fixture : extrait réel de l'export BoursoBank fourni par le foyer -------
@@ -480,6 +481,79 @@ class RapprochementDBTest(TestCase):
         self.assertEqual(ctrl["solde_app"], Decimal("-10.00"))
         self.assertTrue(ctrl["coherent"])
 
+    # --- Contrôle par compte (hors page d'import) ---------------------------
+
+    def test_dernier_controle_none_sans_releve(self):
+        """Un compte jamais rapproché n'est pas une erreur : il n'a rien à dire."""
+        self.assertIsNone(dernier_controle_pour_compte(self.compte))
+
+    def test_dernier_controle_prend_le_point_le_plus_recent_tous_lots(self):
+        """⚠️ Le cas qui motive la fonction : un vieux relevé importé APRÈS un récent.
+
+        Ancrer le contrôle sur le dernier *lot* ferait reculer la référence et
+        afficherait un écart là où il n'y en a pas. La référence est le point
+        de relevé le plus récent, quel que soit l'ordre des imports.
+        """
+        self.compte.solde_initial = Decimal("0.00")
+        self.compte.save(update_fields=["solde_initial"])
+        self._flux("-56.15", 17)
+
+        recent = self._lot()
+        self._ligne_db(recent, "-56.15", 17, "a", solde="-56.15")
+        # Rattrapage d'un mois oublié, importé ensuite : plus vieux en date.
+        ancien = self._lot()
+        self._ligne_db(ancien, "-10.00", 3, "b", solde="-999.00")
+
+        ctrl = dernier_controle_pour_compte(self.compte)
+        self.assertEqual(ctrl["date_reference"], date(2026, 7, 17))
+        self.assertEqual(ctrl["solde_banque"], Decimal("-56.15"))
+        self.assertTrue(ctrl["coherent"])
+        self.assertEqual(ctrl["import_id"], str(recent.id))
+
+    def test_dernier_controle_anciennete_jour_injecte(self):
+        """L'âge est calculé sur un jour injecté — sinon le test périme."""
+        lot = self._lot()
+        self._ligne_db(lot, "-10.00", 17, "a", solde="-10.00")
+
+        ctrl = dernier_controle_pour_compte(
+            self.compte, aujourd_hui=date(2026, 7, 27)
+        )
+        self.assertEqual(ctrl["anciennete_jours"], 10)
+
+    def test_dernier_controle_ignore_un_lot_supprime(self):
+        """Le soft delete d'un lot cascade sur ses lignes : elles sortent du calcul.
+
+        Sans quoi supprimer un relevé erroné laisserait sa référence piloter le
+        widget pour toujours.
+        """
+        self.compte.solde_initial = Decimal("0.00")
+        self.compte.save(update_fields=["solde_initial"])
+        vivant = self._lot()
+        self._ligne_db(vivant, "-10.00", 3, "a", solde="-10.00")
+        efface = self._lot()
+        self._ligne_db(efface, "-10.00", 17, "b", solde="-999.00")
+        efface.delete()
+
+        ctrl = dernier_controle_pour_compte(self.compte)
+        self.assertEqual(ctrl["date_reference"], date(2026, 7, 3))
+        self.assertEqual(ctrl["solde_banque"], Decimal("-10.00"))
+
+    def test_dernier_controle_ignore_les_autres_comptes(self):
+        """Le relevé d'un compte ne contrôle jamais le solde d'un autre."""
+        from comptes.models import Compte
+
+        autre = Compte.objects.create(
+            nom="Autre", code="00099999999",
+            type_compte=self.compte.type_compte,
+            titulaire=self.compte.titulaire,
+            etablissement=self.compte.etablissement,
+            devise=self.devise, solde_initial=Decimal("0.00"),
+        )
+        lot = self._lot()          # rattaché à self.compte
+        self._ligne_db(lot, "-10.00", 17, "a", solde="-10.00")
+
+        self.assertIsNone(dernier_controle_pour_compte(autre))
+
 
 # --- API : upload multipart + rapport + validation --------------------------
 
@@ -644,3 +718,42 @@ class ImportAPITest(APIAuthTestCase):
             {"flux_id": flux_choisi}, format="json")
         self.assertEqual(resp.status_code, 200, resp.data)
         self.assertEqual(resp.data["statut"], "rapproche")
+
+    # --- Contrôle de solde exposé hors import -------------------------------
+
+    def _controle(self, compte_id):
+        return self.client.get(
+            f"/api/v1/imports/controle-compte/?compte={compte_id}")
+
+    def test_controle_compte_apres_import(self):
+        self._upload()
+        resp = self._controle(self.compte.id)
+        self.assertEqual(resp.status_code, 200, resp.data)
+        # Montants en chaîne, comme partout ailleurs dans l'API.
+        self.assertEqual(resp.data["solde_banque"], "11.35")
+        self.assertIn("anciennete_jours", resp.data)
+        self.assertIn("import_id", resp.data)
+
+    def test_controle_compte_204_si_jamais_rapproche(self):
+        """Pas de relevé n'est pas une erreur : le widget ne s'affiche pas, c'est tout."""
+        resp = self._controle(self.compte.id)
+        self.assertEqual(resp.status_code, 204)
+
+    def test_controle_compte_sans_parametre_400(self):
+        resp = self.client.get("/api/v1/imports/controle-compte/")
+        self.assertEqual(resp.status_code, 400)
+
+    def test_controle_compte_inconnu_404(self):
+        import uuid
+        self.assertEqual(self._controle(uuid.uuid4()).status_code, 404)
+
+    def test_controle_compte_uuid_malforme_404_pas_500(self):
+        """Une URL bricolée à la main répond « inconnu », pas « le serveur a planté »."""
+        self.assertEqual(self._controle("pas-un-uuid").status_code, 404)
+
+    def test_controle_compte_refuse_anonyme(self):
+        """C'est un solde : la route ne s'ouvre pas parce qu'elle est en lecture."""
+        from rest_framework.test import APIClient
+        anonyme = APIClient()
+        resp = anonyme.get(f"/api/v1/imports/controle-compte/?compte={self.compte.id}")
+        self.assertEqual(resp.status_code, 401)

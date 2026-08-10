@@ -306,10 +306,90 @@ n'explique rien.
   oublier laissait des tests passer **pour de mauvaises raisons**, ou échouer
   selon le `.env` de la machine.
 
-**Reste** : le front de BudgetTracker ne dit pas encore que le mot de passe se
-gère dans l'annuaire, et l'écran de connexion parle toujours d'« identifiant ».
+~~**Reste** : le front de BudgetTracker ne dit pas encore que le mot de passe se
+gère dans l'annuaire, et l'écran de connexion parle toujours d'« identifiant ».~~
+**Soldé le 2026-08-10** (passe de dettes, §5 ci-dessous).
 Secours si l'annuaire est éteint : **admin Django** (session et mot de passe
 locaux) — ne pas supprimer les comptes `pierre` / `pmourret_adm`.
+
+### 🧹 Passe de dettes techniques — 2026-08-10
+
+Décidée avant d'enchaîner sur la feuille de route : quatre dettes nommées au
+fil des chantiers précédents, traitées ensemble. **493 tests** (+15).
+
+**1. `SECRET_KEY` de production** — la clé ne peut pas être posée depuis le
+dépôt (`.env.prod` vit sur le homelab, gitignoré), et **elle ne doit pas
+l'être** : un secret qui transite par un canal de travail n'en est plus un. Ce
+qui a été fait à la place, c'est de rendre l'oubli impossible et la marche à
+suivre exacte.
+- Garantie **vérifiée en réel** : `DJANGO_DEBUG=False` + clé de 11 octets →
+  `SystemCheckError: (core.E002)`, le conteneur refuse de servir. La dette ne
+  peut donc pas partir en production silencieusement — au pire elle empêche le
+  démarrage, ce qui est le bon échec.
+- ⚠️ **`DEPLOY.md` affirmait encore, à deux endroits, que l'auth était
+  désactivée** (« dette assumée pour cette Alpha »). C'était faux depuis le
+  durcissement, et bien plus coûteux que la clé : un déploiement mené d'après
+  ce document montait une pile **dans laquelle personne ne pouvait entrer**,
+  faute d'avoir créé un compte. Corrigé, et la séquence gagne les étapes qui
+  manquaient : génération de la clé **sur le serveur**, `creer_utilisateur`
+  (étape 5, sans laquelle l'app se verrouille dehors), réglages d'identité,
+  et un `curl` de contrôle qui doit répondre **401**.
+
+**2. Parcours de connexion jamais cliqué en navigateur** — **reste ouverte**,
+voir l'encadré ℹ️ de l'étape 2 ci-dessus. Le contrat HTTP est vérifié, la suite
+passe, le front compile ; personne n'a encore cliqué. Ni Playwright ni Vitest
+dans ce dépôt : en ajouter un est un **écart à la stack commune** (suite §8) qui
+engagerait aussi FoyerOS, donc une décision de suite et non un détail de dette.
+
+**3. L'écran de connexion mentait sur qui authentifie** — ✅ soldée.
+- **`GET /api/v1/auth/contexte/`** (`accounts/views.py::ContexteView`, anonyme)
+  → `{"autorite_externe": bool}`. ⚠️ **Le front ne peut pas déduire ce fait** :
+  c'est un réglage serveur. Le déduire d'une variable de build (`VITE_…`)
+  aurait écrit la même vérité à deux endroits — un front en désaccord avec son
+  back **mentirait sans que rien ne le signale**.
+- ⚠️ **N'expose que le booléen** — ni `IDENTITE_URL`, ni `IDENTITE_FOYER`. Le
+  navigateur ne parle jamais à l'annuaire (c'est l'intérêt du relais) : publier
+  son adresse à un appelant anonyme dessinerait la topologie interne pour rien.
+  Test de régression sur l'exhaustivité des clés.
+- Front : `useContexteAuth` + `ConnexionPage`. Sous autorité → champ **« Email »**
+  (`type=email`), 401 dit « Email ou mot de passe incorrect », et un pied de
+  formulaire indique que **le mot de passe se gère dans FoyerOS**. Le taire
+  laissait chercher un lien « mot de passe oublié » qui ne peut pas exister.
+- ⚠️ **`retry: false` et repli silencieux** : sans réponse, l'écran garde sa
+  formulation neutre, vraie dans les deux modes. Faire dépendre le formulaire
+  d'un appel qui n'ajuste qu'un libellé transformerait un confort en panne
+  d'accès.
+
+**4. Contrôle de solde invisible hors page d'import** — ✅ soldée.
+- Service **`dernier_controle_pour_compte(compte, aujourd_hui=None)`**
+  (`imports/services/rapprochement.py`). Le cœur du calcul est extrait en
+  `_comparer_au_releve(compte, ligne)`, partagé avec `controle_solde(lot)` : les
+  deux appelants ne diffèrent que par la ligne de référence choisie, dupliquer
+  le calcul aurait laissé deux réponses possibles à la même question.
+- ⚠️ **La référence est le point de relevé le plus récent du compte, tous lots
+  confondus** — surtout pas « le dernier lot importé ». Importer un vieux relevé
+  après un récent est banal (rattrapage d'un mois oublié) ; ancrer sur le
+  dernier import ferait **reculer** la référence et afficherait un faux écart
+  avec toutes les apparences d'un problème nouveau. Test dédié.
+- ⚠️ **`anciennete_jours` fait partie de la réponse.** Le contrôle compare au
+  solde **actuel** : sur un relevé qui date, un écart ne signale que les
+  mouvements survenus depuis. Sans l'âge, le widget crierait à l'erreur dès
+  qu'on n'a pas importé depuis deux semaines. **Aucun seuil** (règle 1) : le
+  nombre de jours est donné, la couleur ne dépend que de la concordance —
+  teinter au-delà de N jours reviendrait à décider à la place du foyer.
+- Endpoint **`GET /api/v1/imports/controle-compte/?compte=<uuid>`**.
+  ⚠️ **Il vit dans `imports`, pas dans `comptes`** : le porter par
+  `CompteViewSet` obligerait `comptes` à importer `imports` alors que la
+  dépendance va déjà dans l'autre sens — un aller-retour entre deux apps ne se
+  défait plus. **`204`** si le compte n'a jamais été rapproché (état normal, pas
+  une erreur) ; UUID malformé → **404**, pas 500.
+- Front : `useControleSoldeCompte` (⚠️ `204` → `null` explicitement : axios rend
+  `data === ''`, qui passerait pour un objet vide et afficherait un widget de
+  tirets) + `components/comptes/ControleSoldeCompte.jsx`, placé **sous les trois
+  cartes de solde** de `CompteDetailPage` — il les qualifie. Clé sous le préfixe
+  `['imports']`, donc déjà invalidé par l'upload, la suppression de lot et la
+  création de flux depuis une ligne.
+- **+11 tests** `imports` (5 service, 6 API), **+4** `accounts`.
 
 ### ✅ Backend — Phases 1 à 8 COMPLÈTES
 
@@ -429,7 +509,11 @@ Exploration complète backend + frontend, corrections de cohérence, **19 tests 
 
 > **Scénario retenu : A (pragmatique).** Stabiliser l'app (CRUD + hiérarchie catégories + budgets répétables) AVANT le prévisionnel. Les budgets dynamiques sont repoussés en phase 12 (nécessitent un cadrage métier dédié).
 >
-> **État au dernier point :** phases 11a, 11b, 11c **terminées**. Prochaine étape = **Phase 10-A** (prévisionnel, socle lecture seule), dont la **spec détaillée est désormais cadrée** ci-dessous (session de réflexion du projet). Les budgets dynamiques (phase 12) restent **gelés** jusqu'à ce que l'usage réel du prévisionnel 10-A en nourrisse la spec — on n'automatise bien que ce qu'on a d'abord fait à la main et compris.
+> **État au 2026-08-10 :** phases 11a, 11b, 11c, 11b-3, **10-A**, 13 (+ ses trois incréments), **14-A** et **14-B** terminées ; durcissement de l'auth et vérification des jetons de l'annuaire livrés ; **passe de dettes techniques** faite (§5, 3 des 4 dettes soldées).
+>
+> **Prochaine étape = l'étape 3 de l'interop courses** (`RegleIngestion` + `POST /integrations/depenses/`), et elle est **bloquée par une décision de suite** : depuis que l'annuaire fait autorité, FoyerOS n'a plus aucun moyen de s'authentifier ici (un compte local n'obtient plus de jeton, et `accounts/annuaire.py` refuse tout jeton portant `service: true`). Trois issues sont cadrées dans `FoyerOS/docs/interop-budgettracker.md` ; **trancher avant de coder**.
+>
+> Ensuite : **10-B** (scénarios + fourchettes), puis le prévisionnel à taux d'épargne. Les budgets dynamiques (phase 12) restent **gelés** jusqu'à ce que l'usage réel du prévisionnel 10-A en nourrisse la spec — on n'automatise bien que ce qu'on a d'abord fait à la main et compris.
 
 ### ✅ Phase 11a — CRUD complets — TERMINÉE
 
@@ -617,7 +701,7 @@ Module de **rapprochement** (réconciliation), pas d'import brut : confronter un
 
 **✅ 14-B livrée** (juillet 2026) : **création du flux manquant en 1 clic** depuis une ligne `manquant_app` + **pointage durable / anti-re-match**. C'est la **seule** écriture de flux du module. Service `rapprochement.py::creer_flux_depuis_ligne(ligne, categorie, libelle=None, statut=None)` (atomique : crée le flux — type_flux dérivé du signe, statut définitif par défaut, `reference_externe` = trace bancaire lisible — puis rattache la ligne → `rapproché` ; `CreationFluxInvalide` si déjà rapprochée). Endpoint `POST /imports-lignes/{id}/creer-flux/` (body `{categorie, libelle?}` → 201 `{ligne, flux}`). **Pointage / anti-re-match** : la détection « pointé » s'appuie sur le **lien de rapprochement** (`LigneBancaire.flux` rapproché, lot vivant), pas sur `reference_externe` (plus robuste ; `reference_externe` reste une trace lisible posée à la création). Helper `flux_ids_deja_pointes(compte, sauf_lot=None)` : les flux déjà pointés par un AUTRE lot sont **exclus du vivier** (`_flux_du_compte`, `candidats_pour`, `flux_orphelins`) → un relevé qui se chevauche ne re-propose pas un flux déjà rapproché. `FluxViewSet` annote `est_pointe` (`Exists` d'une ligne rapprochée) exposé par `FluxSerializer` → badge « Pointé » (teal) sur la page Flux. Front : `CreerFluxModal` (catégorie requise, libellé éditable, montant/date figés, **avertissement si libellé ~ « VIR »** = virement probable → renvoi vers Transferts), bouton « Créer » sur les lignes `manquant_app`, hook `useCreerFluxDepuisLigne` (invalide imports/flux/comptes/budgets/alertes/analytics). **+5 tests** (415 OK).
 
-**Reste ouvert** : exposer le `controle_solde` par compte hors import (widget) ; import Excel (migration `SUIVI_BUDGET.xlsx`).
+**Reste ouvert** : ~~exposer le `controle_solde` par compte hors import (widget)~~ **livré le 2026-08-10** (passe de dettes, §5 — service `dernier_controle_pour_compte`, route `/imports/controle-compte/`, widget sur `CompteDetailPage`) ; import Excel (migration `SUIVI_BUDGET.xlsx`).
 
 ### ⏳ Phases ultérieures (non détaillées)
 

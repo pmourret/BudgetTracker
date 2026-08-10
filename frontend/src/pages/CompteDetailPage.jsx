@@ -11,6 +11,7 @@ import { Loading, ErrorState } from '../components/ui/States'
 import BarChart from '../components/charts/BarChart'
 import DepensesCategories, { CAT_PALETTE } from '../components/charts/DepensesCategories'
 import FluxSearchPanel from '../components/flux/FluxSearchPanel'
+import ControleSoldeCompte from '../components/comptes/ControleSoldeCompte'
 
 function useCompteDashboard(id) {
   return useQuery({
@@ -78,6 +79,11 @@ export default function CompteDetailPage() {
               defAlign="right"
             />
           </div>
+
+          {/* Confrontation au dernier relevé — juste sous les soldes, parce
+              qu'elle qualifie ceux-ci. Silencieuse si le compte n'a jamais été
+              rapproché. */}
+          <ControleSoldeCompte compteId={id} />
 
           {/* Dépenses / revenus du mois */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">

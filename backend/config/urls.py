@@ -19,6 +19,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from accounts.views import (
     ConnexionView,
+    ContexteView,
     DeconnexionView,
     MoiView,
     RafraichissementView,
@@ -90,6 +91,9 @@ urlpatterns = [
         name="deconnexion",
     ),
     path("api/v1/auth/me/", MoiView.as_view(), name="moi"),
+    # Lue **avant** d'avoir un jeton : elle dit à l'écran de connexion qui
+    # authentifie, donc où se gère le mot de passe.
+    path("api/v1/auth/contexte/", ContexteView.as_view(), name="contexte"),
     path("api/v1/analytics/dashboard/", DashboardView.as_view(), name="dashboard"),
     path("api/v1/analytics/compte/<uuid:compte_id>/", CompteDashboardView.as_view(), name="compte-dashboard"),
     path("api/v1/analytics/previsionnel/", PrevisionnelView.as_view(), name="previsionnel"),
