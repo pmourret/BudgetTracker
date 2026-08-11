@@ -115,7 +115,7 @@ depuis que l'annuaire fait autorité, FoyerOS n'a plus aucun moyen de
 s'authentifier ici — un compte local n'obtient plus de jeton, et
 `accounts/annuaire.py` refuse tout jeton portant `service: true`.
 
-Trois issues sont cadrées dans `FoyerOS/docs/interop-budgettracker.md`.
+Les trois issues sont détaillées dans le contrat : <https://doc.sternum-lab.duckdns.org/suite/interop-courses-budget/#le-point-bloquant>
 **Trancher avant de coder.**
 
 Ensuite : **10-B** (scénarios + fourchettes), puis le prévisionnel à taux
