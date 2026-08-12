@@ -231,6 +231,30 @@ docker compose logs -f frontend
 **URLs dev :** front `http://localhost:5173` · API `http://localhost:8000/api/v1/`
 · admin `http://localhost:8000/admin/`
 
+### ⚠️ Pousser sur `main` DÉPLOIE EN PRODUCTION
+
+Depuis le 2026-08-12 (ADR-0037), `.github/workflows/ci-cd.yml` vérifie chez
+GitHub — ruff, `makemigrations --check`, 493 tests, eslint, images de prod —
+puis lance `make deploy` sur un runner auto-hébergé du homelab. Donc
+**`make backup` puis `migrate` sur la base réelle, sans que personne ne
+regarde.**
+
+```powershell
+make lint          # ruff, via Docker — rien à installer
+make lint-front    # eslint (exige la stack de dev lancée)
+make dev-test      # les 493 tests
+```
+
+- **Migration non triviale** (renommage de table, déplacement de modèle, champ
+  supprimé dont l'information doit être reportée) → mettre
+  **`[sans-deploiement]`** dans le message de commit, puis dérouler `DEPLOY.md`
+  à la main.
+- Les règles vivent dans `ruff.toml` (racine) et `frontend/eslint.config.js` ;
+  la version de ruff est **figée** dans `backend/requirements-dev.txt`.
+- ⚠️ `.env.prod` n'est pas versionné : un réglage nouveau se pose sur l'hôte
+  **avant** de pousser le code qui le lit.
+- 📖 Installation du runner, dépannage : site → *Exploitation / CI/CD*.
+
 ---
 
 ## 9. FORMAT DE TRAVAIL ATTENDU
@@ -251,6 +275,11 @@ docker compose logs -f frontend
 
 ## 10. EXCLUSIONS (ne jamais faire)
 
+- **Pousser une migration non triviale sans `[sans-deploiement]`** : `migrate`
+  partirait tout seul sur la base de production.
+- **Désactiver un contrôle de la CI pour faire passer une passe.** Le lint,
+  `makemigrations --check` et les tests sont les seuls garde-fous entre un
+  commit et la production. Corriger le code, jamais la règle.
 - Donner un conseil financier personnalisé réglementé, recommander d'acheter/vendre un actif, promettre un rendement.
 - Coder une valeur de référence ou un seuil en dur (toujours via référentiel administrable).
 - Rendre `solde_theorique`, `solde_reel` ou `ecart_solde` modifiables manuellement.
