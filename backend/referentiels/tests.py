@@ -1,10 +1,8 @@
-from django.test import TestCase
 from django.db.utils import IntegrityError
+from django.test import TestCase
 
 from core.tests_base import APIAuthTestCase
-from referentiels.models import (
-    TypeCompte, Devise, StatutFlux, Frequence
-)
+from referentiels.models import Devise, Frequence, StatutFlux, TypeCompte
 
 
 class ReferentielBaseTest(TestCase):
@@ -72,12 +70,18 @@ class ParametresBudgetAPITest(APIAuthTestCase):
     def setUp(self):
         import datetime
         from decimal import Decimal
-        from referentiels.models import (
-            Titulaire, Etablissement, TypeFlux, StatutFlux as SF,
-        )
-        from comptes.models import Compte
+
         from categories.models import Categorie
+        from comptes.models import Compte
         from flux.models import Flux
+        from referentiels.models import (
+            Etablissement,
+            Titulaire,
+            TypeFlux,
+        )
+        from referentiels.models import (
+            StatutFlux as SF,
+        )
 
         self.url = "/api/v1/referentiels/parametres-budget/"
 

@@ -1,24 +1,28 @@
 import datetime
 from decimal import Decimal
+
 from dateutil.relativedelta import relativedelta
 from django.test import TestCase
 
-from referentiels.models import (
-    TypeCompte, Etablissement, Titulaire, Devise, TypeFlux, StatutFlux,
-    Frequence
-)
-from comptes.models import Compte
-from categories.models import Categorie
-from flux.models import Flux
-from budgets.models import Budget, BudgetTemplate
-from analytics.services.dashboard import calculer_dashboard
-from analytics.services.compte_dashboard import calculer_compte_dashboard
-from analytics.services.projection import (
-    calculer_solde_projete, calculer_capacite_restante
-)
-from analytics.services.trajectoire import calculer_trajectoire
 from analytics.services.analyse import calculer_analyse
+from analytics.services.compte_dashboard import calculer_compte_dashboard
+from analytics.services.dashboard import calculer_dashboard
+from analytics.services.projection import calculer_capacite_restante, calculer_solde_projete
+from analytics.services.trajectoire import calculer_trajectoire
+from budgets.models import Budget, BudgetTemplate
+from categories.models import Categorie
+from comptes.models import Compte
 from core.tests_base import APIAuthTestCase
+from flux.models import Flux
+from referentiels.models import (
+    Devise,
+    Etablissement,
+    Frequence,
+    StatutFlux,
+    Titulaire,
+    TypeCompte,
+    TypeFlux,
+)
 
 
 class DashboardServiceTest(TestCase):
@@ -111,7 +115,7 @@ class DashboardServiceTest(TestCase):
 
     def test_derniers_flux_limite_5(self):
         """Le dashboard ne renvoie que les 5 flux les plus récents."""
-        for i in range(7):
+        for _ in range(7):
             self._make_flux("-10.00")
         data = calculer_dashboard()
         self.assertEqual(len(data["derniers_flux"]), 5)
@@ -576,6 +580,7 @@ class CompteDashboardAPITest(APIAuthTestCase):
 
     def test_endpoint_404_si_compte_inconnu(self):
         import uuid
+
         from django.urls import reverse
         url = reverse("compte-dashboard", args=[uuid.uuid4()])
         response = self.client.get(url)

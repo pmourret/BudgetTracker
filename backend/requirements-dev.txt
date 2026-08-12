@@ -1,0 +1,6 @@
+# Outillage de développement — jamais installé dans l'image de production.
+#
+# Version **figée**. Un linter qui se met à jour tout seul transforme un matin
+# ordinaire en séance de correction de style sur du code que personne n'a
+# touché : la CI passe au rouge sur un commit qui n'y est pour rien.
+ruff==0.12.0

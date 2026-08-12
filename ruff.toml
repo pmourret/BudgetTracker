@@ -1,0 +1,67 @@
+# Ruff — lint du backend BudgetTracker.
+#
+# Ce fichier est à la RACINE du dépôt : `ruff check .` fonctionne depuis
+# n'importe où, et la CI n'a pas à connaître un chemin de configuration.
+#
+# ⚠️ **Le formatage automatique n'est pas activé.** `ruff format` réécrirait
+# 125 fichiers ici (~9 800 lignes) — dont tous les commentaires explicatifs
+# retaillés à la main, qui portent l'essentiel de la mémoire du projet. Le lint
+# attrape les défauts ; le formatage ne ferait que brasser du texte. Si on
+# l'adopte un jour, ce sera une passe délibérée et un commit à part :
+#     ruff format .
+
+line-length = 100
+target-version = "py312"
+
+# Les migrations décrivent un état passé : elles ne se relookent pas.
+extend-exclude = ["*/migrations/*", "frontend", "node_modules"]
+
+[lint]
+# E4/E7/E9 + F sont le défaut de Ruff ; E501 en est volontairement absent, la
+# longueur de ligne relevant du formateur. On y ajoute :
+#   I  — ordre des imports (le seul point de style qui crée vraiment des conflits)
+#   UP — tournures obsolètes pour Python 3.12
+#   B  — pièges réels (mutable par défaut, boucle qui fuit sa variable…)
+#   C4 — compréhensions inutiles
+select = ["E4", "E7", "E9", "F", "I", "UP", "B", "C4"]
+
+ignore = [
+    # Les réglages Django importent après une condition, et plusieurs modules de
+    # tests ont été étendus par ajout d'un second bloc d'imports en cours de
+    # fichier. Aucun des deux n'est un défaut ; les traiter coûterait une
+    # chirurgie sans contrepartie.
+    "E402",
+    # `l` pour « ligne » dans les services d'import et de rapprochement — 10
+    # sites. Renommer traverse le code d'import bancaire, qui est le plus
+    # délicat du dépôt : passe ultérieure, pas un blocage de CI.
+    "E741",
+    # `raise … from` : correct, mais 6 sites, tous dans des `except` qui ne
+    # lient pas l'exception. Candidat pour une passe ultérieure.
+    "B904",
+]
+
+[lint.per-file-ignores]
+# `from .base import *` est la convention Django pour les réglages dérivés.
+"backend/config/settings/*.py" = ["F403", "F405"]
+
+[lint.isort]
+known-first-party = [
+    "abonnements",
+    "accounts",
+    "alertes",
+    "analytics",
+    "audit",
+    "budgets",
+    "categories",
+    "comptes",
+    "config",
+    "core",
+    "flux",
+    "imports",
+    "market_data",
+    "objectifs",
+    "patrimoine",
+    "providers",
+    "referentiels",
+    "transferts",
+]

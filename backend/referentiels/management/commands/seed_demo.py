@@ -1,14 +1,13 @@
 from decimal import Decimal
+
 from django.conf import settings
 from django.core.management import call_command
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
-from referentiels.models import (
-    TypeCompte, Titulaire, Etablissement, Devise
-)
-from comptes.models import Compte
 from categories.models import Categorie
+from comptes.models import Compte
+from referentiels.models import Devise, Etablissement, Titulaire, TypeCompte
 
 
 class Command(BaseCommand):

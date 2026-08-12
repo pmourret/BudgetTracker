@@ -9,7 +9,7 @@ Trois propriétés portent tout :
    clé entière ;
 3. **rien de l'existant ne casse** tant que l'autorité n'est pas basculée.
 """
-from datetime import datetime, timedelta, timezone as tz
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
 import jwt
@@ -45,8 +45,8 @@ def jeton(foyers=None, **surcharges):
         "prenom": "Camille",
         "technique": False,
         "foyers": [{"id": FOYER_ICI, "nom": "Foyer A"}] if foyers is None else foyers,
-        "exp": datetime.now(tz.utc) + timedelta(minutes=30),
-        "iat": datetime.now(tz.utc),
+        "exp": datetime.now(UTC) + timedelta(minutes=30),
+        "iat": datetime.now(UTC),
     }
     claims.update(surcharges)
     return jwt.encode(claims, PRIVEE, algorithm="RS256")
@@ -131,7 +131,7 @@ class VerificationTest(APITestCase):
         ).decode()
         faux = jwt.encode(
             {"email": "x@y.z", "foyers": [{"id": FOYER_ICI}],
-             "exp": datetime.now(tz.utc) + timedelta(minutes=5)},
+             "exp": datetime.now(UTC) + timedelta(minutes=5)},
             pem, algorithm="RS256",
         )
         self.porter(faux)
@@ -141,7 +141,7 @@ class VerificationTest(APITestCase):
         )
 
     def test_jeton_expire_refuse(self):
-        self.porter(jeton(exp=datetime.now(tz.utc) - timedelta(minutes=1)))
+        self.porter(jeton(exp=datetime.now(UTC) - timedelta(minutes=1)))
         self.assertEqual(
             self.client.get("/api/v1/auth/me/").status_code,
             status.HTTP_401_UNAUTHORIZED,

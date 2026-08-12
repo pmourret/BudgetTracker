@@ -1,9 +1,8 @@
 from django.db import models
 from django.utils import timezone
+
 from core.models import BaseModel
-from referentiels.models import (
-    TypeFlux, Titulaire, ModePaiement, StatutFlux, Devise
-)
+from referentiels.models import Devise, ModePaiement, StatutFlux, Titulaire, TypeFlux
 
 
 class Flux(BaseModel):

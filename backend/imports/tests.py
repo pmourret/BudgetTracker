@@ -6,16 +6,27 @@ from types import SimpleNamespace
 from django.test import SimpleTestCase, TestCase
 
 from core.tests_base import APIAuthTestCase
+from imports.models import (
+    Banque,
+    ImportBancaire,
+    LigneBancaire,
+    StatutRapprochement,
+)
 from imports.parsers import decoder_fichier, parser_boursobank
 from imports.parsers.boursobank import FormatInvalideError, _nettoyer_montant
-from imports.models import (
-    Banque, ImportBancaire, LigneBancaire, StatutRapprochement,
-)
 from imports.services.rapprochement import (
-    CreationFluxInvalide, ValidationInvalide, apparier, candidats_pour,
-    controle_solde, creer_flux_depuis_ligne, dernier_controle_pour_compte,
-    executer_rapprochement, filtrer_doublons, flux_ids_deja_pointes,
-    rejeter_ligne, valider_ligne,
+    CreationFluxInvalide,
+    ValidationInvalide,
+    apparier,
+    candidats_pour,
+    controle_solde,
+    creer_flux_depuis_ligne,
+    dernier_controle_pour_compte,
+    executer_rapprochement,
+    filtrer_doublons,
+    flux_ids_deja_pointes,
+    rejeter_ligne,
+    valider_ligne,
 )
 
 # --- Fixture : extrait réel de l'export BoursoBank fourni par le foyer -------
@@ -239,11 +250,16 @@ class ApparierTest(SimpleTestCase):
 class RapprochementDBTest(TestCase):
 
     def setUp(self):
-        from referentiels.models import (
-            TypeCompte, Titulaire, Etablissement, Devise, TypeFlux, StatutFlux,
-        )
-        from comptes.models import Compte
         from categories.models import Categorie
+        from comptes.models import Compte
+        from referentiels.models import (
+            Devise,
+            Etablissement,
+            StatutFlux,
+            Titulaire,
+            TypeCompte,
+            TypeFlux,
+        )
 
         self.devise = Devise.objects.create(
             code="EUR", libelle="Euro", symbole="€", est_defaut=True)
@@ -560,12 +576,17 @@ class RapprochementDBTest(TestCase):
 class ImportAPITest(APIAuthTestCase):
 
     def setUp(self):
-        from referentiels.models import (
-            TypeCompte, Titulaire, Etablissement, Devise, TypeFlux, StatutFlux,
-        )
-        from comptes.models import Compte
         from categories.models import Categorie
+        from comptes.models import Compte
         from flux.models import Flux
+        from referentiels.models import (
+            Devise,
+            Etablissement,
+            StatutFlux,
+            Titulaire,
+            TypeCompte,
+            TypeFlux,
+        )
 
         self.devise = Devise.objects.create(
             code="EUR", libelle="Euro", symbole="€", est_defaut=True)

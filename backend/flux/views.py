@@ -1,10 +1,10 @@
 from decimal import Decimal
 
-from rest_framework import viewsets, filters, serializers, status
+from django_filters import rest_framework as django_filters
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import filters, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django_filters.rest_framework import DjangoFilterBackend
-from django_filters import rest_framework as django_filters
 
 from .models import Flux
 from .serializers import FluxSerializer
@@ -79,6 +79,7 @@ class FluxViewSet(viewsets.ModelViewSet):
         # chargement des apps (imports référence flux).
         from django.db.models import Exists, OuterRef, Q, Sum, Value
         from django.db.models.functions import Coalesce
+
         from imports.models import LigneBancaire, StatutRapprochement
 
         ligne_pointee = LigneBancaire.objects.filter(

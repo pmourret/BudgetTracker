@@ -18,14 +18,12 @@ référentiel que l'utilisateur matérialise en flux (décision du foyer,
 juillet 2026). Un abonnement pesera donc sur la projection uniquement via
 les flux réellement saisis et via les enveloppes de templates.
 """
-import datetime
 from dateutil.relativedelta import relativedelta
 from django.db.models import Sum
 
 from .projection import (
     ZERO,
     _aujourd_hui_ou,
-    _fin_de_mois,
     _mois_de,
     reste_a_depenser_budgete,
 )

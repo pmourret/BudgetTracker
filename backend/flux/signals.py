@@ -1,5 +1,6 @@
-from django.db.models.signals import pre_save, post_save, post_delete
+from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
+
 from .models import Flux
 
 
@@ -21,12 +22,12 @@ def memoriser_etat_precedent(sender, instance, **kwargs):
 
 @receiver(post_save, sender=Flux)
 def recalculer_apres_save(sender, instance, **kwargs):
-    from comptes.services.solde import calculer_solde
+    from alertes.services import detecter_alertes_budget
     from budgets.services.consommation import (
         calculer_consommation_pour_flux,
         recalculer_budgets_pour,
     )
-    from alertes.services import detecter_alertes_budget
+    from comptes.services.solde import calculer_solde
 
     calculer_solde(instance.compte)
     calculer_consommation_pour_flux(instance)
@@ -76,8 +77,8 @@ def recalculer_apres_save(sender, instance, **kwargs):
 
 @receiver(post_delete, sender=Flux)
 def recalculer_apres_delete(sender, instance, **kwargs):
-    from comptes.services.solde import calculer_solde
     from budgets.services.consommation import calculer_consommation_pour_flux
+    from comptes.services.solde import calculer_solde
 
     calculer_solde(instance.compte)
     calculer_consommation_pour_flux(instance)

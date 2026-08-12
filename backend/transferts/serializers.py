@@ -1,10 +1,12 @@
-import datetime
 from decimal import Decimal
+
 from rest_framework import serializers
-from .models import Transfert
-from transferts.services import creer_transfert
-from referentiels.models import TypeFlux, StatutFlux, Devise
+
 from comptes.models import Compte
+from referentiels.models import Devise, StatutFlux, TypeFlux
+from transferts.services import creer_transfert
+
+from .models import Transfert
 
 
 class TransfertSerializer(serializers.ModelSerializer):

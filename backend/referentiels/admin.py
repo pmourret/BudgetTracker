@@ -1,8 +1,16 @@
 from django.contrib import admin
+
 from .models import (
+    Devise,
+    Etablissement,
+    Fiscalite,
+    Frequence,
+    ModePaiement,
     ParametresBudget,
-    TypeCompte, TypeFlux, Titulaire, ModePaiement,
-    Frequence, Etablissement, Devise, Fiscalite, StatutFlux,
+    StatutFlux,
+    Titulaire,
+    TypeCompte,
+    TypeFlux,
 )
 
 

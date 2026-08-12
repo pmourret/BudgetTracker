@@ -1,7 +1,8 @@
-from decimal import Decimal
 import datetime
+from decimal import Decimal
+
 from dateutil.relativedelta import relativedelta
-from django.db.models import Sum, Q
+from django.db.models import Sum
 
 
 def _mois_courant():
@@ -24,10 +25,9 @@ def calculer_dashboard(nb_mois: int = 6, mois: datetime.date = None) -> dict:
     Le patrimoine estimatif est calculé séparément et ne se mélange jamais
     au solde bancaire (règle métier 10).
     """
-    from comptes.models import Compte
-    from flux.models import Flux
-    from budgets.models import Budget
     from alertes.models import Alerte
+    from budgets.models import Budget
+    from flux.models import Flux
 
     mois_max = _mois_courant()
     mois_min = (
@@ -145,13 +145,13 @@ def _calculer_depenses_par_categorie(mois: datetime.date, compte_id=None) -> lis
     """
     from flux.models import Flux
 
-    filtres = dict(
-        mois=mois,
-        montant__lt=0,
-        est_transfert=False,
-        est_ajustement=False,
-        categorie__isnull=False,
-    )
+    filtres = {
+        "mois": mois,
+        "montant__lt": 0,
+        "est_transfert": False,
+        "est_ajustement": False,
+        "categorie__isnull": False,
+    }
     if compte_id is not None:
         filtres["compte_id"] = compte_id
 
@@ -241,8 +241,8 @@ def _solde_fin_de_mois(mois: datetime.date) -> Decimal:
     égale `Σ solde_theorique` (cohérence avec l'état affiché des comptes).
     """
     from comptes.models import Compte
-    from flux.models import Flux
     from core.services.periode import bornes_mois_comptable, jour_bascule_actif
+    from flux.models import Flux
 
     fin_mois = bornes_mois_comptable(mois, jour_bascule_actif())[1]
     solde_initial_total = (

@@ -13,7 +13,7 @@ Réserve disponible = Σ(deltas des mois clôturés) − Σ(points alloués).
 Calcul à la volée, déterministe (aucune table ledger).
 """
 
-from decimal import Decimal, ROUND_CEILING
+from decimal import ROUND_CEILING, Decimal
 
 from dateutil.relativedelta import relativedelta
 
@@ -77,6 +77,7 @@ def delta_mois(mois, vp: Decimal = None) -> int:
 def _total_points_alloues() -> int:
     """Somme de tous les points distribués (débités de la réserve)."""
     from django.db.models import Sum
+
     from budgets.models import Budget
 
     return (

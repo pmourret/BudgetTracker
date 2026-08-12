@@ -1,4 +1,5 @@
 from rest_framework import serializers
+
 from .models import Compte
 
 
@@ -92,6 +93,6 @@ class CompteSerializer(serializers.ModelSerializer):
         tentatives = champs_interdits & set(self.initial_data.keys())
         if tentatives:
             raise serializers.ValidationError(
-                {champ: "Ce champ est calculé et non modifiable." for champ in tentatives}
+                dict.fromkeys(tentatives, "Ce champ est calculé et non modifiable.")
             )
         return data

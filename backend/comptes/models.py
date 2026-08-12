@@ -1,6 +1,7 @@
 from django.db import models
+
 from core.models import BaseModel
-from referentiels.models import TypeCompte, Titulaire, Etablissement, Devise
+from referentiels.models import Devise, Etablissement, Titulaire, TypeCompte
 
 
 class Compte(BaseModel):

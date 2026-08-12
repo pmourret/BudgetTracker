@@ -107,6 +107,30 @@ reset-db: ## ⚠️  DÉTRUIT la base (volume pgdata) puis réinitialise
 	$(MAKE) init
 
 # ==========================================================
+# QUALITÉ — mêmes règles que la CI
+# ==========================================================
+# À lancer avant de pousser. Ce qui passe ici passe dans `.github/workflows`,
+# et réciproquement : la version de ruff est figée dans `requirements-dev.txt`,
+# la configuration dans `ruff.toml` à la racine.
+#
+# ⚠️ `lint` passe par Docker et ne demande **rien** d'installé sur l'hôte —
+# c'est délibéré : un linter qu'il faut installer avant de s'en servir ne se
+# lance jamais.
+.PHONY: lint
+lint: ## Lint du backend (ruff) — aucune installation requise sur l'hôte
+	docker run --rm -v "$$PWD:/app" -w /app python:3.12-slim \
+		sh -c "pip install --no-cache-dir -q -r backend/requirements-dev.txt && ruff check ."
+
+.PHONY: lint-fix
+lint-fix: ## Applique les corrections sûres de ruff
+	docker run --rm -v "$$PWD:/app" -w /app python:3.12-slim \
+		sh -c "pip install --no-cache-dir -q -r backend/requirements-dev.txt && ruff check --fix ."
+
+.PHONY: lint-front
+lint-front: ## Lint du frontend (eslint) — exige la stack de dev lancée (make dev-up)
+	$(COMPOSE_DEV) exec frontend npm run lint
+
+# ==========================================================
 # DEV (local)
 # ==========================================================
 

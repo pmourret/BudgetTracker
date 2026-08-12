@@ -1,4 +1,5 @@
 from rest_framework import serializers
+
 from .models import Alerte
 
 
@@ -74,7 +75,6 @@ class AlerteSerializer(serializers.ModelSerializer):
         tentatives = champs_interdits & set(self.initial_data.keys())
         if tentatives:
             raise serializers.ValidationError(
-                {champ: "Ce champ n'est pas modifiable."
-                 for champ in tentatives}
+                dict.fromkeys(tentatives, "Ce champ n'est pas modifiable.")
             )
         return data

@@ -1,6 +1,6 @@
 from decimal import Decimal
-from alertes.models import Alerte, TypeAlerte, NiveauAlerte
 
+from alertes.models import Alerte, NiveauAlerte, TypeAlerte
 
 # ---------------------------------------------------------------------------
 # Détection budget

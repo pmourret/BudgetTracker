@@ -1,15 +1,14 @@
 import datetime
 from decimal import Decimal
+
 from django.test import TestCase
 
-from referentiels.models import (
-    TypeFlux, StatutFlux, Devise, TypeCompte, Etablissement, Titulaire
-)
 from comptes.models import Compte
+from core.tests_base import APIAuthTestCase
 from flux.models import Flux
+from referentiels.models import Devise, Etablissement, StatutFlux, Titulaire, TypeCompte, TypeFlux
 from transferts.models import Transfert
 from transferts.services import creer_transfert
-from core.tests_base import APIAuthTestCase
 
 
 class TransfertServiceTest(TestCase):

@@ -1,13 +1,13 @@
 from decimal import Decimal
+from unittest.mock import MagicMock
+
 from django.test import TestCase
 from django.urls import reverse
-from unittest.mock import MagicMock
-from rest_framework.test import APITestCase
 from rest_framework import status
 
 from comptes.services.solde import _calculer_solde_avec_model
-from referentiels.models import TypeCompte, Titulaire, Etablissement, Devise
 from core.tests_base import APIAuthTestCase
+from referentiels.models import Devise, Etablissement, Titulaire, TypeCompte
 
 
 class CalculSoldeServiceTest(TestCase):

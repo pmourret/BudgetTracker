@@ -1,4 +1,5 @@
 from decimal import Decimal
+
 from django.db.models import Sum
 
 
@@ -101,7 +102,9 @@ def mettre_a_jour_valorisation(actif, valeur: Decimal) -> None:
     Fiabilité : estimative.
     """
     import datetime
+
     from django.db import transaction
+
     from patrimoine.models import HistoriqueValorisation
 
     if valeur < 0:
@@ -139,7 +142,9 @@ def calculer_historique_patrimoine(nb_mois: int = 12) -> dict:
     Ne touche jamais aux soldes bancaires réels.
     """
     import datetime
+
     from dateutil.relativedelta import relativedelta
+
     from patrimoine.models import Actif, HistoriqueValorisation
 
     aujourd_hui = datetime.date.today()

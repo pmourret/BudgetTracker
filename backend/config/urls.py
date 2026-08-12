@@ -15,8 +15,10 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import include, path
 from rest_framework.routers import DefaultRouter
+
+from abonnements.views import AbonnementViewSet
 from accounts.views import (
     ConnexionView,
     ContexteView,
@@ -24,27 +26,35 @@ from accounts.views import (
     MoiView,
     RafraichissementView,
 )
-
-from comptes.views import CompteViewSet
-from categories.views import CategorieViewSet
-from flux.views import FluxViewSet
-from transferts.views import TransfertViewSet
-from budgets.views import BudgetViewSet, BudgetTemplateViewSet
-from abonnements.views import AbonnementViewSet
 from alertes.views import AlerteViewSet
-from patrimoine.views import ActifViewSet
-from imports.views import ImportBancaireViewSet, LigneBancaireViewSet
-from referentiels.views import (
-    ParametresBudgetView,
-    TypeCompteViewSet, TypeFluxViewSet, TitulaireViewSet,
-    ModePaiementViewSet, FrequenceViewSet, EtablissementViewSet,
-    DeviseViewSet, FiscaliteViewSet, StatutFluxViewSet
-)
-
 from analytics.views import (
-    DashboardView, CompteDashboardView, PrevisionnelView, AnalyseView,
-    AbonnementsAnalyseView, PointsView, TransfertsAnalyseView
+    AbonnementsAnalyseView,
+    AnalyseView,
+    CompteDashboardView,
+    DashboardView,
+    PointsView,
+    PrevisionnelView,
+    TransfertsAnalyseView,
 )
+from budgets.views import BudgetTemplateViewSet, BudgetViewSet
+from categories.views import CategorieViewSet
+from comptes.views import CompteViewSet
+from flux.views import FluxViewSet
+from imports.views import ImportBancaireViewSet, LigneBancaireViewSet
+from patrimoine.views import ActifViewSet
+from referentiels.views import (
+    DeviseViewSet,
+    EtablissementViewSet,
+    FiscaliteViewSet,
+    FrequenceViewSet,
+    ModePaiementViewSet,
+    ParametresBudgetView,
+    StatutFluxViewSet,
+    TitulaireViewSet,
+    TypeCompteViewSet,
+    TypeFluxViewSet,
+)
+from transferts.views import TransfertViewSet
 
 router = DefaultRouter()
 

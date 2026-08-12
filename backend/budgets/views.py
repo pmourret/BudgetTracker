@@ -1,9 +1,10 @@
 import datetime
-from rest_framework import viewsets, filters, status
+
+from django_filters import rest_framework as django_filters
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django_filters.rest_framework import DjangoFilterBackend
-from django_filters import rest_framework as django_filters
 
 from .models import Budget, BudgetTemplate
 from .serializers import BudgetSerializer, BudgetTemplateSerializer
@@ -62,7 +63,8 @@ class BudgetViewSet(viewsets.ModelViewSet):
         Distribue des points de la réserve vers cette enveloppe (mécanique B, 12-B-2).
         Body : { "points": N } (entier ≥ 0). Plafonné à la réserve disponible.
         """
-        from .services import allouer as allouer_service, AllocationInvalide
+        from .services import AllocationInvalide
+        from .services import allouer as allouer_service
 
         budget = self.get_object()
         try:

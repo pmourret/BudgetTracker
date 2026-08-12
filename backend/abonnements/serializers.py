@@ -1,7 +1,7 @@
+
 from rest_framework import serializers
+
 from .models import Abonnement
-from .services import verifier_divergence
-from decimal import Decimal
 
 
 class AbonnementSerializer(serializers.ModelSerializer):

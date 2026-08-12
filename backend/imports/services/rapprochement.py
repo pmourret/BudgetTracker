@@ -32,7 +32,6 @@ from decimal import Decimal
 
 from ..models import StatutRapprochement
 
-
 # --- Couche PURE -------------------------------------------------------------
 
 @dataclass
@@ -98,9 +97,7 @@ def apparier(lignes, flux, tolerance_jours: int) -> ResultatRapprochement:
     # Passe 1 — STRICT : montant ET date exacts. Plusieurs correspondances
     # exactes = mouvements interchangeables → on en consomme un (déterministe).
     for i, ligne in enumerate(lignes):
-        exacts = [
-            f for f in _candidats(ligne, flux, consommes, delta_max=0)
-        ]
+        exacts = list(_candidats(ligne, flux, consommes, delta_max=0))
         if exacts:
             choisi = min(exacts, key=lambda f: str(f.id))
             consommes.add(choisi.id)
@@ -215,7 +212,7 @@ def executer_rapprochement(import_lot):
 
     compteurs = Counter()
     with transaction.atomic():
-        for ligne, decision in zip(lignes, resultat.decisions):
+        for ligne, decision in zip(lignes, resultat.decisions, strict=False):
             ligne.statut = decision.statut
             ligne.flux_id = decision.flux_id
             ligne.save(update_fields=["statut", "flux", "updated_at"])
@@ -325,6 +322,7 @@ def creer_flux_depuis_ligne(ligne, categorie, libelle=None, statut=None):
     Atomique. Lève CreationFluxInvalide si la ligne est déjà rapprochée.
     """
     from django.db import transaction
+
     from flux.models import Flux
     from referentiels.models import StatutFlux, TypeFlux
 
@@ -423,6 +421,7 @@ def _comparer_au_releve(compte, ligne):
     le dupliquer aurait laissé deux réponses possibles à la même question.
     """
     from django.db.models import Sum
+
     from flux.models import Flux
 
     if ligne is None:

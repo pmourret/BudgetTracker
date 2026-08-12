@@ -1,13 +1,11 @@
 import datetime
 from decimal import Decimal
-from django.test import TestCase
-from django.utils import timezone
 
-from alertes.models import Alerte, TypeAlerte, NiveauAlerte
-from referentiels.models import (
-    TypeCompte, Etablissement, Titulaire, Devise
-)
+from django.test import TestCase
+
+from alertes.models import Alerte, NiveauAlerte, TypeAlerte
 from comptes.models import Compte
+from referentiels.models import Devise, Etablissement, Titulaire, TypeCompte
 
 
 class AlerteModelTest(TestCase):
@@ -85,26 +83,19 @@ class AlerteModelTest(TestCase):
         self.assertIn("ABONNEMENT_DIVERGENCE", TypeAlerte.values)
         self.assertIn("ECART_SOLDE", TypeAlerte.values)
 
-import datetime
-from decimal import Decimal
 from django.test import TestCase
 
-from alertes.models import Alerte, TypeAlerte, NiveauAlerte
+from abonnements.models import Abonnement
 from alertes.services import (
-    detecter_alertes_budget,
-    detecter_alerte_solde_bas,
     detecter_alerte_abonnement_en_retard,
     detecter_alerte_divergence_abonnement,
     detecter_alerte_ecart_solde,
+    detecter_alerte_solde_bas,
+    detecter_alertes_budget,
 )
-from referentiels.models import (
-    TypeCompte, Etablissement, Titulaire, Devise,
-    TypeFlux, Frequence
-)
-from comptes.models import Compte
-from categories.models import Categorie
 from budgets.models import Budget
-from abonnements.models import Abonnement
+from categories.models import Categorie
+from referentiels.models import Frequence, TypeFlux
 
 
 class DetectionAlerteBudgetTest(TestCase):
@@ -315,8 +306,8 @@ class DetectionAlerteAbonnementTest(TestCase):
         self.assertIsNone(alerte)
 
 from django.urls import reverse
-from rest_framework.test import APITestCase
 from rest_framework import status as drf_status
+
 from core.tests_base import APIAuthTestCase
 
 

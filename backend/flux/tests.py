@@ -1,17 +1,21 @@
 import datetime
 from decimal import Decimal
+
 from django.test import TestCase
 from django.urls import reverse
 from rest_framework import status
-from rest_framework.test import APITestCase
 
-from referentiels.models import (
-    TypeFlux, Titulaire, ModePaiement, StatutFlux, Devise,
-    TypeCompte, Etablissement
-)
-from comptes.models import Compte
 from categories.models import Categorie
+from comptes.models import Compte
 from flux.models import Flux
+from referentiels.models import (
+    Devise,
+    Etablissement,
+    StatutFlux,
+    Titulaire,
+    TypeCompte,
+    TypeFlux,
+)
 
 
 class FluxModelTest(TestCase):
@@ -102,7 +106,6 @@ class FluxModelTest(TestCase):
         self.assertFalse(Flux.objects.filter(id=flux_id).exists())
         self.assertTrue(Flux.objects.all_with_deleted().filter(id=flux_id).exists())
 
-from comptes.services.solde import calculer_solde
 
 
 class SignalRecalculSoldeTest(TestCase):
@@ -210,8 +213,6 @@ class SignalRecalculSoldeTest(TestCase):
         self.compte.refresh_from_db()
         self.assertEqual(self.compte.solde_theorique, Decimal("750.00"))
 
-from rest_framework.test import APITestCase
-from django.urls import reverse
 from core.tests_base import APIAuthTestCase
 
 

@@ -2,9 +2,16 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from referentiels.models import (
+    Devise,
+    Etablissement,
+    Fiscalite,
+    Frequence,
+    ModePaiement,
     ParametresBudget,
-    TypeCompte, TypeFlux, Titulaire, ModePaiement,
-    Frequence, Etablissement, Devise, Fiscalite, StatutFlux
+    StatutFlux,
+    Titulaire,
+    TypeCompte,
+    TypeFlux,
 )
 
 

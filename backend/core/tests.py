@@ -1,7 +1,8 @@
 import datetime
 
 from django.test import TestCase
-from core.models import BaseModel, SoftDeleteManager, SoftDeleteQuerySet
+
+from core.models import BaseModel, SoftDeleteManager
 from core.services.periode import bornes_mois_comptable, mois_comptable
 
 

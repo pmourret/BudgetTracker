@@ -47,6 +47,7 @@ def rembourser_flux(flux, montant, date, libelle=None):
     Lève RemboursementInvalide si les conditions ne sont pas réunies.
     """
     from django.db import transaction
+
     from referentiels.models import StatutFlux, TypeFlux
 
     if flux.est_transfert:

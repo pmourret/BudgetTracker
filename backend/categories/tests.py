@@ -1,12 +1,11 @@
-from django.test import TestCase
-from rest_framework.test import APITestCase
-from rest_framework import status
-from django.urls import reverse
 from unittest.mock import MagicMock, patch
+
+from django.test import TestCase
+from django.urls import reverse
+from rest_framework import status
 
 from categories.models import Categorie
 from core.tests_base import APIAuthTestCase
-
 
 # ---------------------------------------------------------------------------
 # Tests modèle
@@ -256,6 +255,7 @@ class CategoriePaginationTest(APIAuthTestCase):
     def test_max_page_size_borne_la_demande(self):
         """?page_size=5000 est plafonné à max_page_size (1000) par la classe."""
         from rest_framework.test import APIRequestFactory
+
         from core.pagination import StandardPagination
 
         request = APIRequestFactory().get("/api/v1/categories/", {"page_size": 5000})

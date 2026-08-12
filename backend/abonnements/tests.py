@@ -1,14 +1,19 @@
 import datetime
 from decimal import Decimal
+
 from django.test import TestCase
 
-from referentiels.models import (
-    TypeFlux, ModePaiement, Frequence,
-    TypeCompte, Etablissement, Titulaire, Devise
-)
-from comptes.models import Compte
-from categories.models import Categorie
 from abonnements.models import Abonnement
+from categories.models import Categorie
+from comptes.models import Compte
+from referentiels.models import (
+    Devise,
+    Etablissement,
+    Frequence,
+    Titulaire,
+    TypeCompte,
+    TypeFlux,
+)
 
 
 class AbonnementModelTest(TestCase):
@@ -134,8 +139,8 @@ class AbonnementModelTest(TestCase):
 
 from abonnements.services import (
     calculer_divergence_pct,
-    verifier_divergence,
     mettre_a_jour_derniere_occurrence,
+    verifier_divergence,
 )
 
 
@@ -318,8 +323,8 @@ class MiseAJourDerniereOccurrenceTest(TestCase):
         )
 
 from django.urls import reverse
-from rest_framework.test import APITestCase
 from rest_framework import status as drf_status
+
 from core.tests_base import APIAuthTestCase
 
 
@@ -540,8 +545,8 @@ class FluxAbonnementSignalTest(TestCase):
         )
 
     def test_flux_sans_abonnement_ignore_le_hook(self):
-        from flux.models import Flux
         from alertes.models import Alerte
+        from flux.models import Flux
 
         Flux.objects.create(
             compte=self.compte, categorie=self.categorie,

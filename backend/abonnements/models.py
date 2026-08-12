@@ -1,4 +1,5 @@
 from django.db import models
+
 from core.models import BaseModel
 
 
@@ -118,7 +119,7 @@ class Abonnement(BaseModel):
         Fiabilité : estimative (dépend de la saisie manuelle des flux).
         """
         import datetime
-        from referentiels.models import Frequence
+
 
         if not self.actif or not self.derniere_occurrence:
             return False

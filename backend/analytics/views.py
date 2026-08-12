@@ -1,21 +1,21 @@
-from rest_framework.views import APIView
-from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
-from .services.dashboard import calculer_dashboard
-from .services.compte_dashboard import calculer_compte_dashboard
-from .services.projection import calculer_previsionnel
-from .services.analyse import calculer_analyse
-from .services.abonnements import calculer_abonnements
 from .serializers import (
-    DashboardSerializer,
-    CompteDashboardSerializer,
-    PrevisionnelSerializer,
-    AnalyseSerializer,
     AbonnementsAnalyseSerializer,
-    TransfertsAnalyseSerializer,
+    AnalyseSerializer,
+    CompteDashboardSerializer,
+    DashboardSerializer,
     PointsSerializer,
+    PrevisionnelSerializer,
+    TransfertsAnalyseSerializer,
 )
+from .services.abonnements import calculer_abonnements
+from .services.analyse import calculer_analyse
+from .services.compte_dashboard import calculer_compte_dashboard
+from .services.dashboard import calculer_dashboard
+from .services.projection import calculer_previsionnel
 
 
 class DashboardView(APIView):

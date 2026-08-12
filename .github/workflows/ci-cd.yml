@@ -1,0 +1,220 @@
+# ⚠️ CE FICHIER EST LE SEUL DU DÉPÔT QUI PUISSE ÉCRIRE EN PRODUCTION.
+#
+# Les trois travaux de vérification tournent chez GitHub ; `deploiement` tourne
+# sur un **runner auto-hébergé** installé sur le homelab, et lance `make deploy`
+# — donc `make backup`, `git pull`, `build`, `up`, `migrate`. Il ne démarre
+# jamais si l'un des trois précédents a échoué.
+#
+# ⚠️ **Échappatoire pour une migration délicate** : mettre `[sans-deploiement]`
+# dans le message de commit. La vérification tourne, le déploiement est sauté,
+# et l'on va dérouler la procédure à la main.
+
+name: CI/CD
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+    workflow_dispatch:
+
+# Deux poussées rapprochées ne doivent pas déployer en même temps sur le même
+# hôte. On ne coupe PAS celui qui tourne : il est peut-être au milieu d'un
+# `migrate`, et l'interrompre est pire que de le laisser finir.
+concurrency:
+    group: ci-cd-${{ github.ref }}
+    cancel-in-progress: false
+
+env:
+    # Aucune valeur de secret : elle ne sert qu'à faire taire le contrôle de
+    # démarrage sur `SECRET_KEY`. ⚠️ Ce contrôle est BLOQUANT pendant les tests
+    # — le lanceur Django force `DEBUG=False`, ce qui fait passer
+    # l'avertissement en erreur (c'est précisément le niveau variable décrit
+    # dans l'ADR-0021) et empêche la suite de démarrer.
+    DJANGO_SECRET_KEY: cle-de-ci-sans-valeur-de-secret-0123456789abcdef
+
+jobs:
+    backend:
+        name: Backend — lint, contrôles, tests
+        runs-on: ubuntu-latest
+        timeout-minutes: 20
+
+        services:
+            db:
+                image: postgres:16-alpine
+                env:
+                    POSTGRES_DB: budgetfamilial
+                    POSTGRES_USER: budget
+                    POSTGRES_PASSWORD: ci
+                ports: ['5432:5432']
+                options: >-
+                    --health-cmd pg_isready
+                    --health-interval 10s
+                    --health-timeout 5s
+                    --health-retries 5
+
+        env:
+            # `base.py` lit les conventions POSTGRES_* d'abord, puis retombe
+            # sur DB_*. On pose la première forme, celle de la production.
+            POSTGRES_DB: budgetfamilial
+            POSTGRES_USER: budget
+            POSTGRES_PASSWORD: ci
+            DB_HOST: localhost
+            DB_PORT: '5432'
+            DJANGO_SETTINGS_MODULE: config.settings.dev
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-python@v5
+              with:
+                  python-version: '3.12'
+                  cache: pip
+                  cache-dependency-path: |
+                      backend/requirements.txt
+                      backend/requirements-dev.txt
+
+            - name: Installer les dépendances
+              run: pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+
+            - name: Lint (ruff)
+              run: ruff check .
+
+            - name: Contrôles de démarrage
+              working-directory: backend
+              run: python manage.py check
+
+            # Le piège le plus fréquent du dépôt : un modèle changé sans
+            # migration générée. Invisible en développement — la base locale a
+            # déjà la colonne — et fatal au déploiement suivant.
+            - name: Aucune migration manquante
+              working-directory: backend
+              run: python manage.py makemigrations --check --dry-run
+
+            - name: Tests
+              working-directory: backend
+              run: python manage.py test --parallel 4
+
+    frontend:
+        name: Frontend — lint
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+
+        # ⚠️ Le **build** n'est pas ici : il est fait par le travail `images`,
+        # dans `node:20-alpine`. Ce n'est pas un détail de confort —
+        # `package-lock.json` a été engendré dans ce conteneur et ne porte que
+        # le binaire rollup **musl** (`@rollup/rollup-linux-x64-musl`). Un
+        # `npm run build` sur un runner glibc échouerait sur un module natif
+        # introuvable, alors que la production, elle, va très bien. Le lint,
+        # lui, ne charge pas rollup : il tourne partout.
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: '20'
+                  cache: npm
+                  cache-dependency-path: frontend/package-lock.json
+
+            - name: Installer les dépendances
+              working-directory: frontend
+              run: npm ci
+
+            - name: Lint (eslint)
+              working-directory: frontend
+              run: npm run lint
+
+    images:
+        name: Images de production
+        runs-on: ubuntu-latest
+        timeout-minutes: 20
+
+        # Construire sans publier : on veut savoir qu'un `Dockerfile.prod` est
+        # cassé maintenant, pas pendant le déploiement. C'est aussi ici que le
+        # `npm run build` du front est réellement vérifié (cf. `frontend`).
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Image backend
+              run: docker build -f backend/Dockerfile.prod -t budgettracker-backend:ci backend
+
+            - name: Image frontend
+              run: docker build -f frontend/Dockerfile.prod -t budgettracker-frontend:ci frontend
+
+    deploiement:
+        name: Déploiement (homelab)
+        needs: [backend, frontend, images]
+        if: >-
+            github.ref == 'refs/heads/main'
+            && github.event_name != 'pull_request'
+            && !contains(github.event.head_commit.message, '[sans-deploiement]')
+
+        # Le homelab n'a aucun port ouvert sur internet : un runner hébergé par
+        # GitHub ne peut pas l'atteindre. Le runner auto-hébergé, lui, ne fait
+        # que des connexions **sortantes**. Installation : site → Exploitation.
+        runs-on: [self-hosted, homelab]
+        timeout-minutes: 30
+
+        # Un seul déploiement à la fois sur cet hôte, tous déclencheurs
+        # confondus. Sans ça, deux `migrate` concurrents sur la même base.
+        concurrency:
+            group: deploiement-budgettracker
+            cancel-in-progress: false
+
+        steps:
+            # Aucun `checkout` : on ne veut PAS d'une seconde copie du dépôt.
+            # Le déploiement se fait dans le répertoire de production existant,
+            # celui qui porte `.env.prod` et les chemins de bind-mount.
+            - name: Vérifier la configuration du runner
+              run: |
+                  set -eu
+                  if [ -z "${CHEMIN:-}" ]; then
+                    echo "::error::La variable de dépôt CHEMIN_DEPLOIEMENT n'est pas définie."
+                    echo "La poser dans Settings → Secrets and variables → Actions → Variables."
+                    exit 1
+                  fi
+                  test -f "$CHEMIN/docker-compose.prod.yml" \
+                    || { echo "::error::$CHEMIN ne contient pas docker-compose.prod.yml"; exit 1; }
+                  test -f "$CHEMIN/.env.prod" \
+                    || { echo "::error::$CHEMIN/.env.prod est absent — la stack ne démarrerait pas"; exit 1; }
+              env:
+                  CHEMIN: ${{ vars.CHEMIN_DEPLOIEMENT }}
+
+            # `make deploy` enchaîne : backup → git pull --ff-only → build →
+            # up -d → migrate → collectstatic → check.
+            - name: make deploy
+              working-directory: ${{ vars.CHEMIN_DEPLOIEMENT }}
+              run: make deploy
+
+            # ⚠️ **L'étape qui compte.** `make deploy` peut se terminer sans
+            # erreur alors qu'un conteneur part en boucle de redémarrage : le
+            # `up -d` rend la main dès que le conteneur est créé, pas quand il
+            # tient debout. Sans cette vérification, la CI serait verte et
+            # l'application morte.
+            - name: Vérifier que la stack tient debout
+              working-directory: ${{ vars.CHEMIN_DEPLOIEMENT }}
+              run: |
+                  set -eu
+                  COMPOSE="docker compose -f docker-compose.prod.yml --env-file .env.prod"
+
+                  for essai in $(seq 1 18); do
+                    etats=$($COMPOSE ps --format '{{.Service}} {{.State}}')
+                    printf '%s\n' "$etats" | grep -qE ' (restarting|created|paused)$' || break
+                    echo "… encore instable (essai $essai/18)"
+                    sleep 5
+                  done
+
+                  printf '%s\n' "$etats"
+
+                  if printf '%s\n' "$etats" | grep -qE ' restarting$'; then
+                    echo "::error::Un service redémarre en boucle après le déploiement."
+                    $COMPOSE logs --tail=80
+                    exit 1
+                  fi
+
+                  # Ce dépôt n'expose pas d'endpoint de santé : on interroge
+                  # Django lui-même dans le conteneur. S'il répond, l'ORM, les
+                  # réglages et les contrôles de démarrage sont bons.
+                  $COMPOSE exec -T backend python manage.py check \
+                    || { echo "::error::manage.py check échoue après déploiement."; $COMPOSE logs --tail=80 backend; exit 1; }
+
+                  echo "Déploiement vérifié."

@@ -1,9 +1,18 @@
 import re
+
 from rest_framework import serializers
+
 from .models import (
+    Devise,
+    Etablissement,
+    Fiscalite,
+    Frequence,
+    ModePaiement,
     ParametresBudget,
-    TypeCompte, TypeFlux, Titulaire, ModePaiement,
-    Frequence, Etablissement, Devise, Fiscalite, StatutFlux
+    StatutFlux,
+    Titulaire,
+    TypeCompte,
+    TypeFlux,
 )
 
 

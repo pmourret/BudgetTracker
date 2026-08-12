@@ -1,9 +1,10 @@
 import datetime
 from decimal import Decimal
+
 from django.test import TestCase
 
-from referentiels.models import Devise, Fiscalite
 from patrimoine.models import Actif, TypeActif
+from referentiels.models import Devise, Fiscalite
 
 
 class ActifModelTest(TestCase):
@@ -193,8 +194,8 @@ class MiseAJourValorisationTest(TestCase):
         self.assertEqual(self.actif.valeur_actuelle, Decimal("0.00"))
 
 from django.urls import reverse
-from rest_framework.test import APITestCase
 from rest_framework import status as drf_status
+
 from core.tests_base import APIAuthTestCase
 
 

@@ -1,18 +1,31 @@
-from rest_framework import viewsets, filters, generics
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import filters, generics, viewsets
 
 from .models import (
+    Devise,
+    Etablissement,
+    Fiscalite,
+    Frequence,
+    ModePaiement,
     ParametresBudget,
-    TypeCompte, TypeFlux, Titulaire, ModePaiement,
-    Frequence, Etablissement, Devise, Fiscalite, StatutFlux
+    StatutFlux,
+    Titulaire,
+    TypeCompte,
+    TypeFlux,
 )
 from .serializers import (
+    DeviseSerializer,
+    EtablissementSerializer,
+    EtablissementWritableSerializer,
+    FiscaliteSerializer,
+    FrequenceSerializer,
+    ModePaiementSerializer,
     ParametresBudgetSerializer,
-    TypeCompteSerializer, TypeFluxSerializer,
-    TitulaireSerializer, TitulaireWritableSerializer,
-    ModePaiementSerializer, FrequenceSerializer,
-    EtablissementSerializer, EtablissementWritableSerializer,
-    DeviseSerializer, FiscaliteSerializer, StatutFluxSerializer
+    StatutFluxSerializer,
+    TitulaireSerializer,
+    TitulaireWritableSerializer,
+    TypeCompteSerializer,
+    TypeFluxSerializer,
 )
 
 

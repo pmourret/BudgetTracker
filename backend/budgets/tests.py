@@ -1,19 +1,16 @@
 import datetime
 from decimal import Decimal
 from unittest.mock import MagicMock
+
 from django.test import TestCase
 
-from referentiels.models import (
-    TypeFlux, StatutFlux, Devise, TypeCompte, Etablissement, Titulaire
-)
-from comptes.models import Compte
-from categories.models import Categorie
-from flux.models import Flux
 from budgets.models import Budget, BudgetTemplate
-from budgets.services.consommation import (
-    calculer_consommation, _calculer_consommation_avec_model
-)
+from budgets.services.consommation import _calculer_consommation_avec_model
 from budgets.services.reconduire import reconduire_vers_mois
+from categories.models import Categorie
+from comptes.models import Compte
+from flux.models import Flux
+from referentiels.models import Devise, Etablissement, StatutFlux, Titulaire, TypeCompte, TypeFlux
 
 
 class CalculConsommationServiceTest(TestCase):
@@ -160,8 +157,8 @@ class SignalBudgetTest(TestCase):
 
 
 from django.urls import reverse
-from rest_framework.test import APITestCase
 from rest_framework import status as drf_status
+
 from core.tests_base import APIAuthTestCase
 
 
@@ -1141,7 +1138,7 @@ class PointsAllocationTest(TestCase):
         self.assertEqual(solde_disponible(aujourd_hui=self.aujourd), 5)  # 10 − 5
 
     def test_allocation_plafonnee(self):
-        from budgets.services.points import allouer, AllocationInvalide
+        from budgets.services.points import AllocationInvalide, allouer
         with self.assertRaises(AllocationInvalide):
             allouer(self.courant, 15, aujourd_hui=self.aujourd)  # > 10 disponibles
 
@@ -1154,7 +1151,7 @@ class PointsAllocationTest(TestCase):
         self.assertEqual(solde_disponible(aujourd_hui=self.aujourd), 10)
 
     def test_allocation_hors_jeu_refusee(self):
-        from budgets.services.points import allouer, AllocationInvalide
+        from budgets.services.points import AllocationInvalide, allouer
         hors = Budget.objects.create(
             categorie=Categorie.objects.create(code="AL_HJ", nom="HorsJeu"),
             mois=datetime.date(2026, 7, 1),
@@ -1164,7 +1161,7 @@ class PointsAllocationTest(TestCase):
             allouer(hors, 1, aujourd_hui=self.aujourd)
 
     def test_allocation_mois_non_courant_refusee(self):
-        from budgets.services.points import allouer, AllocationInvalide
+        from budgets.services.points import AllocationInvalide, allouer
         juin = Budget.objects.get(mois=datetime.date(2026, 6, 1))
         with self.assertRaises(AllocationInvalide):
             allouer(juin, 1, aujourd_hui=self.aujourd)
@@ -1175,6 +1172,7 @@ class PointsAllocationAPITest(APIAuthTestCase):
 
     def test_allouer_endpoint(self):
         from dateutil.relativedelta import relativedelta
+
         from core.services.periode import mois_comptable_courant
         from referentiels.models import ParametresBudget
         p = ParametresBudget.get_solo()

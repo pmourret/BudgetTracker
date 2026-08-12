@@ -8,7 +8,7 @@ propriété « une requête anonyme est refusée » est réellement vérifiée.
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.core.management.base import CommandError
-from django.test import TestCase, override_settings
+from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
