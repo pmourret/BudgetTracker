@@ -1,4 +1,3 @@
-import axios from 'axios'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import apiClient from '../api/client'
 
@@ -63,14 +62,28 @@ export function useUploadImport() {
       if (compte) form.append('compte', compte)
       form.append('banque', banque)
       form.append('fichier', fichier)
-      // ⚠️ On n'utilise PAS `apiClient` ici : son défaut `Content-Type:
-      // application/json` fait que axios v1 SÉRIALISE le FormData en JSON
-      // (defaults/index.js : `hasJSONContentType ? JSON.stringify(...) : data`)
-      // → le backend renvoie 415. Un axios nu n'a aucun Content-Type par défaut
-      // → le FormData part tel quel et le navigateur pose le boundary multipart.
-      // Chemin complet car pas de baseURL ; le proxy Vite `/api` reste actif.
-      // L'objet d'erreur conserve `response` → la gestion 400 côté modal marche.
-      const { data } = await axios.post('/api/v1/imports/', form)
+      // ⚠️ **`Content-Type: null`, et surtout PAS un axios nu.**
+      //
+      // Deux pièges se croisent ici, et n'en éviter qu'un casse l'autre :
+      //
+      // 1. Le défaut `Content-Type: application/json` d'`apiClient` fait que
+      //    axios v1 **sérialise le FormData en JSON**
+      //    (`defaults/index.js` : `hasJSONContentType ? JSON.stringify(...)`)
+      //    → le backend renvoie **415**.
+      // 2. Un axios nu évite le 415… mais sort de `apiClient`, donc des deux
+      //    intercepteurs : plus d'`Authorization`, plus de renouvellement sur
+      //    401. L'upload répondait « Informations d'authentification non
+      //    fournies » **en production**, depuis le durcissement d'août 2026.
+      //
+      // `null` (pas `undefined`, pas `'multipart/form-data'`) résout les deux :
+      // `getContentType()` rend `''`, donc le FormData part tel quel ; et
+      // `AxiosHeaders.toJSON` écarte les en-têtes `null`, donc rien n'est
+      // envoyé et le **navigateur pose lui-même le boundary**. Forcer
+      // `multipart/form-data` à la main ne marcherait pas : le boundary
+      // manquerait.
+      const { data } = await apiClient.post('/imports/', form, {
+        headers: { 'Content-Type': null },
+      })
       return data
     },
     onSuccess: () => {

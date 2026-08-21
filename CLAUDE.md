@@ -210,7 +210,30 @@ d'épargne. **Phase 12 mécaniques A et C : gelées, ne pas coder sans spec.**
 - **`titulaire_compte` ≠ `titulaire`** : le propriétaire d'un compte est `compte__titulaire` ; le `titulaire` du flux est souvent nul.
 - **Heatmap : échelle plafonnée au 90e centile**, jamais sur le max brut (un loyer écrasait toute l'échelle). Cellules en hauteur fixe (`h-12 sm:h-14`), **jamais `aspect-square`**.
 - **Infos-bulles : textes centralisés** dans `src/constants/definitions.js`, jamais au point d'usage. Le `Tooltip` s'ouvre au **survol ET au clic** (le `:hover` seul est inutilisable en tactile). **Toute nouvelle métrique ajoute son entrée.**
-- ⚠️ **Upload `FormData` via `apiClient` → 415** : `api/client.js` fixe `Content-Type: application/json`, et axios v1 **sérialise alors le FormData en JSON**. Forcer `multipart/form-data` ne suffit pas (le **boundary manque**). **Solution : axios NU** (`axios.post('/api/v1/imports/', form)`), chemin complet requis. **Ne PAS refaire passer l'upload par `apiClient`.**
+- ⚠️ **Upload `FormData` : `apiClient` avec `Content-Type: null`.** Deux pièges se
+  croisent, et n'en éviter qu'un ouvre l'autre.
+  1. `api/client.js` fixe `Content-Type: application/json`, et axios v1
+     **sérialise alors le FormData en JSON** → **415**. Forcer
+     `multipart/form-data` ne suffit pas : le **boundary** manquerait.
+  2. Un **axios nu** évite le 415 mais sort d'`apiClient`, donc de ses deux
+     intercepteurs : plus d'`Authorization`, plus de renouvellement sur 401.
+     C'est ce que recommandait une version antérieure de cette note, et l'import
+     bancaire répondait « Informations d'authentification non fournies » **en
+     production** — 401, découvert le 2026-08-21.
+
+  `null` résout les deux : `getContentType()` rend `''` donc le FormData part tel
+  quel, et `AxiosHeaders.toJSON` écarte les en-têtes `null` donc le navigateur
+  pose lui-même le boundary. Ni `undefined`, ni `'multipart/form-data'`.
+
+  ```js
+  apiClient.post('/imports/', form, { headers: { 'Content-Type': null } })
+  ```
+
+  📌 **La cause profonde est une asymétrie de suite** : le client de FoyerOS ne
+  fixe aucun `Content-Type` par défaut, celui-ci si. Axios le pose déjà seul pour
+  un objet simple — ce défaut explicite est donc redondant autant que nuisible.
+  Le retirer alignerait les deux applications, mais touche **toutes** les
+  requêtes : à faire hors correctif de production.
 - **`refresh` fait foi pour « suis-je connecté ? »**, pas `access` — ce dernier expire en 30 min.
 - **Seul un rejet explicite (401/403) ferme la session.** Un `catch` attrapant toute erreur efface les jetons sur un 502 de redéploiement.
 - **Le renouvellement mis en commun dans `client.js` est une condition de correction**, pas une optimisation : la liste noire invalide le refresh au premier usage. **Ne pas la retirer.**
