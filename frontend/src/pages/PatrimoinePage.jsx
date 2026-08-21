@@ -14,9 +14,11 @@ import Input from '../components/ui/Input'
 import { Loading, ErrorState, EmptyState } from '../components/ui/States'
 import LineChart from '../components/charts/LineChart'
 import DoughnutChart from '../components/charts/DoughnutChart'
+import { usePaletteDonnees } from '../components/charts/paletteDonnees'
 import { chartColors } from '../components/charts/chartSetup'
 import ActifFormModal from '../components/patrimoine/ActifFormModal'
 import IconBadge from '../components/ui/IconBadge'
+import Metric, { MetricRow } from '../components/ui/Metric'
 
 function usePatrimoineTotal() {
   return useQuery({
@@ -41,6 +43,7 @@ function usePatrimoineHistorique() {
 }
 
 export default function PatrimoinePage() {
+  const { couleurDe } = usePaletteDonnees()
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedActif, setSelectedActif] = useState(null)
   const [valoriserFor, setValoriserFor] = useState(null)
@@ -65,6 +68,8 @@ export default function PatrimoinePage() {
   const donutEntries = Object.values(parType).filter((t) => Number(t.total_estime) > 0)
   const donutLabels = donutEntries.map((t) => t.libelle)
   const donutValues = donutEntries.map((t) => Number(t.total_estime))
+  // Couleur stable par type d'actif, jamais par rang dans la liste.
+  const donutColors = donutEntries.map((t) => couleurDe(t.code ?? t.libelle))
 
   const histoSerie = historique?.serie ?? []
   const courbeLabels = histoSerie.map((p) => {
@@ -100,7 +105,7 @@ export default function PatrimoinePage() {
 
       {actifs.length === 0 ? (
         <EmptyState
-          icon="🏦"
+          Icon={Landmark}
           message="Aucun actif patrimonial enregistré."
           action={
             <Button variant="primary" onClick={openCreate}>
@@ -110,13 +115,13 @@ export default function PatrimoinePage() {
         />
       ) : (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-            <MetricCard
+          <MetricRow colonnes={3}>
+            <Metric
               label="Patrimoine total estimé"
               value={formatEuro(total?.total_estime ?? 0)}
               def={DEFINITIONS.patrimoine_total}
             />
-            <MetricCard
+            <Metric
               label="Plus-value latente estimée"
               value={
                 total?.plus_value_latente_globale_estimee != null
@@ -130,13 +135,13 @@ export default function PatrimoinePage() {
               }
               def={DEFINITIONS.plus_value_latente}
             />
-            <MetricCard label="Nombre d'actifs" value={String(actifs.length)} />
-          </div>
+            <Metric label="Nombre d'actifs" value={String(actifs.length)} />
+          </MetricRow>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             {donutValues.length > 0 && (
               <Card title="Répartition par type">
-                <DoughnutChart labels={donutLabels} values={donutValues} />
+                <DoughnutChart labels={donutLabels} values={donutValues} colors={donutColors} />
               </Card>
             )}
             {courbeValues.some((v) => v > 0) && (
@@ -171,17 +176,6 @@ export default function PatrimoinePage() {
   )
 }
 
-function MetricCard({ label, value, valueClass = 'text-content', def, defAlign = 'left' }) {
-  return (
-    <div className="bg-surface-3 rounded-lg px-4 py-3.5">
-      <div className="text-xs text-content-2 mb-1 flex items-center gap-1">
-        {label}
-        {def && <Tooltip {...def} align={defAlign} />}
-      </div>
-      <div className={`text-xl font-medium ${valueClass}`}>{value}</div>
-    </div>
-  )
-}
 
 function ActifCard({ actif, onEdit, onValoriser }) {
   const pv = actif.plus_value_latente

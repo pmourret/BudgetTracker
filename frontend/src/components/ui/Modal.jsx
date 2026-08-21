@@ -17,11 +17,11 @@ export default function Modal({ isOpen, onClose, title, children, footer }) {
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-[60] bg-slate-900/60 flex justify-center items-stretch sm:items-center p-0 sm:p-4"
+      className="fixed inset-0 z-[60] bg-slate-900/60 flex justify-center items-stretch lg:items-center p-0 lg:p-4"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-surface flex flex-col overflow-hidden w-full h-dvh rounded-none sm:w-[480px] sm:max-w-full sm:h-auto sm:max-h-[90dvh] sm:rounded-xl"
+        className="bg-surface flex flex-col overflow-hidden w-full h-dvh rounded-none lg:w-[480px] lg:max-w-full lg:h-auto lg:max-h-[90dvh] lg:rounded-xl"
       >
         <div className="flex justify-between items-center px-5 py-4 border-b border-border-app shrink-0">
           <span className="text-base font-medium text-content">{title}</span>

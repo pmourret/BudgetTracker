@@ -411,3 +411,185 @@ class AlerteAPITest(APIAuthTestCase):
         )
         self.assertEqual(response.status_code, drf_status.HTTP_200_OK)
         self.assertEqual(response.data["count"], 1)
+
+
+# ---------------------------------------------------------------------------
+# Formatage français des phrases d'alerte (D02 de la revue UI/UX 2026-08-20)
+# ---------------------------------------------------------------------------
+
+class FormatageAlerteTest(TestCase):
+    """
+    Une alerte est lue par un humain : elle s'écrit comme le reste de
+    l'interface. Ces tests verrouillent la forme, pas le fond.
+    """
+
+    def test_euros_espace_insecable_et_virgule(self):
+        from alertes.services.formatage import euros
+        self.assertEqual(euros(Decimal("5636.49")), "5 636,49 €")
+        self.assertEqual(euros(Decimal("139.81")), "139,81 €")
+        self.assertEqual(euros(None), "—")
+
+    def test_pourcent_virgule_decimale(self):
+        from alertes.services.formatage import pourcent
+        self.assertEqual(pourcent(Decimal("93.21")), "93,21 %")
+
+    def test_mois_en_francais(self):
+        from alertes.services.formatage import mois_annee
+        self.assertEqual(mois_annee(datetime.date(2026, 7, 1)), "juillet 2026")
+
+    def test_date_courte_en_francais(self):
+        from alertes.services.formatage import date_courte
+        self.assertEqual(date_courte(datetime.date(2026, 7, 18)), "18 juillet 2026")
+
+
+class PhraseAlerteBudgetTest(TestCase):
+
+    def setUp(self):
+        self.categorie = Categorie.objects.create(code="COURSES2", nom="Courses")
+        self.budget = Budget.objects.create(
+            categorie=self.categorie,
+            mois=datetime.date(2026, 7, 1),
+            montant_prevu=Decimal("150.00"),
+        )
+
+    def _declencher(self, taux, consomme):
+        self.budget.taux_consommation = Decimal(taux)
+        self.budget.montant_consomme = Decimal(consomme)
+        self.budget.save(update_fields=["taux_consommation", "montant_consomme"])
+        return detecter_alertes_budget(self.budget)[0]
+
+    def test_phrase_entierement_en_francais(self):
+        """Le cas exact relevé par la revue : « July 2026 », « 93.21 », « 139.81 »."""
+        alerte = self._declencher("93.21", "139.81")
+        self.assertIn("juillet 2026", alerte.explication)
+        self.assertIn("93,21 %", alerte.explication)
+        self.assertIn("139,81 €", alerte.explication)
+        self.assertNotIn("July", alerte.explication)
+        self.assertNotIn("93.21", alerte.explication)
+        self.assertNotIn("139.81", alerte.explication)
+
+    def test_budget_thematique_ne_plante_pas(self):
+        """
+        Un budget thématique n'a pas de catégorie. `budget.categorie.nom`
+        levait AttributeError — dans un signal post_save de Flux, donc en 500
+        sur la création du flux.
+        """
+        thematique = Budget.objects.create(
+            categorie=None,
+            nom="Vacances d'été",
+            mois=datetime.date(2026, 7, 1),
+            montant_prevu=Decimal("500.00"),
+            taux_consommation=Decimal("85.00"),
+            montant_consomme=Decimal("425.00"),
+        )
+        alertes = detecter_alertes_budget(thematique)
+        self.assertEqual(len(alertes), 1)
+        self.assertIn("Vacances d'été", alertes[0].explication)
+
+
+# ---------------------------------------------------------------------------
+# Refermeture des alertes périmées (D01 de la revue UI/UX 2026-08-20)
+# ---------------------------------------------------------------------------
+
+class RefermetureAlerteBudgetTest(TestCase):
+    """
+    Le cas relevé par la revue : le budget retombe, l'alerte reste et continue
+    d'annoncer l'ancien chiffre à côté du nouveau.
+    """
+
+    def setUp(self):
+        self.categorie = Categorie.objects.create(code="COURSES3", nom="Courses")
+        self.budget = Budget.objects.create(
+            categorie=self.categorie,
+            mois=datetime.date(2026, 7, 1),
+            montant_prevu=Decimal("150.00"),
+        )
+
+    def _taux(self, taux, consomme):
+        self.budget.taux_consommation = Decimal(taux)
+        self.budget.montant_consomme = Decimal(consomme)
+        self.budget.save(update_fields=["taux_consommation", "montant_consomme"])
+
+    def test_alerte_refermee_quand_le_taux_retombe(self):
+        self._taux("93.21", "139.81")
+        alerte = detecter_alertes_budget(self.budget)[0]
+        self.assertFalse(alerte.acquittee)
+
+        self._taux("60.00", "90.00")          # exactement le cas de la revue
+        detecter_alertes_budget(self.budget)
+
+        alerte.refresh_from_db()
+        self.assertTrue(alerte.acquittee)
+        self.assertIsNotNone(alerte.acquittee_le)
+
+    def test_seul_le_seuil_franchi_reste_ouvert(self):
+        """À 110 % les deux alertes existent ; à 85 % seule celle de 80 % tient."""
+        self._taux("110.00", "165.00")
+        detecter_alertes_budget(self.budget)
+        self._taux("85.00", "127.50")
+        detecter_alertes_budget(self.budget)
+
+        ouvertes = Alerte.objects.filter(budget=self.budget, acquittee=False)
+        types = sorted(a.type_alerte for a in ouvertes)
+        self.assertEqual(types, [TypeAlerte.BUDGET_ALERTE])
+
+    def test_rien_ne_se_referme_si_le_seuil_tient_toujours(self):
+        self._taux("93.21", "139.81")
+        alerte = detecter_alertes_budget(self.budget)[0]
+        self._taux("88.00", "132.00")
+        detecter_alertes_budget(self.budget)
+        alerte.refresh_from_db()
+        self.assertFalse(alerte.acquittee)
+
+    def test_une_alerte_juste_peut_reprendre_apres_refermeture(self):
+        """Le dédoublonnage ne doit pas bloquer une alerte légitime ensuite."""
+        self._taux("93.21", "139.81")
+        detecter_alertes_budget(self.budget)
+        self._taux("40.00", "60.00")
+        detecter_alertes_budget(self.budget)
+        self._taux("95.00", "142.50")
+        nouvelles = detecter_alertes_budget(self.budget)
+
+        self.assertEqual(len(nouvelles), 1)
+        self.assertIn("95,00 %", nouvelles[0].explication)
+
+
+class AlerteSurBudgetSupprimeTest(TestCase):
+    """
+    Second déclencheur d'ADR-0067 : la cause ne baisse pas, elle **disparaît**.
+
+    Constaté le 2026-08-21 en vérifiant la passe 4 : un budget de juin
+    soft-deleté n'existait plus dans l'application, mais son alerte s'affichait
+    toujours dans « Alertes récentes », datée et affirmative, à côté d'un
+    tableau où le budget était absent.
+    """
+
+    def setUp(self):
+        self.categorie = Categorie.objects.create(code="COURSES4", nom="Courses")
+        self.budget = Budget.objects.create(
+            categorie=self.categorie,
+            mois=datetime.date(2026, 6, 1),
+            montant_prevu=Decimal("100.00"),
+            montant_consomme=Decimal("90.00"),
+            taux_consommation=Decimal("90.00"),
+        )
+
+    def test_supprimer_le_budget_referme_ses_alertes(self):
+        alerte = detecter_alertes_budget(self.budget)[0]
+        self.assertFalse(alerte.acquittee)
+
+        self.budget.delete()
+
+        alerte.refresh_from_db()
+        self.assertTrue(alerte.acquittee)
+        self.assertIsNotNone(alerte.acquittee_le)
+
+    def test_l_alerte_reste_lisible_apres_coup(self):
+        """On referme, on ne supprime pas : le journal garde la trace."""
+        alerte = detecter_alertes_budget(self.budget)[0]
+        texte = alerte.explication
+        self.budget.delete()
+
+        alerte.refresh_from_db()
+        self.assertEqual(alerte.explication, texte)
+        self.assertFalse(alerte.is_deleted)

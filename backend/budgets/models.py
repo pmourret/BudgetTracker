@@ -177,11 +177,44 @@ class Budget(BaseModel):
             models.Index(fields=["categorie", "mois"]),
         ]
 
+    @property
+    def libelle(self) -> str:
+        """
+        Nom lisible du budget, quelle que soit sa forme.
+
+        ⚠️ `categorie` est **nullable** : un budget thématique n'en a pas, il
+        porte un `nom`. Écrire `budget.categorie.nom` plante donc sur un
+        thématique — et comme la détection d'alertes tourne dans un signal
+        `post_save` de Flux, le plantage remonte en 500 sur la création du flux.
+        Passer par cette propriété, jamais par `categorie.nom`.
+        """
+        return (self.categorie.nom if self.categorie_id else self.nom) or "?"
+
     def __str__(self):
-        libelle = self.categorie.nom if self.categorie_id else self.nom
-        return f"{libelle} | {self.mois:%Y-%m} | {self.montant_prevu} €"
+        return f"{self.libelle} | {self.mois:%Y-%m} | {self.montant_prevu} €"
 
     def save(self, *args, **kwargs):
         """Force le mois au 1er du mois avant chaque sauvegarde."""
         self.mois = self.mois.replace(day=1)
         super().save(*args, **kwargs)
+
+    def delete(self, using=None, keep_parents=False):
+        """
+        Soft delete — et **referme les alertes que ce budget avait levées**.
+
+        Une alerte survivait à la disparition de son objet : le budget quittait
+        l'application, sa phrase restait dans « Alertes récentes », datée et
+        affirmative, à côté d'un tableau où le budget n'existait plus. Constaté
+        le 2026-08-21 sur un budget de juin soft-deleté dont l'alerte
+        s'affichait encore.
+
+        C'est le second déclencheur de la règle posée par ADR-0067 — « une
+        alerte se referme quand sa cause disparaît ». Le premier était le retour
+        sous le seuil ; celui-ci est la disparition pure et simple.
+        """
+        from alertes.models import Alerte
+
+        for alerte in Alerte.objects.filter(budget=self, acquittee=False):
+            alerte.acquitter()
+
+        super().delete(using=using, keep_parents=keep_parents)

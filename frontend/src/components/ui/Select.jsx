@@ -23,7 +23,7 @@ export default function Select({
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
         className={[
-          'h-11 sm:h-10 px-3 rounded-lg border text-sm',
+          'h-11 lg:h-10 px-3 rounded-lg border text-sm',
           'outline-none transition-colors appearance-none',
           'bg-surface bg-no-repeat cursor-pointer',
           'focus:border-purple-600',

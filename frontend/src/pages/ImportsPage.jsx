@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   Upload, RefreshCw, ChevronDown, ChevronRight, Check, X,
-  AlertTriangle, CheckCircle2, FileText, Trash2, FilePlus,
+  AlertTriangle, CheckCircle2, FileText, Trash2, FilePlus, FileUp
 } from 'lucide-react'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
@@ -56,7 +56,7 @@ export default function ImportsPage() {
       {!isLoading && !isError && (
         lots.length === 0 ? (
           <EmptyState
-            icon="🏦"
+            Icon={FileUp}
             message="Aucun relevé importé pour l'instant."
             action={<Button variant="primary" onClick={() => setModalOpen(true)}>Importer un relevé</Button>}
           />

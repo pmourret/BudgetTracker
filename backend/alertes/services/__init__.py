@@ -5,10 +5,12 @@ from .detection import (
     detecter_alerte_solde_bas,
     detecter_alerte_valorisation_a_faire,
     detecter_alertes_budget,
+    refermer_alertes_budget_perimees,
 )
 
 __all__ = [
     "detecter_alertes_budget",
+    "refermer_alertes_budget_perimees",
     "detecter_alerte_solde_bas",
     "detecter_alerte_abonnement_en_retard",
     "detecter_alerte_divergence_abonnement",

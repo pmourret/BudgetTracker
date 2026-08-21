@@ -77,8 +77,31 @@ def recalculer_apres_save(sender, instance, **kwargs):
 
 @receiver(post_delete, sender=Flux)
 def recalculer_apres_delete(sender, instance, **kwargs):
+    """
+    ⚠️ Recalculer la consommation ne suffit pas : il faut **réévaluer les
+    alertes**. Sans cela, supprimer le flux qui avait fait franchir un seuil
+    laissait l'alerte ouverte pour toujours — elle continuait d'annoncer un
+    dépassement qui n'existait plus, et le dédoublonnage empêchait qu'une
+    alerte juste vienne la remplacer. (D01 de la revue UI/UX du 2026-08-20.)
+    """
+    from alertes.services import refermer_alertes_budget_perimees
+    from budgets.models import Budget
     from budgets.services.consommation import calculer_consommation_pour_flux
     from comptes.services.solde import calculer_solde
 
     calculer_solde(instance.compte)
     calculer_consommation_pour_flux(instance)
+
+    if instance.est_transfert or instance.categorie_id is None:
+        return
+
+    budgets_concernes = Budget.objects.filter(
+        categorie_id=instance.categorie_id,
+        mois=instance.mois,
+    ) | Budget.objects.filter(
+        mois=instance.mois,
+        categories_incluses=instance.categorie_id,
+    )
+    for budget in budgets_concernes.distinct():
+        budget.refresh_from_db()
+        refermer_alertes_budget_perimees(budget)

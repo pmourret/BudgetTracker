@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { TrendingUp } from 'lucide-react'
 import usePrevisionnel from '../hooks/usePrevisionnel'
 import { formatEuro, formatMonth } from '../utils/format'
 import Card from '../components/ui/Card'
@@ -37,7 +38,7 @@ export default function PrevisionnelPage() {
       {!isLoading && !isError && data && (
         estVide(data) ? (
           <EmptyState
-            icon="🔮"
+            Icon={TrendingUp}
             message="Pas encore assez de données pour projeter. Ajoutez des comptes, des flux ou des budgets pour alimenter le prévisionnel."
           />
         ) : (

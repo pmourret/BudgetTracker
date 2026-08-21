@@ -25,7 +25,7 @@ export default function Input({
         placeholder={placeholder}
         disabled={disabled}
         className={[
-          'h-11 sm:h-10 px-3 rounded-lg border text-sm text-content bg-surface',
+          'h-11 lg:h-10 px-3 rounded-lg border text-sm text-content bg-surface',
           'outline-none transition-colors',
           'focus:border-purple-600',
           'disabled:bg-surface-3 disabled:cursor-not-allowed',

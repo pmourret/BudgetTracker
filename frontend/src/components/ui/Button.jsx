@@ -22,7 +22,11 @@ export default function Button({
       onClick={onClick}
       disabled={disabled}
       className={[
-        'h-11 sm:h-10 px-4 rounded-lg border text-sm font-medium',
+        // `inline-flex` : sans lui, un bouton portant une icône ET un
+        // libellé les empile sur deux lignes. Même base que le Button de
+        // FoyerOS — le vocabulaire de la suite converge (ADR-0066).
+        'inline-flex items-center justify-center gap-1.5',
+        'h-11 lg:h-10 px-4 rounded-lg border text-sm font-medium',
         'cursor-pointer transition-all active:scale-[0.98]',
         'disabled:opacity-50 disabled:cursor-not-allowed',
         fullWidth ? 'w-full' : '',

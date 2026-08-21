@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Pencil, Trash2, Search, X, Undo2 } from 'lucide-react'
+import {
+  ChevronDown, ChevronUp, Pencil, Search, SlidersHorizontal, Trash2, Undo2, X,
+} from 'lucide-react'
 import {
   useInfiniteResource,
   useDeleteResource,
@@ -126,6 +128,25 @@ export default function FluxSearchPanel({
   const count = query.data?.pages[0]?.count ?? 0
 
   const hasActiveFilters = Object.entries(filters).some(([, v]) => v !== '')
+  // La recherche a son propre champ, toujours visible : elle ne compte pas
+  // parmi les filtres repliés.
+  const nbFiltresActifs = Object.entries(filters).filter(
+    ([cle, v]) => cle !== 'search' && v !== ''
+  ).length
+
+  /**
+   * Les filtres sont **repliés par défaut**.
+   *
+   * Sept contrôles pour trier douze mouvements occupaient plus de place que le
+   * tableau qu'ils filtrent ; en mobile, ils prenaient la totalité du premier
+   * écran, si bien qu'il fallait défiler pour voir une seule transaction sur un
+   * écran dont c'est l'unique objet.
+   * (D12 de la revue UI/UX du 2026-08-20.)
+   *
+   * Ouverts d'emblée **si un filtre est déjà posé** : un tableau filtré sans que
+   * rien ne dise par quoi serait pire que le panneau lui-même.
+   */
+  const [filtresOuverts, setFiltresOuverts] = useState(nbFiltresActifs > 0)
 
   // Chargement dynamique : charge la page suivante quand la sentinelle entre
   // dans le viewport (fallback : bouton « Charger plus »).
@@ -169,11 +190,43 @@ export default function FluxSearchPanel({
               value={filters.search}
               onChange={(e) => set('search', e.target.value)}
               placeholder="Rechercher un flux (libellé, référence, notes)…"
-              className="w-full h-11 sm:h-10 pl-9 pr-3 rounded-lg border border-border-app bg-surface text-sm text-content outline-none focus:border-purple-600"
+              className="w-full h-11 lg:h-10 pl-9 pr-3 rounded-lg border border-border-app bg-surface text-sm text-content outline-none focus:border-purple-600"
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setFiltresOuverts((o) => !o)}
+              aria-expanded={filtresOuverts}
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border-app bg-surface text-sm text-content-2 hover:bg-surface-3 cursor-pointer"
+            >
+              <SlidersHorizontal size={14} />
+              Filtres
+              {nbFiltresActifs > 0 && (
+                <span className="ml-0.5 inline-grid place-items-center min-w-5 h-5 px-1 rounded-full bg-purple-600 text-purple-50 text-[11px] font-medium tabular-nums">
+                  {nbFiltresActifs}
+                </span>
+              )}
+              {filtresOuverts ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+
+            {hasActiveFilters && (
+              <button
+                onClick={reset}
+                className="inline-flex items-center gap-1 text-xs text-content-2 hover:text-content cursor-pointer"
+              >
+                <X size={13} /> Réinitialiser
+              </button>
+            )}
+          </div>
+
+          {/* 4 colonnes sur bureau : à 3, le septième contrôle retombait seul
+              sur sa propre ligne en laissant deux tiers de rangée vides. */}
+          <div
+            hidden={!filtresOuverts}
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"
+          >
             {!hideCompteFilter && (
               <Select
                 label="Compte" value={filters.compte} onChange={(v) => set('compte', v)}
@@ -215,14 +268,6 @@ export default function FluxSearchPanel({
             />
           </div>
 
-          {hasActiveFilters && (
-            <button
-              onClick={reset}
-              className="self-start inline-flex items-center gap-1 text-xs text-content-2 hover:text-content cursor-pointer"
-            >
-              <X size={13} /> Réinitialiser les filtres
-            </button>
-          )}
         </div>
       </Card>
 
@@ -232,7 +277,7 @@ export default function FluxSearchPanel({
 
       {!query.isLoading && !query.isError && flux.length === 0 && (
         <EmptyState
-          icon="🔍"
+          Icon={Search}
           message={hasActiveFilters ? 'Aucun flux ne correspond aux filtres.' : 'Aucun flux enregistré.'}
           action={
             hasActiveFilters
@@ -246,8 +291,8 @@ export default function FluxSearchPanel({
 
       {!query.isLoading && !query.isError && flux.length > 0 && (
         isMobile
-          ? <FluxCards flux={flux} onEdit={openEdit} onRembourser={setRembourseFlux} />
-          : <FluxTable flux={flux} onEdit={openEdit} onRembourser={setRembourseFlux} />
+          ? <FluxCards flux={flux} onEdit={openEdit} onRembourser={setRembourseFlux} hideCompte={hideCompteFilter} />
+          : <FluxTable flux={flux} onEdit={openEdit} onRembourser={setRembourseFlux} hideCompte={hideCompteFilter} />
       )}
 
       {/* Sentinelle + bouton de chargement */}
@@ -362,7 +407,7 @@ function FluxActions({ flux, onEdit, onRembourser, inline = false }) {
   )
 }
 
-function FluxTable({ flux, onEdit, onRembourser }) {
+function FluxTable({ flux, onEdit, onRembourser, hideCompte = false }) {
   return (
     <Card bodyClassName="p-0">
       <table className="w-full border-collapse text-sm">
@@ -371,7 +416,12 @@ function FluxTable({ flux, onEdit, onRembourser }) {
             <th className="text-left px-4 py-3 text-xs font-medium text-content-2">Date</th>
             <th className="text-left px-4 py-3 text-xs font-medium text-content-2">Libellé</th>
             <th className="text-left px-4 py-3 text-xs font-medium text-content-2">Catégorie</th>
-            <th className="text-left px-4 py-3 text-xs font-medium text-content-2">Compte</th>
+            {/* Masquée avec son filtre : sur le détail d'un compte, lire
+                « Compte test 02 » à chaque ligne d'une page qui ne parle que de
+                lui est du bruit. (D13 de la revue UI/UX du 2026-08-20.) */}
+            {!hideCompte && (
+              <th className="text-left px-4 py-3 text-xs font-medium text-content-2">Compte</th>
+            )}
             <th className="text-right px-4 py-3 text-xs font-medium text-content-2">Montant</th>
             <th className="px-4 py-3 w-16"></th>
           </tr>
@@ -390,10 +440,12 @@ function FluxTable({ flux, onEdit, onRembourser }) {
                 </div>
               </td>
               <td className="px-4 py-3 text-content">{f.categorie_nom || '—'}</td>
-              <td className="px-4 py-3 text-content">{f.compte_nom || '—'}</td>
+              {!hideCompte && (
+                <td className="px-4 py-3 text-content">{f.compte_nom || '—'}</td>
+              )}
               <td className="px-4 py-3 text-right"><MontantBadge montant={f.montant} /></td>
               <td className="px-4 py-3">
-                <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="actions-ligne">
                   <FluxActions flux={f} onEdit={onEdit} onRembourser={onRembourser} inline />
                 </div>
               </td>
@@ -405,7 +457,7 @@ function FluxTable({ flux, onEdit, onRembourser }) {
   )
 }
 
-function FluxCards({ flux, onEdit, onRembourser }) {
+function FluxCards({ flux, onEdit, onRembourser, hideCompte = false }) {
   return (
     <div className="flex flex-col gap-2">
       {flux.map((f) => (
@@ -420,7 +472,9 @@ function FluxCards({ flux, onEdit, onRembourser }) {
                 <RemboursementTag f={f} />
               </div>
               <div className="text-xs text-content-2 mt-0.5">
-                {f.categorie_nom || '—'} · {f.compte_nom || '—'} · {formatDate(f.date_flux)}
+                {f.categorie_nom || '—'}
+                {!hideCompte && ` · ${f.compte_nom || '—'}`}
+                {` · ${formatDate(f.date_flux)}`}
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">

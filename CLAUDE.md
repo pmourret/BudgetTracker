@@ -172,6 +172,22 @@ d'épargne. **Phase 12 mécaniques A et C : gelées, ne pas coder sans spec.**
 
 - **Emojis comme icônes** : abandonnés au profit de `lucide-react`. Utiliser `IconBadge`.
 - **Couleurs en dark** : ne pas bricoler `dark:` au cas par cas → variables CSS sémantiques centralisées.
+- ⚠️ **Couleurs de données ≠ couleurs d'état.** Le turquoise dit « entrant »,
+  le rouge « sortant », l'ambre « alerte », le violet la marque : aucune ne
+  désigne jamais une catégorie ou une série. Passer par
+  `charts/paletteDonnees.js` (`usePaletteDonnees`), dont la rampe est
+  **disjointe** et validée (chroma, séparation en vision déficiente,
+  contraste), avec ses propres crans en sombre. La couleur suit
+  l'**identifiant** de l'entité, jamais son rang dans la liste — sinon une
+  catégorie change de couleur dès qu'une autre est ajoutée. Revalider après
+  tout changement de rampe : les contrôles portent sur les paires
+  **adjacentes**, donc l'ordre compte.
+- ⚠️ **En thème sombre, une frontière se trace par la BORDURE, pas par le fond.**
+  Une carte ne se sépare du fond que par **1,22:1** — c'est `border-border-app`
+  qui la délimite. Remonter un fond pour « détacher » un bloc ne marche pas :
+  la barre latérale câblée sur `bg-ink` était à 1,12:1 du fond de page et
+  disparaissait. Corrigé par fond **et** `border-r`. Vérifier un contraste par
+  le calcul, jamais à l'œil sur un écran calibré autrement.
 - **Dashboard non rafraîchi après mutation** : toute ressource affectant les agrégats doit être ajoutée à `RESOURCE_DEPENDENCIES` dans `useResource.js`, sinon le cache reste périmé.
 - **Early return sur `isError`** : pattern à éviter, il remplace toute la page (header compris) et supprime les boutons d'action. Préférer `{isLoading && …}` / `{isError && …}` / `{!isLoading && !isError && (…)}`.
 - **Label des comptes dans les selects** : toujours `nom — établissement`, jamais `établissement || nom` (deux comptes de la même banque deviendraient indiscernables).

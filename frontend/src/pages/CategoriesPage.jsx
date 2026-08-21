@@ -106,7 +106,7 @@ export default function CategoriesPage() {
 
       {!isLoading && !isError && majeures.length === 0 && (
         <EmptyState
-          icon="🏷️"
+          Icon={Tag}
           message="Aucune catégorie configurée."
           action={
             <Button variant="primary" onClick={openCreateMajeure}>

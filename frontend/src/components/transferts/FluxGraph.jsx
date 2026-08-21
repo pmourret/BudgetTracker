@@ -187,11 +187,11 @@ export default function FluxGraph({ noeuds = [], liens = [] }) {
       {expanded && (
         <div
           onClick={() => setExpanded(false)}
-          className="fixed inset-0 z-[70] bg-slate-900/60 flex items-stretch sm:items-center justify-center p-0 sm:p-4"
+          className="fixed inset-0 z-[70] bg-slate-900/60 flex items-stretch lg:items-center justify-center p-0 lg:p-4"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="bg-surface flex flex-col overflow-hidden w-full h-dvh rounded-none sm:w-[95vw] sm:h-[92dvh] sm:rounded-xl"
+            className="bg-surface flex flex-col overflow-hidden w-full h-dvh rounded-none lg:w-[95vw] lg:h-[92dvh] lg:rounded-xl"
           >
             <div className="flex justify-between items-center px-5 py-3 border-b border-border-app shrink-0">
               <span className="text-base font-medium text-content">Graphe des virements</span>

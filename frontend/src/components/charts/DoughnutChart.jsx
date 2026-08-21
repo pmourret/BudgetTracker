@@ -1,14 +1,17 @@
 import { Doughnut } from 'react-chartjs-2'
-import { chartColors } from './chartSetup'
 
-const DEFAULT_PALETTE = [
-  chartColors.purple,
-  chartColors.teal,
-  chartColors.amber,
-  chartColors.red,
-  chartColors.blue,
-  chartColors.gray,
-]
+/**
+ * ⚠️ **Aucune palette par défaut empruntée aux couleurs d'état.**
+ *
+ * Elle valait `purple, teal, amber, red, blue, gray` — c'est-à-dire exactement
+ * la sémantique monétaire de l'application : le turquoise « entrant » servait à
+ * désigner un type d'actif, le rouge « sortant » un autre.
+ * (D05 de la revue UI/UX du 2026-08-20.)
+ *
+ * `colors` est désormais **obligatoire** : l'appelant connaît ses entités, donc
+ * lui seul peut leur donner une couleur stable (`usePaletteDonnees`). Un défaut
+ * silencieux redeviendrait une palette de rang.
+ */
 
 export default function DoughnutChart({ labels, values, colors, height = 200 }) {
   const data = {
@@ -16,7 +19,7 @@ export default function DoughnutChart({ labels, values, colors, height = 200 }) 
     datasets: [
       {
         data: values,
-        backgroundColor: colors || DEFAULT_PALETTE,
+        backgroundColor: colors,
         borderWidth: 0,
         hoverOffset: 4,
       },

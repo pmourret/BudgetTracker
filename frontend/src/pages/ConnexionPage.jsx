@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Eye, EyeOff, Wallet } from 'lucide-react'
+import { Eye, EyeOff, LogIn, Wallet } from 'lucide-react'
 
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
@@ -59,12 +59,19 @@ export default function ConnexionPage() {
         onSubmit={soumettre}
         className="w-full max-w-sm bg-surface border border-border-app rounded-xl p-6 flex flex-col gap-5"
       >
+        {/* ⚠️ **Porte d'entrée de la suite** — même forme que celle de
+            FoyerOS : tuile de marque, nom, accroche, sur une seule rangée. Les
+            deux applications partagent un annuaire et une session ; leur premier
+            écran ne peut pas donner l'impression d'être deux produits sans
+            rapport. Chacune garde **sa** marque : converger n'est pas se
+            déguiser en l'autre.
+            (D09 de la revue UI/UX du 2026-08-20, ADR-0066.) */}
         <div className="flex items-center gap-2.5">
           <span className="grid place-items-center w-10 h-10 rounded-lg bg-ink text-purple-50 shrink-0">
             <Wallet size={20} />
           </span>
           <div>
-            <h1 className="text-base font-medium text-content">BudgetTracker</h1>
+            <h1 className="text-lg font-semibold text-content">BudgetTracker</h1>
             <p className="text-xs text-content-2">Connectez-vous pour continuer</p>
           </div>
         </div>
@@ -100,7 +107,7 @@ export default function ConnexionPage() {
             type="button"
             onClick={() => setVisible((v) => !v)}
             aria-label={visible ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
-            className="absolute right-0 bottom-0 h-11 sm:h-10 w-10 grid place-items-center text-content-3 hover:text-content"
+            className="absolute right-0 bottom-0 h-11 lg:h-10 w-10 grid place-items-center text-content-3 hover:text-content"
           >
             {visible ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
@@ -117,6 +124,7 @@ export default function ConnexionPage() {
           fullWidth
           disabled={connexion.isPending || !identifiant.trim() || !motDePasse}
         >
+          <LogIn size={18} />
           {connexion.isPending ? 'Connexion…' : 'Se connecter'}
         </Button>
 

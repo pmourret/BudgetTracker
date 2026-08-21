@@ -45,6 +45,22 @@
 
 /* --- Surcharge des variables sémantiques en mode sombre --- */
 .dark {
+  /* Barre latérale en sombre. Câblée en dur sur #1e1b4b, elle se fondait dans le
+     fond de page (#0f172a) : 1,12:1, deux bleus nuit voisins, plus de frontière
+     entre navigation et contenu. (D06 de la revue UI/UX du 2026-08-20.)
+
+     ⚠️ Remonter le fond ne suffit pas. En sombre, une carte ne se sépare du fond
+     que par 1,22:1 — c'est sa BORDURE qui trace la frontière, pas son fond. La
+     barre n'en avait aucune. D'où deux gestes : un fond plus clair (1,38:1, au-
+     dessus de la référence carte/fond) ET `border-r border-ink-light` sur le
+     <nav>, qui donne 2,13:1 contre le fond de page.
+
+     `--color-ink-light` sert à trois choses — pastille d'élément actif, bordure
+     du <nav>, séparateur de déconnexion. La valeur tient les trois : 1,55:1
+     contre la barre, purple-50 dessus à 7,25:1. */
+  --color-ink: #2E2868;
+  --color-ink-light: #4A4199;
+
   --color-surface: #1e293b;
   --color-surface-2: #0f172a;
   --color-surface-3: #283548;
@@ -69,4 +85,31 @@ body {
   -webkit-font-smoothing: antialiased;
   background: var(--color-surface-2);
   color: var(--color-content);
+
+  /* Chiffres à chasse fixe sur toute la surface. L'application est faite de
+     colonnes de montants : sans cela un 1 est plus étroit qu'un 8, les
+     décimales ne s'alignent pas d'une ligne à l'autre, et comparer deux
+     montants demande un effort qui devrait être nul.
+     (D22 de la revue UI/UX du 2026-08-20.) */
+  font-variant-numeric: tabular-nums;
+}
+
+/* Actions de ligne (modifier, supprimer, rembourser...).
+
+   Elles s'effacent au repos pour ne pas encombrer un tableau, MAIS uniquement
+   là où le survol existe. Sur un écran tactile il n'y a pas de survol : câblées
+   en `opacity-0 group-hover:opacity-100`, ces actions y étaient invisibles ET
+   inatteignables. (D11 de la revue UI/UX du 2026-08-20.)
+
+   Le critère est la capacité du pointeur, pas la largeur : une tablette large
+   reste tactile, un petit portable a une souris. */
+@media (hover: hover) {
+  .actions-ligne {
+    opacity: 0;
+    transition: opacity 150ms;
+  }
+  .group:hover .actions-ligne,
+  .actions-ligne:focus-within {
+    opacity: 1;
+  }
 }

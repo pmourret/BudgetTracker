@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Bell } from 'lucide-react'
 import { useResourceList, useResourceAction } from '../hooks/useResource'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
@@ -71,7 +72,7 @@ export default function AlertesPage() {
 
       {!isLoading && !isError && alertes.length === 0 && (
         <EmptyState
-          icon="🔔"
+          Icon={Bell}
           message={
             filtre === 'non_acquittee'
               ? 'Aucune alerte en attente. Tout est sous contrôle.'
@@ -119,7 +120,11 @@ function AlerteCard({ alerte, onAcquitter, isPending }) {
             <div className="text-sm text-content-2 leading-normal">
               {alerte.explication}
             </div>
-            <div className="text-[11px] text-content-3 mt-1.5">
+            {/* `text-content-2`, pas `text-content-3` : ce dernier est à
+                2,56:1 en clair et 3,07:1 en sombre sur une carte — sous le
+                seuil AA de 4,5:1, et à 11 px la tolérance « grand texte » ne
+                s'applique pas. La hiérarchie se fait par la taille. */}
+            <div className="text-[11px] text-content-2 mt-1.5">
               {new Date(alerte.created_at).toLocaleDateString('fr-FR', {
                 day: '2-digit', month: 'long', year: 'numeric',
                 hour: '2-digit', minute: '2-digit',

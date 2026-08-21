@@ -10,11 +10,11 @@ import Modal from '../ui/Modal'
 import PeriodSelector from '../ui/PeriodSelector'
 import { Loading, ErrorState, EmptyState } from '../ui/States'
 import BarChart from '../charts/BarChart'
-import { CAT_PALETTE } from '../charts/DepensesCategories'
+import { usePaletteDonnees } from '../charts/paletteDonnees'
 import AbonnementFormModal from './AbonnementFormModal'
 import {
   AlertTriangle, TrendingUp, CheckCircle2, Pencil, ChevronRight,
-  Users, Tag, LayoutGrid,
+  Users, Tag, LayoutGrid, ChartColumn
 } from 'lucide-react'
 
 const RAISON_LABEL = {
@@ -133,7 +133,7 @@ export default function AbonnementsAnalyse() {
 
       {!isLoading && !isError && data && (
         data.synthese.nb_actifs === 0 ? (
-          <EmptyState icon="📊" message="Aucun abonnement actif à analyser pour l'instant." />
+          <EmptyState Icon={ChartColumn} message="Aucun abonnement actif à analyser pour l'instant." />
         ) : (
           <>
             <Synthese synthese={data.synthese} onOpenAll={openTous} onEdit={handleEdit} />
@@ -286,6 +286,9 @@ function Synthese({ synthese, onOpenAll, onEdit }) {
 // Répartition par catégorie (chaque catégorie = agrégat cliquable)
 // -------------------------------------------------------------------------
 function ParCategorie({ bloc, onSelect }) {
+  const { couleurDe } = usePaletteDonnees(
+    (bloc?.par_categorie ?? []).map((r) => r.id)
+  )
   const rows = bloc.par_categorie
   return (
     <Card>
@@ -301,25 +304,25 @@ function ParCategorie({ bloc, onSelect }) {
             datasets={[{
               label: 'Coût mensuel',
               data: rows.map((r) => Number(r.total_mensuel)),
-              color: rows.map((_, i) => CAT_PALETTE[i % CAT_PALETTE.length]),
+              color: rows.map((r) => couleurDe(r.id)),
             }]}
             height={200}
           />
           <div className="flex flex-col gap-1 mt-3">
-            {rows.map((r, i) => (
+            {rows.map((r) => (
               <button
                 key={r.id}
                 onClick={() => onSelect(r)}
                 className="text-left w-full flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-surface-3 cursor-pointer group"
               >
-                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: CAT_PALETTE[i % CAT_PALETTE.length] }} />
+                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: couleurDe(r.id) }} />
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between text-sm">
                     <span className="text-content truncate">{r.nom} <span className="text-content-3">· {r.nb}</span></span>
                     <span className="text-content tabular-nums">{formatEuro(r.total_mensuel)}<span className="text-content-3">/mois</span></span>
                   </div>
                   <div className="h-1 rounded-full bg-surface-3 mt-1 overflow-hidden">
-                    <div className="h-full rounded-full" style={{ width: `${r.part_pct}%`, background: CAT_PALETTE[i % CAT_PALETTE.length] }} />
+                    <div className="h-full rounded-full" style={{ width: `${r.part_pct}%`, background: couleurDe(r.id) }} />
                   </div>
                 </div>
                 <span className="text-xs text-content-3 tabular-nums w-12 text-right">{formatPercent(r.part_pct)}</span>

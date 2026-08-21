@@ -3,17 +3,19 @@ import { Link } from 'react-router-dom'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, ChartColumn } from 'lucide-react'
 import apiClient from '../api/client'
-import { formatEuro, formatDate, formatMonth, formatPercent } from '../utils/format'
+import { formatEuro, formatDate, formatPercent } from '../utils/format'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Tooltip from '../components/ui/Tooltip'
 import { DEFINITIONS } from '../constants/definitions'
 import PeriodSelector from '../components/ui/PeriodSelector'
+import MonthNav from '../components/ui/MonthNav'
 import { Loading, ErrorState } from '../components/ui/States'
 import LineChart from '../components/charts/LineChart'
 import DepensesCategories from '../components/charts/DepensesCategories'
 import HeatmapDepenses from '../components/charts/HeatmapDepenses'
 import { chartColors } from '../components/charts/chartSetup'
+import Metric, { MetricRow } from '../components/ui/Metric'
 
 function useDashboard(nbMois, mois) {
   return useQuery({
@@ -67,27 +69,12 @@ export default function DashboardPage() {
        <div>
         <h1 className="text-lg font-medium text-content">Tableau de bord</h1>
         <div className="flex items-center gap-1 mt-0.5">
-          <button
-            type="button"
-            onClick={() => setMois(shiftMonth(data.mois_courant, -1))}
-            disabled={!peutReculer}
-            aria-label="Mois précédent"
-            className="p-0.5 rounded text-content-2 hover:bg-surface-3 disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
-          >
-            <ChevronLeft size={18} />
-          </button>
-          <p className="text-sm text-content-2 capitalize min-w-[8rem] text-center">
-            {formatMonth(data.mois_courant)}
-          </p>
-          <button
-            type="button"
-            onClick={() => setMois(shiftMonth(data.mois_courant, 1))}
-            disabled={!peutAvancer}
-            aria-label="Mois suivant"
-            className="p-0.5 rounded text-content-2 hover:bg-surface-3 disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
-          >
-            <ChevronRight size={18} />
-          </button>
+          <MonthNav
+            mois={data.mois_courant}
+            onChange={(pas) => setMois(shiftMonth(data.mois_courant, pas))}
+            peutReculer={peutReculer}
+            peutAvancer={peutAvancer}
+          />
         </div>
        </div>
        <Link
@@ -99,21 +86,21 @@ export default function DashboardPage() {
        </Link>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
-        <MetricCard label="Solde total" value={formatEuro(m.solde_total)} def={DEFINITIONS.solde_total} />
-        <MetricCard
+      <MetricRow colonnes={4}>
+        <Metric label="Solde total" value={formatEuro(m.solde_total)} def={DEFINITIONS.solde_total} />
+        <Metric
           label="Dépenses du mois"
           value={`−${formatEuro(m.depenses_mois)}`}
           valueClass="text-red-600"
           def={DEFINITIONS.depenses_mois}
         />
-        <MetricCard
+        <Metric
           label="Revenus du mois"
           value={`+${formatEuro(m.revenus_mois)}`}
           valueClass="text-teal-600"
           def={DEFINITIONS.revenus_mois}
         />
-        <MetricCard
+        <Metric
           label="Épargne nette"
           value={formatEuro(m.epargne_nette)}
           valueClass={Number(m.epargne_nette) >= 0 ? 'text-purple-400' : 'text-red-600'}
@@ -121,7 +108,7 @@ export default function DashboardPage() {
           def={DEFINITIONS.epargne_nette}
           defAlign="right"
         />
-      </div>
+      </MetricRow>
 
       <Card
         title="Évolution du solde"
@@ -197,9 +184,28 @@ export default function DashboardPage() {
                   <Badge variant={NIVEAU_VARIANT[a.niveau] || 'info'}>
                     {a.type_alerte_display}
                   </Badge>
-                  <span className="text-xs text-content-2 leading-relaxed flex-1">
-                    {a.explication}
-                  </span>
+                  <div className="flex-1">
+                    <span className="text-xs text-content-2 leading-relaxed">
+                      {a.explication}
+                    </span>
+                    {/* La date n'est pas décorative : la phrase ci-dessus est
+                        figée au moment de la détection, alors que le bloc
+                        « Budgets du mois » juste à côté affiche, lui, une valeur
+                        recalculée. Sans elle, les deux se lisent comme
+                        concurrentes. (D01 de la revue UI/UX du 2026-08-20.)
+
+                        `text-content-2`, jamais `text-content-3` : ce dernier
+                        tombe à 2,56:1 en clair et 3,07:1 en sombre — sous le
+                        seuil AA. La hiérarchie se fait par la taille. */}
+                    {a.created_at && (
+                      <time
+                        dateTime={a.created_at}
+                        className="block text-[11px] text-content-2 mt-1"
+                      >
+                        Constaté le {formatDate(a.created_at)}
+                      </time>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -232,18 +238,6 @@ export default function DashboardPage() {
   )
 }
 
-function MetricCard({ label, value, valueClass = 'text-content', sub, def, defAlign = 'left' }) {
-  return (
-    <div className="bg-surface border border-border-app rounded-xl px-4 py-3.5">
-      <div className="text-xs text-content-2 mb-1 flex items-center gap-1">
-        {label}
-        {def && <Tooltip {...def} align={defAlign} />}
-      </div>
-      <div className={`text-xl font-medium ${valueClass}`}>{value}</div>
-      {sub && <div className="text-[11px] text-teal-600 mt-0.5">{sub}</div>}
-    </div>
-  )
-}
 
 function BudgetLine({ budget }) {
   const taux = Number(budget.taux_consommation)

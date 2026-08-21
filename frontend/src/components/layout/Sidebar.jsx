@@ -28,10 +28,10 @@ export default function Sidebar() {
   const deconnecter = useDeconnexion()
 
   return (
-    <nav className="w-[220px] bg-ink px-4 py-6 flex flex-col gap-0.5 shrink-0 h-screen sticky top-0">
+    <nav className="w-[220px] bg-ink border-r border-ink-light px-4 py-6 flex flex-col gap-0.5 shrink-0 h-screen sticky top-0">
       <div className="text-purple-50 font-medium text-[15px] mb-8 px-2 flex items-center gap-2">
         <Wallet size={18} />
-        BudgetTracker - V.α
+        BudgetTracker
       </div>
       {navItems.map(({ to, label, Icon }) => (
         <NavLink

@@ -3,16 +3,18 @@ import { useResourceList, useDeleteResource, useResourceAction } from '../hooks/
 import { useParametres } from '../hooks/useParametres'
 import usePoints from '../hooks/usePoints'
 import { formatEuro, formatMonth } from '../utils/format'
-import { Pencil, Trash2, RefreshCw, Coins } from 'lucide-react'
+import { Pencil, Trash2, RefreshCw, Coins, Target, ClipboardList } from 'lucide-react'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
 import Tooltip from '../components/ui/Tooltip'
 import { DEFINITIONS } from '../constants/definitions'
 import { Loading, ErrorState, EmptyState } from '../components/ui/States'
+import MonthNav from '../components/ui/MonthNav'
 import BudgetFormModal from '../components/budgets/BudgetFormModal'
 import BudgetTemplateFormModal from '../components/budgets/BudgetTemplateFormModal'
 import AllocationModal from '../components/budgets/AllocationModal'
+import Metric, { MetricRow } from '../components/ui/Metric'
 
 // Points d'une enveloppe (miroir client de budgets/services/points.py) :
 // signe(prévu_effectif − consommé) × ⌈ |écart| / valeur_point ⌉.
@@ -210,25 +212,7 @@ export default function BudgetsPage() {
       {/* ---- Onglet Ce mois ---- */}
       {tab === 'mois' && (
         <>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => changeMois(-1)}
-              className="w-8 h-8 rounded-lg border border-border-app bg-surface text-content-2 cursor-pointer hover:bg-surface-3 flex items-center justify-center"
-              aria-label="Mois précédent"
-            >
-              ‹
-            </button>
-            <span className="text-sm font-medium text-content min-w-[130px] text-center capitalize">
-              {formatMonth(moisISO)}
-            </span>
-            <button
-              onClick={() => changeMois(1)}
-              className="w-8 h-8 rounded-lg border border-border-app bg-surface text-content-2 cursor-pointer hover:bg-surface-3 flex items-center justify-center"
-              aria-label="Mois suivant"
-            >
-              ›
-            </button>
-          </div>
+          <MonthNav mois={moisISO} onChange={changeMois} />
 
           <PointsReservePanel />
 
@@ -238,27 +222,27 @@ export default function BudgetsPage() {
           {!isLoading && !isError && (
             <>
               {budgets.length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                  <MetricCard label="Total prévu" value={formatEuro(totalPrevu)} def={DEFINITIONS.budget_total_prevu} />
-                  <MetricCard
+                <MetricRow colonnes={3}>
+                  <Metric label="Total prévu" value={formatEuro(totalPrevu)} def={DEFINITIONS.budget_total_prevu} />
+                  <Metric
                     label="Total consommé"
                     value={formatEuro(totalConsomme)}
                     valueClass={totalConsomme > totalPrevu ? 'text-red-600' : 'text-content'}
                     def={DEFINITIONS.budget_total_consomme}
                   />
-                  <MetricCard
+                  <Metric
                     label="Reste disponible"
                     value={formatEuro(reste)}
                     valueClass={reste < 0 ? 'text-red-600' : 'text-teal-600'}
                     def={DEFINITIONS.budget_reste}
                     defAlign="right"
                   />
-                </div>
+                </MetricRow>
               )}
 
               {budgets.length === 0 ? (
                 <EmptyState
-                  icon="🎯"
+                  Icon={Target}
                   message={`Aucun budget défini pour ${formatMonth(moisISO)}.`}
                   action={
                     <div className="flex flex-col items-center gap-2">
@@ -327,7 +311,7 @@ export default function BudgetsPage() {
           {!templatesLoading && !templatesError && (
             templates.length === 0 ? (
               <EmptyState
-                icon="📋"
+                Icon={ClipboardList}
                 message="Aucun modèle défini."
                 action={
                   <Button variant="primary" onClick={openTemplateCreate}>
@@ -387,17 +371,6 @@ function TabBtn({ active, onClick, children }) {
   )
 }
 
-function MetricCard({ label, value, valueClass = 'text-content', def, defAlign = 'left' }) {
-  return (
-    <div className="bg-surface-3 rounded-lg px-4 py-3.5">
-      <div className="text-xs text-content-2 mb-1 flex items-center gap-1">
-        {label}
-        {def && <Tooltip {...def} align={defAlign} />}
-      </div>
-      <div className={`text-xl font-medium ${valueClass}`}>{value}</div>
-    </div>
-  )
-}
 
 function MineuresIncluses({ detail }) {
   const MAX = 3

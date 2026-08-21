@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react'
+import { ArrowUpRight, ArrowDownRight, Minus, ChartColumn } from 'lucide-react'
 import useAnalyse from '../hooks/useAnalyse'
 import { formatEuro, formatPercent, formatMonth } from '../utils/format'
 import Card from '../components/ui/Card'
@@ -11,7 +11,7 @@ import { ErrorState, EmptyState } from '../components/ui/States'
 import BarChart from '../components/charts/BarChart'
 import LineChart from '../components/charts/LineChart'
 import { chartColors } from '../components/charts/chartSetup'
-import { CAT_PALETTE } from '../components/charts/DepensesCategories'
+import { usePaletteDonnees } from '../components/charts/paletteDonnees'
 
 const JOURS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
 const TOP_CATEGORIES = 7 // au-delà : regroupées sous « Autres »
@@ -45,7 +45,7 @@ export default function AnalysePage() {
       {!isLoading && !isError && data && (
         estVide(data) ? (
           <EmptyState
-            icon="📊"
+            Icon={ChartColumn}
             message="Pas encore de dépenses sur la période. Ajoutez des flux pour alimenter l'analyse."
           />
         ) : (
@@ -115,12 +115,18 @@ function TendancesCard({ bloc }) {
           />
         </div>
 
-        <BarChart labels={labels} datasets={datasets} height={240} />
-
-        <p className="text-[11px] text-content-3 leading-relaxed inline-flex items-center gap-1">
-          Comparaison à la période précédente
+        {/* ⚠️ Légende, pas titre de section. Elle était posée **après** le
+            graphique, seule en bas de carte : « Comparaison à la période
+            précédente ⓘ » suivi de rien se lisait comme un intitulé dont le
+            contenu manquait. Remontée sous les tuiles, elle qualifie enfin ce
+            qu'elle explique — les variations affichées juste au-dessus.
+            (D15 de la revue UI/UX du 2026-08-20.) */}
+        <p className="-mt-2 text-[11px] text-content-2 leading-relaxed inline-flex items-center gap-1">
+          Les variations se calculent par rapport à la période précédente.
           <Tooltip {...DEFINITIONS.analyse_comparaison} align="left" size={12} />
         </p>
+
+        <BarChart labels={labels} datasets={datasets} height={240} />
       </div>
     </Card>
   )
@@ -146,9 +152,23 @@ function RecapTile({ label, total, moyenne, variation, suffixe }) {
 
 // Δ descriptif, volontairement neutre (gris, pas de rouge/vert) : aucun
 // jugement sur les variations (arbitrage foyer « pas de mise en avant »).
+//
+// ⚠️ **Un tiret est une absence de contenu, jamais un contenu.** Ce chip
+// affichait « — nouveau », où le tiret occupait la place d'un indicateur de
+// variation sans qu'on sache s'il voulait dire « pas de comparaison possible »,
+// « nouveau ce mois » ou « delta indisponible ». Il dit maintenant la seule
+// chose vraie : la catégorie n'existait pas à la période précédente, donc il
+// n'y a rien à comparer. (D20 de la revue UI/UX du 2026-08-20.)
 function VariationChip({ variation }) {
   if (variation === null || variation === undefined) {
-    return <span className="text-[11px] text-content-3">— nouveau</span>
+    return (
+      <span
+        className="text-[11px] text-content-3"
+        title="Aucune période précédente à comparer"
+      >
+        nouveau
+      </span>
+    )
   }
   const n = Number(variation)
   const Icon = n > 0 ? ArrowUpRight : n < 0 ? ArrowDownRight : Minus
@@ -164,6 +184,7 @@ function VariationChip({ variation }) {
 /* Épargne réellement mise de côté                                            */
 /* -------------------------------------------------------------------------- */
 function EpargneCard({ bloc }) {
+  const { rampe } = usePaletteDonnees()
   const title = (
     <span className="inline-flex items-center gap-1">
       Épargne
@@ -185,16 +206,20 @@ function EpargneCard({ bloc }) {
   const labels = vpm.map((v) => moisLabel(v.mois))
   const verseSurPeriode = vpm.length ? Number(vpm[vpm.length - 1].cumul) : 0
 
+  // ⚠️ Deux **séries de données** à distinguer, pas un entrant/sortant : elles
+  // prennent les deux premiers crans de la rampe de données. Le turquoise et le
+  // violet de marque qu'elles portaient réutilisaient la sémantique monétaire
+  // pour dire tout autre chose. (D05 de la revue UI/UX du 2026-08-20.)
   const ecartDatasets = [
     {
       label: 'Épargne budgétaire (reste)',
       data: bloc.ecart_budgetaire.map((e) => Number(e.epargne_budgetaire)),
-      color: chartColors.teal,
+      color: rampe[0],
     },
     {
       label: 'Versé réellement',
       data: bloc.ecart_budgetaire.map((e) => Number(e.versement_reel)),
-      color: chartColors.purple,
+      color: rampe[1],
     },
   ]
   const cumulDataset = [
@@ -266,6 +291,15 @@ function EpargneCard({ bloc }) {
 /* Ventilation par titulaire                                                  */
 /* -------------------------------------------------------------------------- */
 function TitulairesCard({ bloc }) {
+  // ⚠️ Les deux clés synthétiques sont déclarées **avec** les titulaires : la
+  // carte porte deux jeux de couleurs (les titulaires en haut, commun/perso en
+  // bas), et sans les réserver ensemble, « Pierre » et « Commun » tombaient sur
+  // le même bleu à quelques pixels d'écart.
+  const { couleurDe } = usePaletteDonnees([
+    ...(bloc.par_titulaire ?? []).map((b) => b.id),
+    '__commun',
+    '__perso',
+  ])
   const buckets = bloc.par_titulaire
   const total = Number(bloc.total_depenses) || 0
   const cvp = bloc.commun_vs_perso
@@ -284,11 +318,11 @@ function TitulairesCard({ bloc }) {
     >
       <div className="flex flex-col gap-4">
         <div className="flex flex-col divide-y divide-border-app">
-          {buckets.map((b, i) => (
+          {buckets.map((b) => (
             <div key={b.id} className="flex items-center gap-3 py-2">
               <span
                 className="w-2.5 h-2.5 rounded-full shrink-0"
-                style={{ background: CAT_PALETTE[i % CAT_PALETTE.length] }}
+                style={{ background: couleurDe(b.id) }}
               />
               <div className="flex-1 min-w-0">
                 <div className="text-sm text-content truncate flex items-center gap-1.5">
@@ -300,7 +334,7 @@ function TitulairesCard({ bloc }) {
                     className="h-full rounded-full"
                     style={{
                       width: `${total > 0 ? (Number(b.depenses) / total) * 100 : 0}%`,
-                      background: CAT_PALETTE[i % CAT_PALETTE.length],
+                      background: couleurDe(b.id),
                     }}
                   />
                 </div>
@@ -328,25 +362,25 @@ function TitulairesCard({ bloc }) {
               className="h-full"
               style={{
                 width: `${totalCvp > 0 ? (communDep / totalCvp) * 100 : 0}%`,
-                background: chartColors.purple,
+                background: couleurDe('__commun'),
               }}
             />
             <div
               className="h-full"
               style={{
                 width: `${totalCvp > 0 ? (persoDep / totalCvp) * 100 : 0}%`,
-                background: chartColors.teal,
+                background: couleurDe('__perso'),
               }}
             />
           </div>
           <div className="flex justify-between text-[11px] text-content-3 tabular-nums">
             <span>
-              <span className="inline-block w-2 h-2 rounded-full mr-1 align-middle" style={{ background: chartColors.purple }} />
+              <span className="inline-block w-2 h-2 rounded-full mr-1 align-middle" style={{ background: couleurDe('__commun') }} />
               Commun {formatEuro(communDep)}
             </span>
             <span>
               Perso {formatEuro(persoDep)}
-              <span className="inline-block w-2 h-2 rounded-full ml-1 align-middle" style={{ background: chartColors.teal }} />
+              <span className="inline-block w-2 h-2 rounded-full ml-1 align-middle" style={{ background: couleurDe('__perso') }} />
             </span>
           </div>
         </div>
@@ -359,6 +393,9 @@ function TitulairesCard({ bloc }) {
 /* Catégories dans le temps                                                   */
 /* -------------------------------------------------------------------------- */
 function CategoriesCard({ bloc, series }) {
+  const { couleurDe } = usePaletteDonnees(
+    (bloc.par_categorie ?? []).map((c) => c.id)
+  )
   const labels = series.map((p) => moisLabel(p.mois))
   const cats = bloc.par_categorie
   const total = Number(bloc.total_periode) || 0
@@ -366,10 +403,10 @@ function CategoriesCard({ bloc, series }) {
   // Barres empilées : top N catégories + « Autres » agrégées.
   const principales = cats.slice(0, TOP_CATEGORIES)
   const reste = cats.slice(TOP_CATEGORIES)
-  const datasets = principales.map((cat, i) => ({
+  const datasets = principales.map((cat) => ({
     label: cat.nom,
     data: cat.serie.map((s) => Number(s.total)),
-    color: CAT_PALETTE[i % CAT_PALETTE.length],
+    color: couleurDe(cat.id),
   }))
   if (reste.length > 0) {
     datasets.push({
@@ -394,11 +431,11 @@ function CategoriesCard({ bloc, series }) {
         <BarChart labels={labels} datasets={datasets} height={260} stacked />
 
         <div className="flex flex-col divide-y divide-border-app">
-          {cats.map((cat, i) => (
+          {cats.map((cat) => (
             <div key={cat.id} className="flex items-center gap-3 py-2">
               <span
                 className="w-2.5 h-2.5 rounded-full shrink-0"
-                style={{ background: CAT_PALETTE[i % CAT_PALETTE.length] }}
+                style={{ background: couleurDe(cat.id) }}
               />
               <div className="flex-1 min-w-0">
                 <div className="text-sm text-content truncate">{cat.nom}</div>
@@ -407,7 +444,7 @@ function CategoriesCard({ bloc, series }) {
                     className="h-full rounded-full"
                     style={{
                       width: `${total > 0 ? (Number(cat.total_periode) / total) * 100 : 0}%`,
-                      background: CAT_PALETTE[i % CAT_PALETTE.length],
+                      background: couleurDe(cat.id),
                     }}
                   />
                 </div>

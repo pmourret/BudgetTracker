@@ -102,12 +102,18 @@ def calculer_dashboard(nb_mois: int = 6, mois: datetime.date = None) -> dict:
         Alerte.objects.filter(acquittee=False)
         .order_by("-created_at")[:5]
     )
+    # ⚠️ `created_at` est indispensable, pas décoratif. `explication` est une
+    # phrase **figée à la détection** ; le budget, lui, se recalcule à chaque
+    # flux. Sans sa date, une alerte périmée se lit comme un état courant, à
+    # côté d'un chiffre à jour qui la contredit.
+    # (D01 de la revue UI/UX du 2026-08-20.)
     alertes_data = [
         {
             "id": str(a.id),
             "type_alerte_display": a.get_type_alerte_display(),
             "niveau": a.niveau,
             "explication": a.explication,
+            "created_at": a.created_at,
         }
         for a in alertes
     ]

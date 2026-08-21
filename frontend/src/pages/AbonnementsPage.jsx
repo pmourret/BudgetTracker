@@ -8,7 +8,7 @@ import {
 import { useFrequences, useStatutsFlux } from '../hooks/useReferentiels'
 import useDebouncedValue from '../hooks/useDebouncedValue'
 import { formatEuro } from '../utils/format'
-import { Pencil, Trash2, FilePlus, Search } from 'lucide-react'
+import { Pencil, Trash2, FilePlus, Search, RefreshCw } from 'lucide-react'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
@@ -20,6 +20,7 @@ import { Loading, ErrorState, EmptyState } from '../components/ui/States'
 import AbonnementFormModal from '../components/abonnements/AbonnementFormModal'
 import AbonnementsAnalyse from '../components/abonnements/AbonnementsAnalyse'
 import FluxFormModal from '../components/flux/FluxFormModal'
+import Metric, { MetricRow } from '../components/ui/Metric'
 
 function echeanceISO(jour) {
   const d = new Date()
@@ -147,17 +148,17 @@ export default function AbonnementsPage() {
         <AbonnementsAnalyse />
       ) : (
       <>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-        <MetricCard label="Total mensuel estimé" value={formatEuro(-totalMensuel)} def={DEFINITIONS.abo_total_mensuel} />
-        <MetricCard label="Abonnements actifs" value={String(actifs.length)} />
-        <MetricCard
+      <MetricRow colonnes={3}>
+        <Metric label="Total mensuel estimé" value={formatEuro(-totalMensuel)} def={DEFINITIONS.abo_total_mensuel} />
+        <Metric label="Abonnements actifs" value={String(actifs.length)} />
+        <Metric
           label="En retard"
           value={String(enRetard)}
           valueClass={enRetard > 0 ? 'text-amber-600' : 'text-content'}
           def={DEFINITIONS.abo_en_retard}
           defAlign="right"
         />
-      </div>
+      </MetricRow>
 
       {/* Filtres */}
       <Card>
@@ -169,7 +170,7 @@ export default function AbonnementsPage() {
               value={filtres.search}
               onChange={(e) => setFiltre('search', e.target.value)}
               placeholder="Rechercher..."
-              className="w-full h-11 sm:h-10 pl-9 pr-3 rounded-lg border border-border-app bg-surface text-sm text-content outline-none focus:border-purple-600"
+              className="w-full h-11 lg:h-10 pl-9 pr-3 rounded-lg border border-border-app bg-surface text-sm text-content outline-none focus:border-purple-600"
             />
           </div>
           <Select value={filtres.compte} onChange={(v) => setFiltre('compte', v)} options={comptesOpts} />
@@ -195,7 +196,7 @@ export default function AbonnementsPage() {
       {!isLoading && !isError && (
         abonnements.length === 0 ? (
           <EmptyState
-            icon="🔄"
+            Icon={RefreshCw}
             message={filtresActifs ? 'Aucun abonnement ne correspond aux filtres.' : 'Aucun abonnement enregistré.'}
             action={
               !filtresActifs && (
@@ -242,17 +243,6 @@ function TabBtn({ active, onClick, children }) {
   )
 }
 
-function MetricCard({ label, value, valueClass = 'text-content', def, defAlign = 'left' }) {
-  return (
-    <div className="bg-surface-3 rounded-lg px-4 py-3.5">
-      <div className="text-xs text-content-2 mb-1 flex items-center gap-1">
-        {label}
-        {def && <Tooltip {...def} align={defAlign} />}
-      </div>
-      <div className={`text-xl font-medium ${valueClass}`}>{value}</div>
-    </div>
-  )
-}
 
 function StatutBadge({ abonnement }) {
   if (!abonnement.actif) return <Badge variant="neutre">Inactif</Badge>
@@ -265,7 +255,7 @@ function AbonnementsTable({ abonnements, onEdit, onGenerate }) {
   return (
     <>
       {/* Desktop */}
-      <div className="hidden sm:block overflow-x-auto">
+      <div className="hidden lg:block overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-xs text-content-2 border-b border-border-app">
@@ -299,7 +289,7 @@ function AbonnementsTable({ abonnements, onEdit, onGenerate }) {
       </div>
 
       {/* Mobile */}
-      <div className="sm:hidden flex flex-col gap-2.5">
+      <div className="lg:hidden flex flex-col gap-2.5">
         {abonnements.map((ab) => (
           <Card key={ab.id}>
             <div className="flex items-start justify-between gap-2">
@@ -341,7 +331,7 @@ function RowActions({ ab, onEdit, onGenerate, showLabels = false }) {
       : 'Générer le flux du mois'
 
   return (
-    <div className={`flex gap-1 justify-end ${showLabels ? '' : 'opacity-0 group-hover:opacity-100 transition-opacity'}`}>
+    <div className={`flex gap-1 justify-end ${showLabels ? '' : 'actions-ligne'}`}>
       <button
         onClick={() => onGenerate(ab)}
         disabled={genererDesactive}

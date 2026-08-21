@@ -8,6 +8,7 @@ import Tooltip from '../ui/Tooltip'
 import PeriodSelector from '../ui/PeriodSelector'
 import { Loading, ErrorState, EmptyState } from '../ui/States'
 import BarChart from '../charts/BarChart'
+import Metric, { MetricRow } from '../ui/Metric'
 
 // React Flow est lourd (~180 kB) : chargé à la demande, uniquement quand
 // l'onglet Analyse est ouvert (il n'est pas l'onglet par défaut).
@@ -43,22 +44,22 @@ export default function TransfertsAnalyse() {
       {!isLoading && !isError && (
         <>
           {/* Synthèse */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            <MetricCard
+          <MetricRow colonnes={4}>
+            <Metric
               label="Volume transféré" value={formatEuro(synthese.total)}
               def={DEFINITIONS.transferts_volume}
             />
-            <MetricCard label="Virements" value={String(synthese.nb ?? 0)} />
-            <MetricCard label="Comptes concernés" value={String(synthese.nb_comptes ?? 0)} />
-            <MetricCard
+            <Metric label="Virements" value={String(synthese.nb ?? 0)} />
+            <Metric label="Comptes concernés" value={String(synthese.nb_comptes ?? 0)} />
+            <Metric
               label="Moyenne / mois" value={formatEuro(synthese.moyenne_mensuelle)}
               def={DEFINITIONS.transferts_moyenne} defAlign="right"
             />
-          </div>
+          </MetricRow>
 
           {aucun ? (
             <EmptyState
-              icon="🔁"
+              Icon={Repeat}
               message="Aucun transfert sur cette période. Élargissez la fenêtre ou créez un transfert."
             />
           ) : (
@@ -122,14 +123,3 @@ export default function TransfertsAnalyse() {
   )
 }
 
-function MetricCard({ label, value, valueClass = 'text-content', def, defAlign = 'left' }) {
-  return (
-    <div className="bg-surface-3 rounded-lg px-4 py-3.5">
-      <div className="text-xs text-content-2 mb-1 flex items-center gap-1">
-        {label}
-        {def && <Tooltip {...def} align={defAlign} />}
-      </div>
-      <div className={`text-xl font-medium ${valueClass}`}>{value}</div>
-    </div>
-  )
-}

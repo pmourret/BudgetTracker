@@ -99,7 +99,7 @@ export default function ImportUploadModal({ isOpen, onClose, onImported }) {
           <label className="text-sm font-medium text-content-2">
             Fichier CSV <span className="text-red-600">*</span>
           </label>
-          <label className="flex items-center gap-2.5 h-11 sm:h-10 px-3 rounded-lg border border-border-app bg-surface cursor-pointer hover:bg-surface-3 text-sm text-content-2">
+          <label className="flex items-center gap-2.5 h-11 lg:h-10 px-3 rounded-lg border border-border-app bg-surface cursor-pointer hover:bg-surface-3 text-sm text-content-2">
             <Upload size={16} />
             <span className="truncate">
               {fichier ? fichier.name : 'Sélectionner un fichier…'}

@@ -140,7 +140,7 @@ function TransfertsListe({ onCreate }) {
               value={filters.search}
               onChange={(e) => set('search', e.target.value)}
               placeholder="Rechercher (compte, notes)…"
-              className="w-full h-11 sm:h-10 pl-9 pr-3 rounded-lg border border-border-app bg-surface text-sm text-content outline-none focus:border-purple-600"
+              className="w-full h-11 lg:h-10 pl-9 pr-3 rounded-lg border border-border-app bg-surface text-sm text-content outline-none focus:border-purple-600"
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -182,7 +182,7 @@ function TransfertsListe({ onCreate }) {
 
       {!query.isLoading && !query.isError && transferts.length === 0 && (
         <EmptyState
-          icon="🔁"
+          Icon={Repeat}
           message={hasActiveFilters ? 'Aucun transfert ne correspond aux filtres.' : 'Aucun transfert enregistré.'}
           action={
             hasActiveFilters
@@ -262,7 +262,7 @@ function TransfertsTable({ transferts }) {
               <td className="px-4 py-3"><StatutBadge t={t} /></td>
               <td className="px-4 py-3 text-right font-medium text-content tabular-nums">{formatEuro(t.montant)}</td>
               <td className="px-4 py-3">
-                <div className="opacity-0 group-hover:opacity-100 transition-opacity flex justify-end">
+                <div className="actions-ligne flex justify-end">
                   <DeleteBtn t={t} inline />
                 </div>
               </td>

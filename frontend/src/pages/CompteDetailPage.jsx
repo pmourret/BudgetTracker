@@ -9,9 +9,11 @@ import Tooltip from '../components/ui/Tooltip'
 import { DEFINITIONS } from '../constants/definitions'
 import { Loading, ErrorState } from '../components/ui/States'
 import BarChart from '../components/charts/BarChart'
-import DepensesCategories, { CAT_PALETTE } from '../components/charts/DepensesCategories'
+import DepensesCategories from '../components/charts/DepensesCategories'
 import FluxSearchPanel from '../components/flux/FluxSearchPanel'
 import ControleSoldeCompte from '../components/comptes/ControleSoldeCompte'
+import Metric, { MetricRow } from '../components/ui/Metric'
+import { usePaletteDonnees } from '../components/charts/paletteDonnees'
 
 function useCompteDashboard(id) {
   return useQuery({
@@ -30,6 +32,9 @@ export default function CompteDetailPage() {
 
   const compte = data?.compte
   const m = data?.metriques
+  const { couleurDe } = usePaletteDonnees(
+    (data?.depenses_par_categorie ?? []).map((c) => c.id)
+  )
 
   return (
     <div className="flex flex-col gap-4">
@@ -42,7 +47,7 @@ export default function CompteDetailPage() {
         </Link>
         <div className="flex items-center gap-2">
           <h1 className="text-lg font-medium text-content">
-            {compte ? (compte.etablissement_libelle || compte.nom) : 'Compte'}
+            {compte ? compte.nom : 'Compte'}
           </h1>
           {compte?.est_commun && (
             <Badge variant="purple">
@@ -57,7 +62,11 @@ export default function CompteDetailPage() {
         </div>
         {compte && (
           <p className="text-sm text-content-2 mt-0.5">
-            {compte.nom} · {compte.titulaire_libelle} · {compte.type_compte_libelle}
+            {/* Même hiérarchie que la page Comptes : le compte au titre, la
+                banque en attribut (D14). */}
+            {[compte.etablissement_libelle, compte.titulaire_libelle, compte.type_compte_libelle]
+              .filter(Boolean)
+              .join(' · ')}
           </p>
         )}
       </div>
@@ -68,17 +77,17 @@ export default function CompteDetailPage() {
       {!isLoading && !isError && data && (
         <>
           {/* Soldes du compte */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-            <MetricCard label="Solde théorique" value={formatEuro(compte.solde_theorique)} def={DEFINITIONS.solde_theorique} />
-            <MetricCard label="Solde confirmé" value={formatEuro(compte.solde_reel)} def={DEFINITIONS.solde_reel} />
-            <MetricCard
+          <MetricRow colonnes={3}>
+            <Metric label="Solde théorique" value={formatEuro(compte.solde_theorique)} def={DEFINITIONS.solde_theorique} />
+            <Metric label="Solde confirmé" value={formatEuro(compte.solde_reel)} def={DEFINITIONS.solde_reel} />
+            <Metric
               label="En attente"
               value={formatEuro(compte.ecart_solde)}
               valueClass={Number(compte.ecart_solde) > 0 ? 'text-amber-600' : 'text-teal-600'}
               def={DEFINITIONS.ecart_solde}
               defAlign="right"
             />
-          </div>
+          </MetricRow>
 
           {/* Confrontation au dernier relevé — juste sous les soldes, parce
               qu'elle qualifie ceux-ci. Silencieuse si le compte n'a jamais été
@@ -86,17 +95,17 @@ export default function CompteDetailPage() {
           <ControleSoldeCompte compteId={id} />
 
           {/* Dépenses / revenus du mois */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
-            <MetricCard label="Dépenses du mois" value={`−${formatEuro(m.depenses_mois)}`} valueClass="text-red-600" def={DEFINITIONS.depenses_mois} />
-            <MetricCard label="Revenus du mois" value={`+${formatEuro(m.revenus_mois)}`} valueClass="text-teal-600" def={DEFINITIONS.revenus_mois} />
-            <MetricCard
+          <MetricRow colonnes={4}>
+            <Metric label="Dépenses du mois" value={`−${formatEuro(m.depenses_mois)}`} valueClass="text-red-600" def={DEFINITIONS.depenses_mois} />
+            <Metric label="Revenus du mois" value={`+${formatEuro(m.revenus_mois)}`} valueClass="text-teal-600" def={DEFINITIONS.revenus_mois} />
+            <Metric
               label="Épargne nette"
               value={formatEuro(m.epargne_nette)}
               valueClass={Number(m.epargne_nette) >= 0 ? 'text-purple-400' : 'text-red-600'}
               def={DEFINITIONS.epargne_nette}
             />
-            <MetricCard label="Mouvements" value={m.nb_flux} def={DEFINITIONS.compte_nb_flux} defAlign="right" />
-          </div>
+            <Metric label="Mouvements" value={m.nb_flux} def={DEFINITIONS.compte_nb_flux} defAlign="right" />
+          </MetricRow>
 
           {/* Dépenses par catégorie : histogramme + donut/légende */}
           <Card
@@ -118,7 +127,7 @@ export default function CompteDetailPage() {
                   datasets={[{
                     label: 'Dépenses',
                     data: data.depenses_par_categorie.map((c) => Number(c.total)),
-                    color: data.depenses_par_categorie.map((_, i) => CAT_PALETTE[i % CAT_PALETTE.length]),
+                    color: data.depenses_par_categorie.map((c) => couleurDe(c.id)),
                   }]}
                   height={220}
                 />
@@ -174,14 +183,3 @@ export default function CompteDetailPage() {
   )
 }
 
-function MetricCard({ label, value, valueClass = 'text-content', def, defAlign = 'left' }) {
-  return (
-    <div className="bg-surface border border-border-app rounded-xl px-4 py-3.5">
-      <div className="text-xs text-content-2 mb-1 flex items-center gap-1">
-        {label}
-        {def && <Tooltip {...def} align={defAlign} />}
-      </div>
-      <div className={`text-xl font-medium ${valueClass}`}>{value}</div>
-    </div>
-  )
-}
