@@ -67,8 +67,15 @@ class AbonnementViewSet(viewsets.ModelViewSet):
         Passe en revue les abonnements actifs et génère les alertes
         « en retard » pour ceux non constatés depuis plus d'un cycle.
 
-        Miroir de /patrimoine/verifier-rappels/. Idempotent (pas de doublon
-        d'alerte non acquittée). Retourne le nombre d'alertes créées.
+        Miroir de /patrimoine/verifier-rappels/. Retourne le nombre d'alertes
+        créées.
+
+        ⚠️ **Idempotent — et depuis le 2026-08-21 seulement.** Cette phrase
+        était écrite ici alors que rien ne l'assurait : le dédoublonnage était
+        un `exists()` suivi d'un `create()`, et deux appels concurrents
+        créaient deux alertes identiques. C'est arrivé. Ce qui le garantit
+        maintenant est la contrainte `alerte_ouverte_unique_par_cible`, pas ce
+        commentaire. (D27 de la revue UI/UX du 2026-08-20.)
         """
         from alertes.services import detecter_alerte_abonnement_en_retard
 

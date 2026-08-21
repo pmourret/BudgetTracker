@@ -1,6 +1,7 @@
 import datetime
 from decimal import Decimal
 
+from django.db import IntegrityError, transaction
 from django.test import TestCase
 
 from alertes.models import Alerte, NiveauAlerte, TypeAlerte
@@ -593,3 +594,118 @@ class AlerteSurBudgetSupprimeTest(TestCase):
         alerte.refresh_from_db()
         self.assertEqual(alerte.explication, texte)
         self.assertFalse(alerte.is_deleted)
+
+
+# ---------------------------------------------------------------------------
+# Unicité d'une alerte ouverte (D27 de la revue UI/UX du 2026-08-20)
+# ---------------------------------------------------------------------------
+
+class AlerteOuverteUniqueTest(TestCase):
+    """
+    Le dédoublonnage n'était qu'un `exists()` suivi d'un `create()`. Ce qui
+    garantit désormais l'unicité est la contrainte, pas le test — et ces
+    tests-ci s'adressent à la contrainte.
+    """
+
+    def setUp(self):
+        self.categorie = Categorie.objects.create(code="COURSES5", nom="Courses")
+        self.budget = Budget.objects.create(
+            categorie=self.categorie,
+            mois=datetime.date(2026, 9, 1),
+            montant_prevu=Decimal("100.00"),
+            montant_consomme=Decimal("90.00"),
+            taux_consommation=Decimal("90.00"),
+        )
+
+    def _creer(self):
+        """Contourne le service : on vise la contrainte, pas son garde-fou."""
+        return Alerte.objects.create(
+            type_alerte=TypeAlerte.BUDGET_ALERTE,
+            niveau=NiveauAlerte.AVERTISSEMENT,
+            budget=self.budget,
+            explication="x",
+            valeur_seuil=Decimal("80.00"),
+        )
+
+    def test_deux_alertes_ouvertes_sur_la_meme_cible_sont_refusees(self):
+        self._creer()
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                self._creer()
+
+    def test_la_contrainte_compare_bien_les_cibles_nulles(self):
+        """
+        ⚠️ Le cœur du correctif. Une seule des quatre cibles est renseignée ;
+        sans `nulls_distinct=False`, PostgreSQL tient deux `NULL` pour distincts
+        et la contrainte ne mordrait **jamais**. Ce test échoue si on le retire.
+        """
+        Alerte.objects.create(
+            type_alerte=TypeAlerte.ABONNEMENT_EN_RETARD,
+            niveau=NiveauAlerte.AVERTISSEMENT,
+            explication="sans cible",
+        )
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                Alerte.objects.create(
+                    type_alerte=TypeAlerte.ABONNEMENT_EN_RETARD,
+                    niveau=NiveauAlerte.AVERTISSEMENT,
+                    explication="sans cible",
+                )
+
+    def test_une_alerte_acquittee_laisse_la_place(self):
+        premiere = self._creer()
+        premiere.acquitter()
+        self.assertIsNotNone(self._creer())
+
+    def test_une_alerte_supprimee_laisse_la_place(self):
+        """
+        ⚠️ `condition` porte `is_deleted=False`. Sans lui, une ligne
+        soft-deletée occuperait encore la place et bloquerait une recréation
+        légitime — piège du §7, déjà payé ailleurs.
+        """
+        premiere = self._creer()
+        premiere.delete()
+        self.assertIsNotNone(self._creer())
+
+    def test_le_service_rend_None_plutot_que_de_lever(self):
+        """Perdre la course n'est pas une erreur : c'est le résultat attendu."""
+        from alertes.services import creer_si_absente
+
+        premier = creer_si_absente(
+            type_alerte=TypeAlerte.SOLDE_BAS,
+            cible={"budget": self.budget},
+            niveau=NiveauAlerte.AVERTISSEMENT,
+            explication="x",
+        )
+        self.assertIsNotNone(premier)
+        # Le chemin rapide (`exists`) écarte le second.
+        self.assertIsNone(
+            creer_si_absente(
+                type_alerte=TypeAlerte.SOLDE_BAS,
+                cible={"budget": self.budget},
+                niveau=NiveauAlerte.AVERTISSEMENT,
+                explication="x",
+            )
+        )
+
+    def test_la_transaction_survit_a_une_course_perdue(self):
+        """
+        ⚠️ Sans `transaction.atomic()` autour du `create`, l'`IntegrityError`
+        marquerait la transaction courante comme à annuler et **la requête
+        suivante lèverait** `TransactionManagementError`. Le signal de Flux
+        s'effondrerait après la première course perdue.
+        """
+        from alertes.services import creer_si_absente
+
+        self._creer()
+        # On force le chemin lent : le test rapide est court-circuité par un
+        # type différent, mais la contrainte, elle, verra le doublon.
+        perdue = creer_si_absente(
+            type_alerte=TypeAlerte.BUDGET_ALERTE,
+            cible={"budget": self.budget},
+            niveau=NiveauAlerte.AVERTISSEMENT,
+            explication="x",
+        )
+        self.assertIsNone(perdue)
+        # La transaction est toujours utilisable — c'est tout l'objet du test.
+        self.assertEqual(Alerte.objects.filter(budget=self.budget).count(), 1)

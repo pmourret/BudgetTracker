@@ -146,6 +146,25 @@ d'épargne. **Phase 12 mécaniques A et C : gelées, ne pas coder sans spec.**
 - **`perform_create()` manquant** : si seul `perform_update()` est surchargé, les objets créés par POST n'ont pas leurs champs calculés. **Surcharger les deux.**
 - **`solde_reel` auto-calculé** (`comptes/services/solde.py`), `read_only`. Ne jamais le saisir. Après un import de données, relancer `calculer_solde()` sur tous les comptes.
 - **Changement de compte/catégorie/date d'un flux** : `pre_save` mémorise l'état précédent, `post_save` recalcule AUSSI l'ancien compte et les anciens budgets (`recalculer_budgets_pour`). **Ne pas court-circuiter avec des `update()` de queryset** — ils ne déclenchent pas les signaux.
+- ⚠️ **`exists()` puis `create()` n'est pas un dédoublonnage, c'est une course.**
+  Entre le test et l'insertion, rien n'empêche un second appel de passer aussi.
+  Deux alertes « Abonnement en retard » identiques ont bel et bien coexisté,
+  créées à la même seconde, pendant que l'endpoint **documentait** son
+  idempotence. Ce qui garantit l'unicité est une **contrainte**, jamais un test
+  applicatif : `alerte_ouverte_unique_par_cible`, et
+  `alertes.services.creer_si_absente` qui rattrape l'`IntegrityError`.
+  - ⚠️ `nulls_distinct=False` est indispensable quand la clé porte des colonnes
+    **nullables** — une seule des quatre cibles d'une alerte est renseignée, et
+    PostgreSQL tient par défaut deux `NULL` pour distincts : la contrainte
+    n'aurait jamais mordu. PostgreSQL 15+ et Django 5+ requis.
+  - ⚠️ `transaction.atomic()` **autour du `create`**, sans quoi
+    l'`IntegrityError` marque toute la transaction comme à annuler et la requête
+    suivante lève `TransactionManagementError` — le signal de Flux s'effondre
+    après la première course perdue.
+  - ⚠️ Une contrainte posée sur une table qui la viole déjà **fait échouer la
+    migration** : résorber les doublons dans un `RunPython` **avant**
+    l'`AddConstraint`. On acquitte, on ne supprime pas — une alerte est un
+    enregistrement daté.
 - **Soft delete vs contraintes d'unicité** : toute `UniqueConstraint` sur un `BaseModel` doit porter `condition=Q(is_deleted=False)`. Pour les `code` `unique=True`, la contrainte compte AUSSI les lignes soft-deletées : les `_auto_code` cherchent dans `all_with_deleted()` et `validate_code` renvoie un 400 propre au lieu d'un 500.
 - **Le soft delete ne cascade pas** : `ImportBancaire.delete()` est surchargé pour soft-deleter ses lignes. Sinon leurs hash restent comptés par l'anti-doublon → **ré-import du même relevé bloqué à tort**. Toute nouvelle relation enfant persistée doit prévoir ce cas.
 - **Flux transfert/ajustement protégés** : création directe `est_transfert=True` → 400 ; PATCH/DELETE d'un transfert ou ajustement → 400.

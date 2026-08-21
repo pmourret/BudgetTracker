@@ -111,6 +111,37 @@ class Alerte(BaseModel):
         verbose_name = "Alerte"
         verbose_name_plural = "Alertes"
         ordering = ["-created_at"]
+        constraints = [
+            # ⚠️ **Le dédoublonnage était une course, pas une garantie.**
+            #
+            # Les sept générateurs faisaient `filter(...).exists()` **puis**
+            # `create()`. Entre les deux, rien : deux appels concurrents
+            # passaient tous deux le test et créaient tous deux. Deux alertes
+            # « Abonnement en retard » identiques coexistaient en base, créées
+            # à la même seconde — et `verifier-echeances` **documentait**
+            # pourtant une idempotence qu'il n'assurait pas.
+            # (D27 de la revue UI/UX du 2026-08-20.)
+            #
+            # ⚠️ `condition` porte **`is_deleted=False`** : sur un `BaseModel`,
+            # une contrainte qui l'oublie compte aussi les lignes soft-deletées
+            # et bloque une recréation légitime (piège du §7).
+            #
+            # ⚠️ `nulls_distinct=False` est **indispensable** : une seule des
+            # quatre cibles est renseignée, les trois autres sont `NULL`, et
+            # PostgreSQL considère par défaut deux `NULL` comme distincts — la
+            # contrainte n'aurait alors jamais mordu. Demande PostgreSQL 15+
+            # (on est en 16) et Django 5+ (on est en 6).
+            models.UniqueConstraint(
+                "type_alerte",
+                "compte",
+                "budget",
+                "abonnement",
+                "actif",
+                condition=models.Q(acquittee=False, is_deleted=False),
+                nulls_distinct=False,
+                name="alerte_ouverte_unique_par_cible",
+            ),
+        ]
         indexes = [
             models.Index(fields=["type_alerte", "acquittee"]),
             models.Index(fields=["compte"]),

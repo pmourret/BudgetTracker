@@ -1,6 +1,42 @@
 from decimal import Decimal
 
+from django.db import IntegrityError, transaction
+
 from alertes.models import Alerte, NiveauAlerte, TypeAlerte
+
+
+def creer_si_absente(*, type_alerte, cible, **champs):
+    """
+    Crée une alerte **si aucune n'est déjà ouverte** sur la même cible.
+
+    ⚠️ **Le test ne suffit pas ; c'est la contrainte qui garantit.** Les sept
+    générateurs faisaient `filter(...).exists()` puis `create()` : entre les
+    deux, rien. Deux appels concurrents passaient tous deux le test et créaient
+    tous deux — deux alertes identiques ont bel et bien coexisté en base,
+    créées à la même seconde. (D27 de la revue UI/UX du 2026-08-20.)
+
+    Le test reste, comme chemin rapide : il évite d'aller au bout d'une
+    insertion vouée à l'échec dans le cas courant. Ce qui **garantit** l'unicité,
+    c'est `alerte_ouverte_unique_par_cible`, et le rattrapage de l'`IntegrityError`
+    ci-dessous. Perdre la course n'est pas une erreur : c'est le résultat
+    attendu, et la fonction rend `None` comme si le test avait suffi.
+
+    ⚠️ **`transaction.atomic()` est obligatoire autour du `create`.** Sans lui,
+    l'`IntegrityError` marque toute la transaction courante comme à annuler, et
+    la requête suivante échoue avec `TransactionManagementError` — le signal de
+    Flux qui appelle ce code s'effondrerait après la première course perdue.
+
+    `cible` est le contexte qui identifie l'alerte : `{"budget": budget}`,
+    `{"compte": compte}`… Les autres clés restent nulles, et
+    `nulls_distinct=False` fait que la contrainte les compare quand même.
+    """
+    if Alerte.objects.filter(type_alerte=type_alerte, acquittee=False, **cible).exists():
+        return None
+    try:
+        with transaction.atomic():
+            return Alerte.objects.create(type_alerte=type_alerte, **cible, **champs)
+    except IntegrityError:
+        return None
 from alertes.services.formatage import date_courte, euros, mois_annee, pourcent
 
 # ---------------------------------------------------------------------------
@@ -81,22 +117,15 @@ def detecter_alertes_budget(budget) -> list[Alerte]:
     else:
         return alertes_creees
 
-    # Dédoublonnage — pas de doublon si alerte identique non acquittée
-    existe = Alerte.objects.filter(
+    alerte = creer_si_absente(
         type_alerte=type_a,
-        budget=budget,
-        acquittee=False,
-    ).exists()
-
-    if not existe:
-        alerte = Alerte.objects.create(
-            type_alerte=type_a,
-            niveau=niveau,
-            budget=budget,
-            explication=explication,
-            valeur_constatee=budget.taux_consommation,
-            valeur_seuil=Decimal("100.00") if type_a == TypeAlerte.BUDGET_DEPASSE else Decimal("80.00"),
-        )
+        cible={"budget": budget},
+        niveau=niveau,
+        explication=explication,
+        valeur_constatee=budget.taux_consommation,
+        valeur_seuil=Decimal("100.00") if type_a == TypeAlerte.BUDGET_DEPASSE else Decimal("80.00"),
+    )
+    if alerte is not None:
         alertes_creees.append(alerte)
 
     return alertes_creees
@@ -117,19 +146,10 @@ def detecter_alerte_solde_bas(compte, seuil: Decimal) -> Alerte | None:
     if compte.solde_theorique >= seuil:
         return None
 
-    existe = Alerte.objects.filter(
+    return creer_si_absente(
         type_alerte=TypeAlerte.SOLDE_BAS,
-        compte=compte,
-        acquittee=False,
-    ).exists()
-
-    if existe:
-        return None
-
-    return Alerte.objects.create(
-        type_alerte=TypeAlerte.SOLDE_BAS,
+        cible={"compte": compte},
         niveau=NiveauAlerte.AVERTISSEMENT,
-        compte=compte,
         explication=(
             f"Le solde théorique du compte « {compte.nom} » "
             f"({euros(compte.solde_theorique)}) "
@@ -154,19 +174,10 @@ def detecter_alerte_abonnement_en_retard(abonnement) -> Alerte | None:
     if not abonnement.est_en_retard:
         return None
 
-    existe = Alerte.objects.filter(
+    return creer_si_absente(
         type_alerte=TypeAlerte.ABONNEMENT_EN_RETARD,
-        abonnement=abonnement,
-        acquittee=False,
-    ).exists()
-
-    if existe:
-        return None
-
-    return Alerte.objects.create(
-        type_alerte=TypeAlerte.ABONNEMENT_EN_RETARD,
+        cible={"abonnement": abonnement},
         niveau=NiveauAlerte.AVERTISSEMENT,
-        abonnement=abonnement,
         explication=(
             f"L'abonnement « {abonnement.nom} » n'a pas été constaté "
             f"depuis plus d'un cycle ({abonnement.frequence.libelle}). "
@@ -197,19 +208,10 @@ def detecter_alerte_divergence_abonnement(
     if not result["en_divergence"]:
         return None
 
-    existe = Alerte.objects.filter(
+    return creer_si_absente(
         type_alerte=TypeAlerte.ABONNEMENT_DIVERGENCE,
-        abonnement=abonnement,
-        acquittee=False,
-    ).exists()
-
-    if existe:
-        return None
-
-    return Alerte.objects.create(
-        type_alerte=TypeAlerte.ABONNEMENT_DIVERGENCE,
+        cible={"abonnement": abonnement},
         niveau=NiveauAlerte.AVERTISSEMENT,
-        abonnement=abonnement,
         explication=(
             f"Le montant constaté pour l'abonnement « {abonnement.nom} » "
             f"({euros(montant_reel)}) s'écarte de {pourcent(result['divergence_pct'])} "
@@ -235,19 +237,10 @@ def detecter_alerte_ecart_solde(compte, seuil: Decimal) -> Alerte | None:
     if abs(compte.ecart_solde) <= seuil:
         return None
 
-    existe = Alerte.objects.filter(
+    return creer_si_absente(
         type_alerte=TypeAlerte.ECART_SOLDE,
-        compte=compte,
-        acquittee=False,
-    ).exists()
-
-    if existe:
-        return None
-
-    return Alerte.objects.create(
-        type_alerte=TypeAlerte.ECART_SOLDE,
+        cible={"compte": compte},
         niveau=NiveauAlerte.AVERTISSEMENT,
-        compte=compte,
         explication=(
             f"Un écart de {euros(compte.ecart_solde)} a été détecté "
             f"sur le compte « {compte.nom} » "
@@ -276,21 +269,12 @@ def detecter_alerte_valorisation_a_faire(actif) -> "Alerte | None":
     if not actif.actif or not actif.valorisation_a_faire:
         return None
 
-    existe = Alerte.objects.filter(
-        type_alerte=TypeAlerte.VALORISATION_A_FAIRE,
-        actif=actif,
-        acquittee=False,
-    ).exists()
-
-    if existe:
-        return None
-
     prochaine = actif.date_prochaine_valorisation
 
-    return Alerte.objects.create(
+    return creer_si_absente(
         type_alerte=TypeAlerte.VALORISATION_A_FAIRE,
+        cible={"actif": actif},
         niveau=NiveauAlerte.INFO,
-        actif=actif,
         explication=(
             f"L'actif « {actif.nom} » est à re-valoriser "
             f"(échéance estimée : {date_courte(prochaine)}). "
