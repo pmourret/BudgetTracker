@@ -148,6 +148,27 @@ export function useCreerFluxDepuisLigne() {
   })
 }
 
+// Création d'un virement interne depuis une ligne. Deux flux naissent sur DEUX
+// comptes, et la ligne du relevé d'en face peut être rapprochée dans la foulée
+// → mêmes invalidations que la création de flux, plus `transferts`.
+export function useCreerTransfertDepuisLigne() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ ligneId, compteContrepartie, libelle, notes }) => {
+      const { data } = await apiClient.post(
+        `/imports-lignes/${ligneId}/creer-transfert/`,
+        { compte_contrepartie: compteContrepartie, libelle, notes },
+      )
+      return data
+    },
+    onSuccess: () => {
+      ;['imports', 'transferts', 'flux', 'comptes', 'analytics'].forEach((key) =>
+        queryClient.invalidateQueries({ queryKey: [key] })
+      )
+    },
+  })
+}
+
 export function useRejeterLigne() {
   return useLigneAction(({ ligneId }) => ({
     url: `/imports-lignes/${ligneId}/rejeter/`,

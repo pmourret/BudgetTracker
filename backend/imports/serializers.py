@@ -81,3 +81,18 @@ class CreerFluxSerializer(serializers.Serializer):
 
     categorie = serializers.PrimaryKeyRelatedField(queryset=Categorie.objects.all())
     libelle = serializers.CharField(required=False, allow_blank=True)
+
+
+class CreerTransfertSerializer(serializers.Serializer):
+    """Entrée de la création d'un virement interne depuis une ligne.
+
+    Seule la contrepartie est demandée : montant, date et **sens** sont lus sur
+    la ligne (le signe dit qui débite). Ni catégorie — un transfert n'en porte
+    pas —, ni statut : la ligne est au relevé, donc l'opération est réelle.
+    """
+
+    compte_contrepartie = serializers.PrimaryKeyRelatedField(
+        queryset=Compte.objects.all()
+    )
+    libelle = serializers.CharField(required=False, allow_blank=True)
+    notes = serializers.CharField(required=False, allow_blank=True)

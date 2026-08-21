@@ -13,6 +13,7 @@ from .models import ImportBancaire, LigneBancaire, StatutRapprochement
 from .parsers.boursobank import FormatInvalideError
 from .serializers import (
     CreerFluxSerializer,
+    CreerTransfertSerializer,
     FluxResumeSerializer,
     ImportBancaireSerializer,
     ImportUploadSerializer,
@@ -27,10 +28,12 @@ from .services.creation import (
 )
 from .services.rapprochement import (
     CreationFluxInvalide,
+    CreationTransfertInvalide,
     ValidationInvalide,
     candidats_pour,
     controle_solde,
     creer_flux_depuis_ligne,
+    creer_transfert_depuis_ligne,
     dernier_controle_pour_compte,
     executer_rapprochement,
     flux_orphelins,
@@ -201,6 +204,8 @@ class LigneBancaireViewSet(viewsets.ReadOnlyModelViewSet):
     - GET  /imports-lignes/{id}/candidats/ : flux candidats à valider
     - POST /imports-lignes/{id}/valider/   : body { "flux_id": ... }
     - POST /imports-lignes/{id}/rejeter/   : marque « manquant dans l'app »
+    - POST /imports-lignes/{id}/creer-flux/      : crée le flux manquant
+    - POST /imports-lignes/{id}/creer-transfert/ : crée le virement interne
     """
 
     serializer_class = LigneBancaireSerializer
@@ -260,6 +265,46 @@ class LigneBancaireViewSet(viewsets.ReadOnlyModelViewSet):
             {
                 "ligne": LigneBancaireSerializer(ligne).data,
                 "flux": FluxResumeSerializer(flux).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=True, methods=["post"], url_path="creer-transfert")
+    def creer_transfert(self, request, pk=None):
+        """Crée le virement interne correspondant à cette ligne et la rattache.
+
+        Sans cette route, un virement absent de l'app obligeait à quitter le
+        rapprochement pour la page Transferts, y ressaisir un montant et une
+        date déjà lus sur le relevé, puis revenir relancer le lot. Le sens
+        n'est pas demandé : il se dérive du signe de la ligne.
+
+        `ligne_miroir` est non nul quand le relevé du compte d'en face était
+        déjà importé et que sa ligne a pu être rapprochée dans la foulée.
+        """
+        ligne = self.get_object()
+        entree = CreerTransfertSerializer(data=request.data)
+        entree.is_valid(raise_exception=True)
+        contrepartie = entree.validated_data["compte_contrepartie"]
+        try:
+            resultat = creer_transfert_depuis_ligne(
+                ligne,
+                compte_contrepartie=contrepartie,
+                libelle=entree.validated_data.get("libelle") or None,
+                notes=entree.validated_data.get("notes") or "",
+            )
+        except CreationTransfertInvalide as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        ligne.refresh_from_db()
+        miroir = resultat["ligne_miroir"]
+        return Response(
+            {
+                "ligne": LigneBancaireSerializer(ligne).data,
+                "flux": FluxResumeSerializer(resultat["flux"]).data,
+                "transfert_id": str(resultat["transfert"].id),
+                "contrepartie_nom": contrepartie.nom,
+                "ligne_miroir": (
+                    LigneBancaireSerializer(miroir).data if miroir else None
+                ),
             },
             status=status.HTTP_201_CREATED,
         )

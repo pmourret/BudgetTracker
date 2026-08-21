@@ -16,11 +16,13 @@ from imports.parsers import decoder_fichier, parser_boursobank
 from imports.parsers.boursobank import FormatInvalideError, _nettoyer_montant
 from imports.services.rapprochement import (
     CreationFluxInvalide,
+    CreationTransfertInvalide,
     ValidationInvalide,
     apparier,
     candidats_pour,
     controle_solde,
     creer_flux_depuis_ligne,
+    creer_transfert_depuis_ligne,
     dernier_controle_pour_compte,
     executer_rapprochement,
     filtrer_doublons,
@@ -269,11 +271,25 @@ class RapprochementDBTest(TestCase):
         self.previsionnel = StatutFlux.objects.create(
             code="PREV", libelle="Prévisionnel", est_definitif=False)
         self.categorie = Categorie.objects.create(code="ALIM", nom="Alimentation")
+        # CREDIT est nécessaire au volet « virement interne » (transfert = une
+        # paire débit/crédit) ; DEBIT seul suffisait au rapprochement 14-A.
+        self.type_credit = TypeFlux.objects.create(code="CREDIT", libelle="Crédit")
+        self.type_compte = TypeCompte.objects.create(code="COURANT", libelle="Courant")
+        self.titulaire = Titulaire.objects.create(code="PIERRE", libelle="Pierre")
+        self.etablissement = Etablissement.objects.create(
+            code="BOURSO", libelle="BoursoBank")
         self.compte = Compte.objects.create(
             code="CPT-0001", nom="Joint",
-            type_compte=TypeCompte.objects.create(code="COURANT", libelle="Courant"),
-            titulaire=Titulaire.objects.create(code="PIERRE", libelle="Pierre"),
-            etablissement=Etablissement.objects.create(code="BOURSO", libelle="BoursoBank"),
+            type_compte=self.type_compte,
+            titulaire=self.titulaire,
+            etablissement=self.etablissement,
+            devise=self.devise,
+        )
+        self.epargne = Compte.objects.create(
+            code="CPT-0002", nom="Livret A",
+            type_compte=self.type_compte,
+            titulaire=self.titulaire,
+            etablissement=self.etablissement,
             devise=self.devise,
         )
 
@@ -287,9 +303,10 @@ class RapprochementDBTest(TestCase):
             montant=Decimal(str(montant)), date_flux=date(2026, 7, jour), **kw,
         )
 
-    def _lot(self):
+    def _lot(self, compte=None):
         return ImportBancaire.objects.create(
-            compte=self.compte, banque=Banque.BOURSOBANK, compte_num_source="00040553758")
+            compte=compte or self.compte, banque=Banque.BOURSOBANK,
+            compte_num_source="00040553758")
 
     def _ligne_db(self, lot, montant, jour, h="h", solde=None):
         return LigneBancaire.objects.create(
@@ -409,6 +426,132 @@ class RapprochementDBTest(TestCase):
         ligne.refresh_from_db()
         with self.assertRaises(CreationFluxInvalide):
             creer_flux_depuis_ligne(ligne, categorie=self.categorie)
+
+    # --- Virement interne créé depuis le rapprochement ----------------------
+
+    def test_creer_transfert_depuis_ligne_sortante(self):
+        """Ligne négative → le compte du relevé est la SOURCE du virement."""
+        from transferts.models import Transfert
+
+        lot = self._lot()
+        ligne = self._ligne_db(lot, "-500.00", 17, "a")
+        executer_rapprochement(lot)
+        ligne.refresh_from_db()
+        self.assertEqual(ligne.statut, StatutRapprochement.MANQUANT_APP)
+
+        res = creer_transfert_depuis_ligne(ligne, compte_contrepartie=self.epargne)
+        ligne.refresh_from_db()
+        lot.refresh_from_db()
+        transfert = res["transfert"]
+
+        self.assertEqual(Transfert.objects.count(), 1)
+        self.assertEqual(transfert.montant, Decimal("500.00"))
+        self.assertEqual(transfert.flux_debit.compte, self.compte)
+        self.assertEqual(transfert.flux_credit.compte, self.epargne)
+        self.assertEqual(transfert.flux_debit.montant, Decimal("-500.00"))
+        self.assertEqual(transfert.flux_credit.montant, Decimal("500.00"))
+        self.assertTrue(transfert.flux_debit.est_transfert)
+        self.assertTrue(transfert.flux_credit.est_transfert)
+        self.assertEqual(transfert.flux_debit.date_flux, date(2026, 7, 17))
+        self.assertIsNone(transfert.flux_debit.categorie_id)
+
+        # La ligne pointe le flux du compte du relevé, pas la contrepartie.
+        self.assertEqual(ligne.flux_id, transfert.flux_debit.id)
+        self.assertEqual(ligne.statut, StatutRapprochement.RAPPROCHE)
+        self.assertEqual(lot.nb_rapproches, 1)
+        self.assertEqual(lot.nb_manquants_app, 0)
+
+        # Trace bancaire sur le seul côté relevé.
+        self.assertTrue(transfert.flux_debit.reference_externe)
+        self.assertFalse(transfert.flux_credit.reference_externe)
+
+    def test_creer_transfert_depuis_ligne_entrante(self):
+        """Ligne positive → le compte du relevé est la DESTINATION."""
+        lot = self._lot()
+        ligne = self._ligne_db(lot, "500.00", 17, "a")
+        executer_rapprochement(lot)
+        ligne.refresh_from_db()
+
+        res = creer_transfert_depuis_ligne(ligne, compte_contrepartie=self.epargne)
+        transfert = res["transfert"]
+        ligne.refresh_from_db()
+
+        self.assertEqual(transfert.flux_debit.compte, self.epargne)
+        self.assertEqual(transfert.flux_credit.compte, self.compte)
+        self.assertEqual(ligne.flux_id, transfert.flux_credit.id)
+
+    def test_creer_transfert_refuse_contrepartie_identique(self):
+        lot = self._lot()
+        ligne = self._ligne_db(lot, "-500.00", 17, "a")
+        executer_rapprochement(lot)
+        ligne.refresh_from_db()
+        with self.assertRaises(CreationTransfertInvalide):
+            creer_transfert_depuis_ligne(ligne, compte_contrepartie=self.compte)
+
+    def test_creer_transfert_refuse_si_deja_rapproche(self):
+        self._flux("-500.00", 17)
+        lot = self._lot()
+        ligne = self._ligne_db(lot, "-500.00", 17, "a")
+        executer_rapprochement(lot)
+        ligne.refresh_from_db()
+        self.assertEqual(ligne.statut, StatutRapprochement.RAPPROCHE)
+        with self.assertRaises(CreationTransfertInvalide):
+            creer_transfert_depuis_ligne(ligne, compte_contrepartie=self.epargne)
+
+    def test_creer_transfert_rapproche_la_ligne_miroir(self):
+        """Le relevé du compte d'en face, déjà importé, se solde dans la foulée."""
+        lot = self._lot()
+        ligne = self._ligne_db(lot, "-500.00", 17, "a")
+        lot_epargne = self._lot(compte=self.epargne)
+        miroir = self._ligne_db(lot_epargne, "500.00", 18, "b")
+        executer_rapprochement(lot)
+        executer_rapprochement(lot_epargne)
+        ligne.refresh_from_db()
+        miroir.refresh_from_db()
+        self.assertEqual(miroir.statut, StatutRapprochement.MANQUANT_APP)
+
+        res = creer_transfert_depuis_ligne(ligne, compte_contrepartie=self.epargne)
+        miroir.refresh_from_db()
+        lot_epargne.refresh_from_db()
+
+        self.assertEqual(res["ligne_miroir"].id, miroir.id)
+        self.assertEqual(miroir.statut, StatutRapprochement.RAPPROCHE)
+        self.assertEqual(miroir.flux_id, res["transfert"].flux_credit.id)
+        self.assertEqual(lot_epargne.nb_rapproches, 1)
+        self.assertEqual(lot_epargne.nb_manquants_app, 0)
+
+    def test_ligne_miroir_ambigue_non_devinee(self):
+        """Deux lignes miroir plausibles → aucune n'est touchée (on ne devine pas)."""
+        lot = self._lot()
+        ligne = self._ligne_db(lot, "-500.00", 17, "a")
+        lot_epargne = self._lot(compte=self.epargne)
+        m1 = self._ligne_db(lot_epargne, "500.00", 17, "b")
+        m2 = self._ligne_db(lot_epargne, "500.00", 18, "c")
+        executer_rapprochement(lot)
+        executer_rapprochement(lot_epargne)
+        ligne.refresh_from_db()
+
+        res = creer_transfert_depuis_ligne(ligne, compte_contrepartie=self.epargne)
+        m1.refresh_from_db()
+        m2.refresh_from_db()
+
+        self.assertIsNone(res["ligne_miroir"])
+        self.assertEqual(m1.statut, StatutRapprochement.MANQUANT_APP)
+        self.assertEqual(m2.statut, StatutRapprochement.MANQUANT_APP)
+
+    def test_transfert_cree_est_exclu_des_agregats_mais_pointe(self):
+        """Le flux créé reste un transfert : hors dépenses, mais bien pointé."""
+        lot = self._lot()
+        ligne = self._ligne_db(lot, "-500.00", 17, "a")
+        executer_rapprochement(lot)
+        ligne.refresh_from_db()
+        res = creer_transfert_depuis_ligne(ligne, compte_contrepartie=self.epargne)
+
+        flux = res["flux"]
+        self.assertTrue(flux.est_transfert)
+        self.assertFalse(flux.est_ajustement)
+        self.assertTrue(flux.statut.est_definitif)
+        self.assertIn(flux.id, flux_ids_deja_pointes(self.compte))
 
     def test_anti_re_match_entre_lots(self):
         """Un flux déjà pointé par un lot n'est pas re-proposé à un autre lot."""
@@ -594,12 +737,19 @@ class ImportAPITest(APIAuthTestCase):
         self.valide = StatutFlux.objects.create(
             code="VALIDE", libelle="Validé", est_definitif=True)
         self.categorie = Categorie.objects.create(code="ALIM", nom="Alimentation")
+        self.type_credit = TypeFlux.objects.create(code="CREDIT", libelle="Crédit")
+        type_compte = TypeCompte.objects.create(code="COURANT", libelle="Courant")
+        titulaire = Titulaire.objects.create(code="PIERRE", libelle="Pierre")
+        etablissement = Etablissement.objects.create(code="BOURSO", libelle="BoursoBank")
         self.compte = Compte.objects.create(
             code="CPT-0001", nom="Joint",
-            type_compte=TypeCompte.objects.create(code="COURANT", libelle="Courant"),
-            titulaire=Titulaire.objects.create(code="PIERRE", libelle="Pierre"),
-            etablissement=Etablissement.objects.create(code="BOURSO", libelle="BoursoBank"),
-            devise=self.devise,
+            type_compte=type_compte, titulaire=titulaire,
+            etablissement=etablissement, devise=self.devise,
+        )
+        self.epargne = Compte.objects.create(
+            code="CPT-0002", nom="Livret A",
+            type_compte=type_compte, titulaire=titulaire,
+            etablissement=etablissement, devise=self.devise,
         )
         # Un flux app correspondant exactement à la 1re ligne du CSV échantillon.
         Flux.objects.create(
@@ -716,6 +866,43 @@ class ImportAPITest(APIAuthTestCase):
         par_id = {f["id"]: f for f in results}
         self.assertTrue(par_id[flux_cree_id]["est_pointe"])
         self.assertFalse(par_id[str(autre.id)]["est_pointe"])
+
+    def test_creer_transfert_via_api(self):
+        """Un virement se crée depuis le rapprochement, sans passer par /transferts/."""
+        lot_id = self._upload().data["lot"]["id"]
+        rapport = self.client.get(f"/api/v1/imports/{lot_id}/rapport/").data
+        ligne = next(
+            l for l in rapport["lignes"]
+            if l["statut"] == "manquant_app" and l["montant"] == "-2469.63")
+
+        resp = self.client.post(
+            f"/api/v1/imports-lignes/{ligne['id']}/creer-transfert/",
+            {"compte_contrepartie": str(self.epargne.id)},
+            format="json")
+
+        self.assertEqual(resp.status_code, 201, resp.data)
+        self.assertEqual(resp.data["ligne"]["statut"], "rapproche")
+        self.assertTrue(resp.data["flux"]["est_transfert"])
+        self.assertIsNone(resp.data["ligne_miroir"])
+
+        # Le transfert existe bien côté /transferts/, avec les deux comptes.
+        transferts = self.client.get("/api/v1/transferts/").data
+        results = transferts.get("results", transferts)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["compte_source_id"], str(self.compte.id))
+        self.assertEqual(results[0]["compte_destination_id"], str(self.epargne.id))
+        self.assertEqual(results[0]["montant"], "2469.63")
+
+    def test_creer_transfert_refuse_meme_compte_via_api(self):
+        lot_id = self._upload().data["lot"]["id"]
+        rapport = self.client.get(f"/api/v1/imports/{lot_id}/rapport/").data
+        ligne = next(l for l in rapport["lignes"] if l["statut"] == "manquant_app")
+
+        resp = self.client.post(
+            f"/api/v1/imports-lignes/{ligne['id']}/creer-transfert/",
+            {"compte_contrepartie": str(self.compte.id)},
+            format="json")
+        self.assertEqual(resp.status_code, 400, resp.data)
 
     def test_validation_ambigu_via_api(self):
         from flux.models import Flux

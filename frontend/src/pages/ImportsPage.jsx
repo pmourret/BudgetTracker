@@ -15,7 +15,7 @@ import {
   useRelancerRapprochement, useDeleteImport,
 } from '../hooks/useImports'
 import ImportUploadModal from '../components/imports/ImportUploadModal'
-import CreerFluxModal from '../components/imports/CreerFluxModal'
+import CreerMouvementModal from '../components/imports/CreerMouvementModal'
 
 const MONTANT_CLASS = (m) => (Number(m) < 0 ? 'text-red-texte' : 'text-teal-texte')
 
@@ -45,9 +45,11 @@ export default function ImportsPage() {
         </Button>
       </div>
 
-      <div className="rounded-lg bg-blue-50 text-blue-800 text-xs px-4 py-2.5 leading-relaxed">
-        Le rapprochement est en <strong>lecture seule</strong> : il ne crée ni ne modifie
-        aucun flux. Le relevé sert de contrôle ; l'application reste la seule vérité comptable.
+      <div className="rounded-lg bg-blue-600/15 text-content text-xs px-4 py-2.5 leading-relaxed">
+        Le relevé sert de <strong>contrôle</strong> : il ne modifie jamais un flux
+        existant. Ce qui lui manque se crée d'ici — dépense, recette ou{' '}
+        <strong>virement interne</strong> — et l'application reste la seule vérité
+        comptable.
       </div>
 
       {isLoading && <Loading message="Chargement des imports…" />}
@@ -143,6 +145,9 @@ function RapportView({ lotId }) {
   const { data, isLoading, isError, refetch } = useRapport(lotId)
   const relancer = useRelancerRapprochement()
   const [creerFor, setCreerFor] = useState(null)
+  // Un virement créé ici peut solder une ligne d'un AUTRE lot (le relevé du
+  // compte d'en face). Sans un mot, cette écriture à distance serait invisible.
+  const [miroirRapproche, setMiroirRapproche] = useState(null)
 
   if (isLoading) return <Loading message="Analyse du relevé…" />
   if (isError) return <ErrorState message="Impossible de charger le rapport." onRetry={refetch} />
@@ -173,6 +178,16 @@ function RapportView({ lotId }) {
 
       {data.controle_solde && <ControleSolde ctrl={data.controle_solde} />}
 
+      {miroirRapproche && (
+        <div className="rounded-lg bg-teal-600/15 text-content text-xs px-4 py-2.5 flex items-start gap-2 leading-relaxed">
+          <CheckCircle2 size={15} className="shrink-0 mt-0.5 text-teal-texte" />
+          <span>
+            Virement créé. La ligne correspondante du relevé de{' '}
+            <strong>{miroirRapproche}</strong> a été rapprochée dans la foulée.
+          </span>
+        </div>
+      )}
+
       {rienACorriger && (
         <div className="rounded-lg bg-teal-50 text-teal-800 text-sm px-4 py-3 flex items-center gap-2">
           <CheckCircle2 size={18} /> Tout est rapproché : aucun écart à corriger.
@@ -193,7 +208,7 @@ function RapportView({ lotId }) {
           hint="Différences entre le relevé et l'application.">
           <div className="flex flex-col gap-4">
             {manquants.length > 0 && (
-              <EcartGroupe titre="Sur le relevé, absent de l'application" sousTitre="Oubli de saisie probable — créez le flux en un clic.">
+              <EcartGroupe titre="Sur le relevé, absent de l'application" sousTitre="Oubli de saisie probable — créez le mouvement (dépense, recette ou virement) en un clic.">
                 {manquants.map((l) => (
                   <BankLine
                     key={l.id} ligne={l}
@@ -227,11 +242,17 @@ function RapportView({ lotId }) {
 
       {rapproches.length > 0 && <Rapproches lignes={rapproches} />}
 
-      <CreerFluxModal
+      <CreerMouvementModal
         ligne={creerFor}
+        compteId={data.lot.compte}
         compteNom={data.lot.compte_nom}
         onClose={() => setCreerFor(null)}
-        onCreated={() => setCreerFor(null)}
+        onCreated={(resultat) => {
+          setCreerFor(null)
+          setMiroirRapproche(
+            resultat?.ligne_miroir ? resultat.contrepartie_nom : null
+          )
+        }}
       />
     </div>
   )
@@ -309,7 +330,7 @@ function BankLine({ ligne, badge, onCreer }) {
       {onCreer && (
         <button
           onClick={onCreer}
-          title="Créer le flux manquant"
+          title="Créer le mouvement manquant"
           className="inline-flex items-center gap-1 text-xs font-medium text-purple-texte hover:underline cursor-pointer bg-transparent border-none shrink-0"
         >
           <FilePlus size={14} /> Créer

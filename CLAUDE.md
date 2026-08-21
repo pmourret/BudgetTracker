@@ -90,7 +90,7 @@ analytics · audit · accounts
 
 ## 5. ÉTAT — EN BREF
 
-**493 tests.** Backend phases 1-8 complètes, frontend phase 9 complète, plus
+**514 tests.** Backend phases 1-8 complètes, frontend phase 9 complète, plus
 10-A, 11a/b/c, 12-B, 13, 14-A/B, durcissement de l'auth et vérification des
 jetons de l'annuaire.
 
@@ -161,7 +161,10 @@ d'épargne. **Phase 12 mécaniques A et C : gelées, ne pas coder sans spec.**
 
 ### Rapprochement bancaire
 
-- **La SEULE écriture de flux est `creer_flux_depuis_ligne`.** Tout le reste du moteur n'écrit que l'état de rapprochement de la `LigneBancaire`.
+- **Les SEULES écritures de flux sont `creer_flux_depuis_ligne` (flux normal) et `creer_transfert_depuis_ligne` (virement interne).** Tout le reste du moteur n'écrit que l'état de rapprochement de la `LigneBancaire`.
+- **Un virement se crée depuis l'écran de rapprochement**, sans passer par la page Transferts. Le **sens vient du signe de la ligne** (négative → le compte du relevé est la source), jamais d'un choix d'interface : seule la contrepartie est demandée. La création délègue à `transferts.services.creer_transfert` — `imports` → `transferts`, sens unique, `transferts` n'appelle jamais `imports`.
+- **La ligne miroir n'est rapprochée que si elle est SEULE.** Un virement apparaît sur les deux relevés : si celui d'en face est déjà importé, sa ligne `manquant_app` de montant opposé est rattachée dans la foulée — mais **à deux candidates ou plus, on ne devine pas** (même règle que le moteur), l'autre lot reste en l'état.
+- **`reference_externe` d'un virement : sur le seul flux du côté relevé.** C'est lui qui a une contrepartie sur ce fichier ; la poser des deux côtés inventerait une trace bancaire pour un compte dont on n'a pas le relevé.
 - **Pointage détecté par le LIEN, pas par `reference_externe`** — celle-ci n'est qu'une trace lisible, jamais une clé de détection, jamais écrasée sur un flux existant.
 - **`accountbalance` BoursoBank = instantané journalier** : les lignes d'un même jour partagent le même solde. Donc (1) **pas d'unicité dure** sur `hash_dedup`, l'anti-doublon se fait par comptage ; (2) le contrôle compare le solde **actuel** de l'app au dernier solde du relevé, **au centime**.
 - ⚠️ **Ne PAS ré-ancrer le contrôle « à la date du relevé »** (`Σ flux ≤ date_ref`) : faux écarts par décalage de dates de saisie, **constaté en prod**.
@@ -286,7 +289,7 @@ docker compose logs -f frontend
 ### ⚠️ Pousser sur `main` DÉPLOIE EN PRODUCTION
 
 Depuis le 2026-08-12 (ADR-0037), `.github/workflows/ci-cd.yml` vérifie chez
-GitHub — ruff, `makemigrations --check`, 493 tests, eslint, images de prod —
+GitHub — ruff, `makemigrations --check`, 514 tests, eslint, images de prod —
 puis lance `make deploy` sur un runner auto-hébergé du homelab. Donc
 **`make backup` puis `migrate` sur la base réelle, sans que personne ne
 regarde.**
@@ -294,7 +297,7 @@ regarde.**
 ```powershell
 make lint          # ruff, via Docker — rien à installer
 make lint-front    # eslint (exige la stack de dev lancée)
-make dev-test      # les 493 tests
+make dev-test      # les 514 tests
 ```
 
 - **Migration non triviale** (renommage de table, déplacement de modèle, champ

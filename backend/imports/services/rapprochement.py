@@ -12,6 +12,10 @@ Deux couches :
   - Orchestration DB (`executer_rapprochement`, `candidats_pour`,
     `valider_ligne`, `rejeter_ligne`) : charge les flux, persiste les statuts.
 
+Les SEULES écritures de flux du module sont `creer_flux_depuis_ligne` (flux
+normal) et `creer_transfert_depuis_ligne` (virement interne) ; tout le reste
+n'écrit que l'état de rapprochement de la `LigneBancaire`.
+
 Règles de matching (validées foyer) :
   - STRICT d'abord : passe 1 = montant ET date exacts.
   - Tolérance ensuite : passe 2 = montant exact, date à ± N jours
@@ -21,6 +25,8 @@ Règles de matching (validées foyer) :
   - Un flux est consommé au plus une fois (pas de double appariement).
   - Les virements internes se rapprochent naturellement : le flux
     `est_transfert` du compte a le bon montant/date, il est dans le vivier.
+    S'il manque, `creer_transfert_depuis_ligne` l'écrit des deux côtés depuis
+    l'écran de rapprochement (le sens vient du signe de la ligne).
   - Les flux `est_ajustement` sont exclus du vivier (pas de contrepartie banque).
 """
 from __future__ import annotations
@@ -301,6 +307,10 @@ class CreationFluxInvalide(Exception):
     """Création de flux impossible depuis cette ligne (déjà rapprochée, etc.)."""
 
 
+class CreationTransfertInvalide(Exception):
+    """Création de transfert impossible depuis cette ligne."""
+
+
 def _reference_bancaire(ligne):
     """Trace lisible posée dans `Flux.reference_externe` d'un flux créé depuis
     le relevé (traçabilité ; jamais écrasée pour un flux existant)."""
@@ -311,10 +321,11 @@ def _reference_bancaire(ligne):
 def creer_flux_depuis_ligne(ligne, categorie, libelle=None, statut=None):
     """
     14-B — crée le flux manquant correspondant à une ligne de relevé, puis
-    rattache la ligne (→ rapproché). **Seule** écriture de flux du module.
+    rattache la ligne (→ rapproché). Une des DEUX écritures de flux du module,
+    avec `creer_transfert_depuis_ligne` (virement interne).
 
-    - `categorie` obligatoire (flux normal, jamais transfert : un virement doit
-      passer par /transferts/ — l'UI avertit sur les libellés « VIR »).
+    - `categorie` obligatoire. Flux NORMAL uniquement : un virement interne
+      passe par `creer_transfert_depuis_ligne`, qui écrit les deux côtés.
     - type_flux dérivé du signe (négatif → DEBIT, positif → CREDIT).
     - statut par défaut = définitif (la ligne est sur le relevé = réel).
     - `reference_externe` reçoit une trace bancaire lisible.
@@ -358,6 +369,148 @@ def creer_flux_depuis_ligne(ligne, categorie, libelle=None, statut=None):
         _resynchroniser_compteurs(ligne.import_lot)
 
     return flux
+
+
+def _flux_cote_releve(transfert, montant_ligne):
+    """Des deux flux du transfert, celui qui vit sur le compte du relevé.
+
+    C'est lui — et lui seul — que la ligne bancaire pointe : le flux de
+    contrepartie appartient à l'autre compte, dont le relevé est un autre lot.
+    """
+    return transfert.flux_debit if montant_ligne < 0 else transfert.flux_credit
+
+
+def _rapprocher_ligne_miroir(flux_contrepartie, tolerance):
+    """Rattache, si elle est SEULE, la ligne du relevé d'en face à ce flux.
+
+    Un virement interne apparaît sur les deux relevés. Si celui du compte de
+    contrepartie est déjà importé, sa ligne est restée `manquant_app` : sans
+    ce raccroc elle afficherait un écart que l'on vient précisément de solder,
+    jusqu'à une relance manuelle du rapprochement de l'autre lot.
+
+    ⚠️ **On ne devine pas** (règle du moteur) : on n'agit que s'il existe
+    EXACTEMENT une ligne candidate — même compte, montant opposé exact, date à
+    ± tolérance, encore `manquant_app`. À deux candidates ou plus, on laisse
+    l'autre lot en l'état ; sa relance produira un `ambigu` que l'utilisateur
+    tranchera.
+
+    Retourne la ligne rapprochée, ou None.
+    """
+    from ..models import LigneBancaire
+
+    marge = timedelta(days=tolerance)
+    candidates = list(
+        LigneBancaire.objects
+        .filter(
+            import_lot__compte=flux_contrepartie.compte,
+            import_lot__is_deleted=False,
+            statut=StatutRapprochement.MANQUANT_APP,
+            flux=None,
+            montant=flux_contrepartie.montant,
+            date_operation__gte=flux_contrepartie.date_flux - marge,
+            date_operation__lte=flux_contrepartie.date_flux + marge,
+        )
+        .select_related("import_lot")[:2]
+    )
+    if len(candidates) != 1:
+        return None
+
+    miroir = candidates[0]
+    miroir.flux = flux_contrepartie
+    miroir.statut = StatutRapprochement.RAPPROCHE
+    miroir.save(update_fields=["flux", "statut", "updated_at"])
+    _resynchroniser_compteurs(miroir.import_lot)
+    return miroir
+
+
+def creer_transfert_depuis_ligne(ligne, compte_contrepartie, libelle=None, notes=""):
+    """
+    Crée le VIREMENT INTERNE correspondant à une ligne de relevé, puis rattache
+    la ligne au flux du compte du relevé (→ rapproché).
+
+    Seconde écriture de flux du module, à côté de `creer_flux_depuis_ligne`.
+    Elle existe parce qu'un virement vu sur un relevé n'est pas un flux : le
+    créer en flux simple ne toucherait qu'un compte et le comptabiliserait en
+    dépense ou en recette (règle §4.4). L'écran de rapprochement devait donc
+    renvoyer vers la page Transferts, où l'utilisateur ressaisissait à la main
+    un montant et une date déjà connus — puis revenait relancer le lot.
+
+    - **Le sens se dérive du signe**, jamais d'un choix d'interface : ligne
+      négative → le compte du relevé est la source ; positive → il est la
+      destination. Seule la contrepartie est demandée.
+    - Montant et date viennent de la ligne (le relevé fait foi).
+    - Statut définitif : la ligne est sur le relevé, donc l'opération est réelle.
+    - `reference_externe` : trace bancaire posée sur le seul flux du côté du
+      relevé — c'est lui qui a une contrepartie sur ce fichier.
+    - `libelle` vide → libellés automatiques du service transferts
+      (« Transfert vers X » / « Transfert depuis Y »), qui disent le sens
+      chacun de leur côté ; le libellé du relevé (« VIR SEPA … ») serait faux
+      sur l'un des deux.
+
+    Atomique. Renvoie {"transfert", "flux", "ligne_miroir"}.
+    """
+    from django.db import transaction
+
+    from referentiels.models import StatutFlux, TypeFlux
+    from transferts.services import creer_transfert
+
+    if ligne.statut == StatutRapprochement.RAPPROCHE or ligne.flux_id:
+        raise CreationTransfertInvalide("Cette ligne est déjà rapprochée à un flux.")
+
+    compte = ligne.import_lot.compte
+    if compte_contrepartie is None:
+        raise CreationTransfertInvalide("Compte de contrepartie requis.")
+    if compte_contrepartie.id == compte.id:
+        raise CreationTransfertInvalide(
+            "Le compte de contrepartie doit être différent du compte du relevé."
+        )
+    if ligne.montant == Decimal("0.00"):
+        raise CreationTransfertInvalide(
+            "Un virement de montant nul n'a pas de contrepartie."
+        )
+
+    type_debit = TypeFlux.objects.filter(code="DEBIT").first()
+    type_credit = TypeFlux.objects.filter(code="CREDIT").first()
+    manquant = "DEBIT" if type_debit is None else ("CREDIT" if type_credit is None else None)
+    if manquant:
+        raise CreationTransfertInvalide(f"Référentiel TypeFlux « {manquant} » manquant.")
+
+    statut = StatutFlux.objects.filter(est_definitif=True).first()
+    if statut is None:
+        raise CreationTransfertInvalide("Aucun statut définitif configuré.")
+
+    sortant = ligne.montant < 0
+    source = compte if sortant else compte_contrepartie
+    destination = compte_contrepartie if sortant else compte
+
+    tolerance = _tolerance_jours()
+    with transaction.atomic():
+        transfert = creer_transfert(
+            compte_source=source,
+            compte_destination=destination,
+            montant=abs(ligne.montant),
+            date_flux=ligne.date_operation,
+            type_flux_debit=type_debit,
+            type_flux_credit=type_credit,
+            statut=statut,
+            devise=compte.devise,
+            libelle=(libelle or "")[:255],
+            notes=notes,
+        )
+
+        flux = _flux_cote_releve(transfert, ligne.montant)
+        flux.reference_externe = _reference_bancaire(ligne)
+        flux.save(update_fields=["reference_externe", "updated_at"])
+
+        ligne.flux = flux
+        ligne.statut = StatutRapprochement.RAPPROCHE
+        ligne.save(update_fields=["flux", "statut", "updated_at"])
+        _resynchroniser_compteurs(ligne.import_lot)
+
+        autre = transfert.flux_credit if sortant else transfert.flux_debit
+        miroir = _rapprocher_ligne_miroir(autre, tolerance)
+
+    return {"transfert": transfert, "flux": flux, "ligne_miroir": miroir}
 
 
 def _resynchroniser_compteurs(import_lot):
