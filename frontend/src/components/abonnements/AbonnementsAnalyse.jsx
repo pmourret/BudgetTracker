@@ -36,7 +36,7 @@ function statsOf(bucket, nbKey = 'nb') {
 function FiabiliteTag({ value }) {
   const map = {
     estimatif: { txt: 'estimatif', cls: 'text-content-3' },
-    reel: { txt: 'réel', cls: 'text-teal-600 dark:text-teal-400' },
+    reel: { txt: 'réel', cls: 'text-teal-texte dark:text-teal-400' },
   }
   const f = map[value] || map.estimatif
   return <span className={`text-[11px] uppercase tracking-wide ${f.cls}`}>{f.txt}</span>
@@ -248,7 +248,7 @@ function Synthese({ synthese, onOpenAll, onEdit }) {
         </span>
         <button
           onClick={() => onOpenAll(synthese)}
-          className="text-xs text-purple-600 dark:text-purple-400 hover:underline cursor-pointer"
+          className="text-xs text-purple-texte hover:underline cursor-pointer"
         >
           Tout voir
         </button>
@@ -436,7 +436,7 @@ function EcartChip({ ecart, divergence }) {
   const n = Number(ecart)
   const signe = n > 0 ? '+' : ''
   const cls = divergence
-    ? 'text-red-600 dark:text-red-400 font-medium'
+    ? 'text-red-texte dark:text-red-400 font-medium'
     : n === 0 ? 'text-content-3' : 'text-content-2'
   return <span className={`tabular-nums text-sm ${cls}`}>{signe}{formatPercent(n)}</span>
 }

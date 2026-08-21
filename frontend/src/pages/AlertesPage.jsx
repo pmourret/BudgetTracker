@@ -133,14 +133,14 @@ function AlerteCard({ alerte, onAcquitter, isPending }) {
           </div>
           <div className="shrink-0">
             {alerte.acquittee ? (
-              <span className="text-xs text-teal-600 flex items-center gap-1">
+              <span className="text-xs text-teal-texte flex items-center gap-1">
                 ✓ Acquittée
               </span>
             ) : (
               <button
                 onClick={onAcquitter}
                 disabled={isPending}
-                className="h-8 px-3 rounded-lg bg-surface border border-border-app text-xs font-medium text-purple-600 dark:text-purple-400 cursor-pointer hover:bg-surface-3 disabled:cursor-not-allowed"
+                className="h-8 px-3 rounded-lg bg-surface border border-border-app text-xs font-medium text-purple-texte cursor-pointer hover:bg-surface-3 disabled:cursor-not-allowed"
               >
                 Acquitter
               </button>

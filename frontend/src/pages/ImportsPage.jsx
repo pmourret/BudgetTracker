@@ -17,7 +17,7 @@ import {
 import ImportUploadModal from '../components/imports/ImportUploadModal'
 import CreerFluxModal from '../components/imports/CreerFluxModal'
 
-const MONTANT_CLASS = (m) => (Number(m) < 0 ? 'text-red-600' : 'text-teal-600')
+const MONTANT_CLASS = (m) => (Number(m) < 0 ? 'text-red-texte' : 'text-teal-texte')
 
 export default function ImportsPage() {
   const [modalOpen, setModalOpen] = useState(false)
@@ -129,7 +129,7 @@ function LotCard({ lot, selected, onSelect, onDeleted }) {
           onClick={handleDelete}
           disabled={deleteImport.isPending}
           title="Supprimer l'import"
-          className="p-1.5 rounded-md text-content-2 hover:text-red-600 hover:bg-red-50 cursor-pointer disabled:opacity-50"
+          className="p-1.5 rounded-md text-content-2 hover:text-red-texte hover:bg-red-50 cursor-pointer disabled:opacity-50"
         >
           <Trash2 size={14} />
         </button>
@@ -310,7 +310,7 @@ function BankLine({ ligne, badge, onCreer }) {
         <button
           onClick={onCreer}
           title="Créer le flux manquant"
-          className="inline-flex items-center gap-1 text-xs font-medium text-purple-600 dark:text-purple-400 hover:underline cursor-pointer bg-transparent border-none shrink-0"
+          className="inline-flex items-center gap-1 text-xs font-medium text-purple-texte hover:underline cursor-pointer bg-transparent border-none shrink-0"
         >
           <FilePlus size={14} /> Créer
         </button>
@@ -374,7 +374,7 @@ function AmbiguRow({ ligne }) {
               onClick={() => valider.mutate({ ligneId: ligne.id, fluxId: c.id })}
               disabled={busy}
               title="C'est celui-ci"
-              className="p-1.5 rounded-md text-teal-600 hover:bg-teal-50 cursor-pointer disabled:opacity-50"
+              className="p-1.5 rounded-md text-teal-texte hover:bg-teal-50 cursor-pointer disabled:opacity-50"
             >
               <Check size={15} />
             </button>
@@ -383,7 +383,7 @@ function AmbiguRow({ ligne }) {
         <button
           onClick={() => rejeter.mutate({ ligneId: ligne.id })}
           disabled={busy}
-          className="self-start inline-flex items-center gap-1.5 text-xs text-content-2 hover:text-red-600 cursor-pointer bg-transparent border-none px-0 py-1 disabled:opacity-50"
+          className="self-start inline-flex items-center gap-1.5 text-xs text-content-2 hover:text-red-texte cursor-pointer bg-transparent border-none px-0 py-1 disabled:opacity-50"
         >
           <X size={13} /> Aucun ne correspond (marquer absent de l'app)
         </button>

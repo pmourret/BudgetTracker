@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Marque de BudgetTracker : le portefeuille de la barre latérale, sur la
+       tuile encre. Même forme que celle de FoyerOS — tuile arrondie, glyphe
+       centré — chacune gardant sa marque (ADR-0066). -->
+  <rect width="32" height="32" rx="7" fill="#1e1b4b"/>
+  <path d="M8 11.5A2.5 2.5 0 0 1 10.5 9H22a1.5 1.5 0 0 1 0 3H10.5a2.5 2.5 0 0 1-2.5-.5z" fill="#EEEDFE"/>
+  <rect x="8" y="11" width="16" height="12" rx="2.5" fill="#EEEDFE"/>
+  <circle cx="20" cy="17" r="1.8" fill="#1e1b4b"/>
+</svg>

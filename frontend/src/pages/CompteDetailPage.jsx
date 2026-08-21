@@ -83,7 +83,7 @@ export default function CompteDetailPage() {
             <Metric
               label="En attente"
               value={formatEuro(compte.ecart_solde)}
-              valueClass={Number(compte.ecart_solde) > 0 ? 'text-amber-600' : 'text-teal-600'}
+              valueClass={Number(compte.ecart_solde) > 0 ? 'text-amber-texte' : 'text-teal-texte'}
               def={DEFINITIONS.ecart_solde}
               defAlign="right"
             />
@@ -96,12 +96,12 @@ export default function CompteDetailPage() {
 
           {/* Dépenses / revenus du mois */}
           <MetricRow colonnes={4}>
-            <Metric label="Dépenses du mois" value={`−${formatEuro(m.depenses_mois)}`} valueClass="text-red-600" def={DEFINITIONS.depenses_mois} />
-            <Metric label="Revenus du mois" value={`+${formatEuro(m.revenus_mois)}`} valueClass="text-teal-600" def={DEFINITIONS.revenus_mois} />
+            <Metric label="Dépenses du mois" value={`−${formatEuro(m.depenses_mois)}`} valueClass="text-red-texte" def={DEFINITIONS.depenses_mois} />
+            <Metric label="Revenus du mois" value={`+${formatEuro(m.revenus_mois)}`} valueClass="text-teal-texte" def={DEFINITIONS.revenus_mois} />
             <Metric
               label="Épargne nette"
               value={formatEuro(m.epargne_nette)}
-              valueClass={Number(m.epargne_nette) >= 0 ? 'text-purple-400' : 'text-red-600'}
+              valueClass={Number(m.epargne_nette) >= 0 ? 'text-purple-texte' : 'text-red-texte'}
               def={DEFINITIONS.epargne_nette}
             />
             <Metric label="Mouvements" value={m.nb_flux} def={DEFINITIONS.compte_nb_flux} defAlign="right" />
@@ -163,7 +163,7 @@ export default function CompteDetailPage() {
                         {f.categorie_nom || '—'} · {formatDate(f.date_flux)}
                       </div>
                     </div>
-                    <span className="text-sm font-medium text-red-600 shrink-0">
+                    <span className="text-sm font-medium text-red-texte shrink-0">
                       {formatEuro(f.montant)}
                     </span>
                   </div>

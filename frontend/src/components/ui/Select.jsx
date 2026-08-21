@@ -15,7 +15,7 @@ export default function Select({
       {label && (
         <label className="text-sm font-medium text-content-2">
           {label}
-          {required && <span className="text-red-600"> *</span>}
+          {required && <span className="text-red-texte"> *</span>}
         </label>
       )}
       <select
@@ -49,7 +49,7 @@ export default function Select({
           </optgroup>
         ))}
       </select>
-      {error && <span className="text-xs text-red-600">{error}</span>}
+      {error && <span className="text-xs text-red-texte">{error}</span>}
     </div>
   )
 }

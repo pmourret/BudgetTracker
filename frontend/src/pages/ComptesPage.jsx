@@ -56,7 +56,7 @@ export default function ComptesPage() {
             <Metric
               label="En attente"
               value={formatEuro(ecartTotal)}
-              valueClass={ecartTotal === 0 ? 'text-teal-600' : ecartTotal > 0 ? 'text-amber-600' : 'text-teal-600'}
+              valueClass={ecartTotal === 0 ? 'text-teal-texte' : ecartTotal > 0 ? 'text-amber-texte' : 'text-teal-texte'}
               def={DEFINITIONS.ecart_solde}
               defAlign="right"
             />
@@ -205,7 +205,7 @@ function CompteLigne({ compte, onEdit }) {
     useActionsCompte(compte)
 
   const tonEcart =
-    ecart === 0 ? 'text-teal-600' : ecart > 0 ? 'text-amber-600' : 'text-teal-600'
+    ecart === 0 ? 'text-teal-texte' : ecart > 0 ? 'text-amber-texte' : 'text-teal-texte'
 
   return (
     <>
@@ -252,7 +252,7 @@ function CompteLigne({ compte, onEdit }) {
               onClick={handleDelete}
               title="Supprimer"
               disabled={deleteCompte.isPending}
-              className="p-1.5 rounded-md text-content-2 hover:text-red-600 hover:bg-red-50 cursor-pointer disabled:opacity-50"
+              className="p-1.5 rounded-md text-content-2 hover:text-red-texte hover:bg-red-50 cursor-pointer disabled:opacity-50"
             >
               <Trash2 size={14} />
             </button>
@@ -326,7 +326,7 @@ function CompteCard({ compte, onEdit }) {
             onClick={handleDelete}
             title="Supprimer"
             disabled={deleteCompte.isPending}
-            className="p-1.5 rounded-md text-content-2 hover:text-red-600 hover:bg-red-50 cursor-pointer disabled:opacity-50"
+            className="p-1.5 rounded-md text-content-2 hover:text-red-texte hover:bg-red-50 cursor-pointer disabled:opacity-50"
           >
             <Trash2 size={14} />
           </button>
@@ -367,7 +367,7 @@ function CompteCard({ compte, onEdit }) {
             <Tooltip {...DEFINITIONS.ecart_solde} align="right" size={12} />
           </div>
           <div className={`text-sm font-medium ${
-            ecart === 0 ? 'text-teal-600' : ecart > 0 ? 'text-amber-600' : 'text-teal-600'
+            ecart === 0 ? 'text-teal-texte' : ecart > 0 ? 'text-amber-texte' : 'text-teal-texte'
           }`}>
             {ecart !== 0 ? (ecart > 0 ? `−${formatEuro(Math.abs(ecart))}` : `+${formatEuro(Math.abs(ecart))}`) : formatEuro(0)}
           </div>

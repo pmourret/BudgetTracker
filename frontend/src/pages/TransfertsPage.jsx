@@ -230,7 +230,7 @@ function DeleteBtn({ t, inline = false }) {
       onClick={handleDelete}
       title="Annuler le transfert"
       disabled={deleteTransfert.isPending}
-      className={`p-1.5 rounded-md text-content-2 hover:text-red-600 hover:bg-red-50 cursor-pointer disabled:opacity-50 shrink-0 ${inline ? '' : ''}`}
+      className={`p-1.5 rounded-md text-content-2 hover:text-red-texte hover:bg-red-50 cursor-pointer disabled:opacity-50 shrink-0 ${inline ? '' : ''}`}
     >
       <Trash2 size={13} />
     </button>

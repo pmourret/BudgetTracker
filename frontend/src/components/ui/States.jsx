@@ -12,12 +12,12 @@ export function Loading({ message = 'Chargement...' }) {
 export function ErrorState({ message = 'Une erreur est survenue.', onRetry }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-12 px-4 text-center">
-      <TriangleAlert size={30} className="text-red-600" />
+      <TriangleAlert size={30} className="text-red-texte" />
       <span className="text-sm text-content">{message}</span>
       {onRetry && (
         <button
           onClick={onRetry}
-          className="mt-2 px-4 py-2 rounded-lg border border-border-app bg-surface text-purple-600 text-sm font-medium cursor-pointer hover:bg-surface-3"
+          className="mt-2 px-4 py-2 rounded-lg border border-border-app bg-surface text-purple-texte text-sm font-medium cursor-pointer hover:bg-surface-3"
         >
           Réessayer
         </button>

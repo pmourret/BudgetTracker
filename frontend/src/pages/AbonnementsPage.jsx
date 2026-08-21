@@ -154,7 +154,7 @@ export default function AbonnementsPage() {
         <Metric
           label="En retard"
           value={String(enRetard)}
-          valueClass={enRetard > 0 ? 'text-amber-600' : 'text-content'}
+          valueClass={enRetard > 0 ? 'text-amber-texte' : 'text-content'}
           def={DEFINITIONS.abo_en_retard}
           defAlign="right"
         />
@@ -336,7 +336,7 @@ function RowActions({ ab, onEdit, onGenerate, showLabels = false }) {
         onClick={() => onGenerate(ab)}
         disabled={genererDesactive}
         title={genererTitle}
-        className="p-1.5 rounded-md text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/40 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+        className="p-1.5 rounded-md text-purple-texte hover:bg-purple-50 dark:hover:bg-purple-950/40 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
       >
         <FilePlus size={15} />
       </button>
@@ -351,7 +351,7 @@ function RowActions({ ab, onEdit, onGenerate, showLabels = false }) {
         onClick={handleDelete}
         title="Supprimer"
         disabled={deleteAbonnement.isPending}
-        className="p-1.5 rounded-md text-content-2 hover:text-red-600 hover:bg-red-50 cursor-pointer disabled:opacity-50"
+        className="p-1.5 rounded-md text-content-2 hover:text-red-texte hover:bg-red-50 cursor-pointer disabled:opacity-50"
       >
         <Trash2 size={14} />
       </button>

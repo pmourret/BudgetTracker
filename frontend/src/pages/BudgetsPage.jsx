@@ -68,7 +68,7 @@ function PointsReservePanel({ nbMois = 6 }) {
       <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
         <div>
           <div className="text-xs text-content-3 mb-0.5">Disponible (mois clôturés)</div>
-          <div className={`text-2xl font-semibold ${soldePositif ? 'text-teal-600' : 'text-red-600'}`}>
+          <div className={`text-2xl font-semibold ${soldePositif ? 'text-teal-texte' : 'text-red-texte'}`}>
             {soldePositif ? '+' : ''}{solde} pt{Math.abs(solde) > 1 ? 's' : ''}
           </div>
           <div className="text-xs text-content-3 mt-0.5">
@@ -79,7 +79,7 @@ function PointsReservePanel({ nbMois = 6 }) {
           <div className="text-xs text-content-3 mb-0.5 inline-flex items-center gap-1">
             Mois en cours <Badge variant="info">projeté</Badge>
           </div>
-          <div className={`text-2xl font-semibold ${delta >= 0 ? 'text-teal-600' : 'text-red-600'}`}>
+          <div className={`text-2xl font-semibold ${delta >= 0 ? 'text-teal-texte' : 'text-red-texte'}`}>
             {delta >= 0 ? '+' : ''}{delta} pt{Math.abs(delta) > 1 ? 's' : ''}
           </div>
           <div className="text-xs text-content-3 mt-0.5">non figé avant la clôture</div>
@@ -111,10 +111,10 @@ function toISO(date) {
 
 function statutFromTaux(taux) {
   const t = Number(taux)
-  if (t >= 100) return { label: 'Dépassé', variant: 'critique', bar: 'bg-red-600', pct: 'text-red-600' }
-  if (t >= 80)  return { label: 'Alerte',  variant: 'avertissement', bar: 'bg-amber-600', pct: 'text-amber-600' }
-  if (t >= 50)  return { label: 'En cours', variant: 'purple', bar: 'bg-purple-600', pct: 'text-purple-400' }
-  return { label: 'OK', variant: 'success', bar: 'bg-teal-600', pct: 'text-teal-600' }
+  if (t >= 100) return { label: 'Dépassé', variant: 'critique', bar: 'bg-red-600', pct: 'text-red-texte' }
+  if (t >= 80)  return { label: 'Alerte',  variant: 'avertissement', bar: 'bg-amber-600', pct: 'text-amber-texte' }
+  if (t >= 50)  return { label: 'En cours', variant: 'purple', bar: 'bg-purple-600', pct: 'text-purple-texte' }
+  return { label: 'OK', variant: 'success', bar: 'bg-teal-600', pct: 'text-teal-texte' }
 }
 
 export default function BudgetsPage() {
@@ -227,13 +227,13 @@ export default function BudgetsPage() {
                   <Metric
                     label="Total consommé"
                     value={formatEuro(totalConsomme)}
-                    valueClass={totalConsomme > totalPrevu ? 'text-red-600' : 'text-content'}
+                    valueClass={totalConsomme > totalPrevu ? 'text-red-texte' : 'text-content'}
                     def={DEFINITIONS.budget_total_consomme}
                   />
                   <Metric
                     label="Reste disponible"
                     value={formatEuro(reste)}
-                    valueClass={reste < 0 ? 'text-red-600' : 'text-teal-600'}
+                    valueClass={reste < 0 ? 'text-red-texte' : 'text-teal-texte'}
                     def={DEFINITIONS.budget_reste}
                     defAlign="right"
                   />
@@ -427,7 +427,7 @@ function BudgetCard({ budget, onEdit, onAllocate = null, valeurPoint = 10 }) {
             <button
               onClick={onAllocate}
               title="Distribuer des points"
-              className="p-1.5 rounded-md text-content-2 hover:text-teal-600 hover:bg-teal-50 cursor-pointer"
+              className="p-1.5 rounded-md text-content-2 hover:text-teal-texte hover:bg-teal-50 cursor-pointer"
             >
               <Coins size={13} />
             </button>
@@ -443,7 +443,7 @@ function BudgetCard({ budget, onEdit, onAllocate = null, valeurPoint = 10 }) {
             onClick={handleDelete}
             title="Supprimer"
             disabled={deleteBudget.isPending}
-            className="p-1.5 rounded-md text-content-2 hover:text-red-600 hover:bg-red-50 cursor-pointer disabled:opacity-50"
+            className="p-1.5 rounded-md text-content-2 hover:text-red-texte hover:bg-red-50 cursor-pointer disabled:opacity-50"
           >
             <Trash2 size={13} />
           </button>
@@ -465,7 +465,7 @@ function BudgetCard({ budget, onEdit, onAllocate = null, valeurPoint = 10 }) {
         <span>
           Prévu : <strong className="text-content font-medium">{formatEuro(prevuEffectif)}</strong>
           {pointsAlloues > 0 && (
-            <span className="text-teal-600"> (dont +{pointsAlloues} pt{pointsAlloues > 1 ? 's' : ''})</span>
+            <span className="text-teal-texte"> (dont +{pointsAlloues} pt{pointsAlloues > 1 ? 's' : ''})</span>
           )}
         </span>
         <span className={`font-medium flex items-center gap-1 ${statut.pct}`}>
@@ -538,7 +538,7 @@ function TemplateCard({ template, onEdit }) {
             onClick={handleDelete}
             title="Supprimer"
             disabled={deleteTemplate.isPending}
-            className="p-1.5 rounded-md text-content-2 hover:text-red-600 hover:bg-red-50 cursor-pointer disabled:opacity-50"
+            className="p-1.5 rounded-md text-content-2 hover:text-red-texte hover:bg-red-50 cursor-pointer disabled:opacity-50"
           >
             <Trash2 size={13} />
           </button>

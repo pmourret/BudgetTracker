@@ -22,7 +22,7 @@ export default function BottomNav() {
           className={({ isActive }) =>
             [
               'flex flex-col items-center gap-0.5 no-underline flex-1 h-full justify-center text-[10px]',
-              isActive ? 'text-purple-600 font-medium' : 'text-content-3 font-normal',
+              isActive ? 'text-purple-texte font-medium' : 'text-content-3 font-normal',
             ].join(' ')
           }
         >

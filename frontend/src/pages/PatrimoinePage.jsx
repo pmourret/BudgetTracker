@@ -130,8 +130,8 @@ export default function PatrimoinePage() {
               }
               valueClass={
                 Number(total?.plus_value_latente_globale_estimee) >= 0
-                  ? 'text-teal-600'
-                  : 'text-red-600'
+                  ? 'text-teal-texte'
+                  : 'text-red-texte'
               }
               def={DEFINITIONS.plus_value_latente}
             />
@@ -221,7 +221,7 @@ function ActifCard({ actif, onEdit, onValoriser }) {
       </div>
 
       {pv != null && (
-        <div className={`text-xs mt-1 flex items-center gap-1 ${Number(pv) >= 0 ? 'text-teal-600' : 'text-red-600'}`}>
+        <div className={`text-xs mt-1 flex items-center gap-1 ${Number(pv) >= 0 ? 'text-teal-texte' : 'text-red-texte'}`}>
           <span>
             Plus-value latente : {formatEuro(pv)}
             {tauxPv != null && ` (${tauxPv.toFixed(1).replace('.', ',')} %)`}
@@ -246,7 +246,7 @@ function ActifCard({ actif, onEdit, onValoriser }) {
         <div className="flex items-center gap-2">
           <button
             onClick={onValoriser}
-            className="text-xs text-purple-600 dark:text-purple-400 font-medium cursor-pointer bg-transparent border-none hover:underline"
+            className="text-xs text-purple-texte font-medium cursor-pointer bg-transparent border-none hover:underline"
           >
             Valoriser
           </button>
@@ -261,7 +261,7 @@ function ActifCard({ actif, onEdit, onValoriser }) {
             onClick={handleDelete}
             title="Supprimer"
             disabled={deleteActif.isPending}
-            className="p-1.5 rounded-md text-content-2 hover:text-red-600 hover:bg-red-50 cursor-pointer disabled:opacity-50"
+            className="p-1.5 rounded-md text-content-2 hover:text-red-texte hover:bg-red-50 cursor-pointer disabled:opacity-50"
           >
             <Trash2 size={13} />
           </button>

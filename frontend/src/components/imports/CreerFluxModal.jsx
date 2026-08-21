@@ -79,7 +79,7 @@ export default function CreerFluxModal({ ligne, compteNom, onClose, onCreated })
           <div className="text-sm font-medium text-content">{ligne.libelle}</div>
           <div className="flex justify-between mt-1 text-xs text-content-2">
             <span>{compteNom} · {formatDate(ligne.date_operation)}</span>
-            <span className={Number(ligne.montant) < 0 ? 'text-red-600' : 'text-teal-600'}>
+            <span className={Number(ligne.montant) < 0 ? 'text-red-texte' : 'text-teal-texte'}>
               {formatEuro(ligne.montant)}
             </span>
           </div>

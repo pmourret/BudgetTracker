@@ -282,7 +282,7 @@ export default function BudgetFormModal({ isOpen, onClose, moisDefaut, budget = 
                 ))}
               </div>
               {(errors.categoriesIncluses || errors.categories_incluses) && (
-                <p className="text-xs text-red-600">
+                <p className="text-xs text-red-texte">
                   {errors.categoriesIncluses || errors.categories_incluses}
                 </p>
               )}
@@ -325,7 +325,7 @@ export default function BudgetFormModal({ isOpen, onClose, moisDefaut, budget = 
                   ))}
                 </div>
                 {(errors.categoriesIncluses || errors.categories_incluses) && (
-                  <p className="text-xs text-red-600">
+                  <p className="text-xs text-red-texte">
                     {errors.categoriesIncluses || errors.categories_incluses}
                   </p>
                 )}

@@ -85,7 +85,7 @@ export default function RemboursementModal({ flux, onClose, onDone }) {
           <div className="text-sm font-medium text-content">{flux.libelle || '—'}</div>
           <div className="flex justify-between mt-1 text-xs text-content-2">
             <span>{flux.compte_nom} · {formatDate(flux.date_flux)}</span>
-            <span className="text-red-600">{formatEuro(flux.montant)}</span>
+            <span className="text-red-texte">{formatEuro(flux.montant)}</span>
           </div>
           {Number(flux.montant_rembourse || 0) > 0 && (
             <div className="mt-1 text-xs text-content-2">
@@ -107,7 +107,7 @@ export default function RemboursementModal({ flux, onClose, onDone }) {
           label="Libellé (optionnel)" value={libelle} onChange={setLibelle}
           placeholder={`Remboursement — ${flux.libelle || 'dépense'}`}
         />
-        {error && <span className="text-xs text-red-600">{error}</span>}
+        {error && <span className="text-xs text-red-texte">{error}</span>}
 
         <p className="text-xs text-content-2 leading-relaxed">
           Une <strong>recette</strong> sera créée sur <strong>{flux.compte_nom}</strong>,

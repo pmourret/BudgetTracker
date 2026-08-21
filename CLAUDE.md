@@ -172,6 +172,19 @@ d'épargne. **Phase 12 mécaniques A et C : gelées, ne pas coder sans spec.**
 
 - **Emojis comme icônes** : abandonnés au profit de `lucide-react`. Utiliser `IconBadge`.
 - **Couleurs en dark** : ne pas bricoler `dark:` au cas par cas → variables CSS sémantiques centralisées.
+- ⚠️ **Une couleur de marque n'est pas une couleur de texte.** Le turquoise, le
+  rouge et l'ambre sont justes sur une barre ou un liseré ; comme texte ils
+  étaient à 3,09 / 3,59 / **1,98:1**, sous le seuil AA de 4,5:1 — et ce sont les
+  couleurs des montants. Employer `text-*-texte` pour du texte, `bg-*-600` pour
+  une marque. Même partage que dans FoyerOS (ADR-0066).
+- ⚠️ **Un fond de cran fixe ne suit pas le thème.** `bg-amber-50` reste clair en
+  sombre : texte clair sur fond clair, 1,69:1. Utiliser une teinte
+  **translucide** du cran de marque (`bg-amber-600/15`), qui prend le fond sous
+  elle.
+- ⚠️ **Le contraste se calcule, il ne s'estime pas** — et sur les **trois** fonds
+  du thème (carte, page, métrique), pas seulement sur le blanc. Un jeton dont on
+  ne fixe pas la valeur (palette Tailwind par défaut, en `oklch`) est un jeton
+  dont on ne connaît pas le contraste.
 - ⚠️ **Couleurs de données ≠ couleurs d'état.** Le turquoise dit « entrant »,
   le rouge « sortant », l'ambre « alerte », le violet la marque : aucune ne
   désigne jamais une catégorie ou une série. Passer par

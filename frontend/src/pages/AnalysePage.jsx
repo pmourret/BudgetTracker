@@ -242,7 +242,7 @@ function EpargneCard({ bloc }) {
           <div className="bg-surface-2 rounded-lg p-3 flex flex-col gap-1">
             <span className="text-xs text-content-2">Versé sur la période</span>
             <span
-              className={`text-xl font-medium tabular-nums ${verseSurPeriode < 0 ? 'text-red-600' : 'text-content'}`}
+              className={`text-xl font-medium tabular-nums ${verseSurPeriode < 0 ? 'text-red-texte' : 'text-content'}`}
             >
               {verseSurPeriode > 0 ? '+' : ''}{formatEuro(verseSurPeriode)}
             </span>

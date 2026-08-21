@@ -64,7 +64,7 @@ export default function FluxCategorieModal({ categorie, mois, compteId, onClose 
                     {!compteId && f.compte_nom ? ` · ${f.compte_nom}` : ''}
                   </div>
                 </div>
-                <span className="text-sm font-medium text-red-600 shrink-0 tabular-nums">
+                <span className="text-sm font-medium text-red-texte shrink-0 tabular-nums">
                   {formatEuro(f.montant)}
                 </span>
               </div>

@@ -62,7 +62,7 @@ export default function AllocationModal({
       onClose={onClose}
       title={
         <span className="inline-flex items-center gap-1.5">
-          <Coins size={16} className="text-teal-600" />
+          <Coins size={16} className="text-teal-texte" />
           Distribuer des points
         </span>
       }
@@ -125,7 +125,7 @@ export default function AllocationModal({
           </div>
           <div className="flex justify-between">
             <span className="text-content-2">Bonus ({points} pt{Math.abs(points) > 1 ? 's' : ''})</span>
-            <span className="text-teal-600">+ {formatEuro(points * valeurPoint)}</span>
+            <span className="text-teal-texte">+ {formatEuro(points * valeurPoint)}</span>
           </div>
           <div className="flex justify-between border-t border-border-app pt-1.5 font-medium">
             <span className="text-content">Prévu effectif</span>
@@ -137,7 +137,7 @@ export default function AllocationModal({
           </div>
         </div>
 
-        {error && <p className="text-xs text-red-600">{error}</p>}
+        {error && <p className="text-xs text-red-texte">{error}</p>}
       </div>
     </Modal>
   )

@@ -114,7 +114,7 @@ export default function ConnexionPage() {
         </div>
 
         {message && (
-          <p role="alert" className="text-xs text-red-600">
+          <p role="alert" className="text-xs text-red-texte">
             {message}
           </p>
         )}

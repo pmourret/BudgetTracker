@@ -249,7 +249,7 @@ function MajeureBlock({
           <button
             onClick={onAddMineure}
             title="Ajouter une sous-catégorie"
-            className="p-1.5 rounded-md text-content-2 hover:text-purple-600 hover:bg-surface-3 cursor-pointer"
+            className="p-1.5 rounded-md text-content-2 hover:text-purple-texte hover:bg-surface-3 cursor-pointer"
           >
             <Plus size={14} />
           </button>
@@ -264,7 +264,7 @@ function MajeureBlock({
             onClick={() => handleDelete(majeure)}
             title="Supprimer"
             disabled={deleteCategorie.isPending}
-            className="p-1.5 rounded-md text-content-2 hover:text-red-600 hover:bg-red-50 cursor-pointer disabled:opacity-50"
+            className="p-1.5 rounded-md text-content-2 hover:text-red-texte hover:bg-red-50 cursor-pointer disabled:opacity-50"
           >
             <Trash2 size={13} />
           </button>
@@ -279,7 +279,7 @@ function MajeureBlock({
               Aucune sous-catégorie —{' '}
               <button
                 onClick={onAddMineure}
-                className="text-purple-600 dark:text-purple-400 hover:underline cursor-pointer bg-transparent border-none"
+                className="text-purple-texte hover:underline cursor-pointer bg-transparent border-none"
               >
                 en ajouter une
               </button>
@@ -348,7 +348,7 @@ function SortableMineure({ mineure, isLast, onEdit, onDelete, isPending }) {
           onClick={onDelete}
           title="Supprimer"
           disabled={isPending}
-          className="p-1 rounded text-content-2 hover:text-red-600 hover:bg-red-50 cursor-pointer disabled:opacity-50"
+          className="p-1 rounded text-content-2 hover:text-red-texte hover:bg-red-50 cursor-pointer disabled:opacity-50"
         >
           <Trash2 size={12} />
         </button>

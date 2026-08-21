@@ -33,7 +33,7 @@ export default function TransfertsAnalyse() {
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
           <span className="text-sm font-medium text-content">Circulation entre comptes</span>
-          <span className="text-[11px] uppercase tracking-wide text-teal-600 dark:text-teal-400">réel</span>
+          <span className="text-[11px] uppercase tracking-wide text-teal-texte dark:text-teal-400">réel</span>
         </div>
         <PeriodSelector value={nbMois} onChange={setNbMois} options={[3, 6, 12]} />
       </div>

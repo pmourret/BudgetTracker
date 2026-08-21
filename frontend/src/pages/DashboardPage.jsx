@@ -91,19 +91,19 @@ export default function DashboardPage() {
         <Metric
           label="Dépenses du mois"
           value={`−${formatEuro(m.depenses_mois)}`}
-          valueClass="text-red-600"
+          valueClass="text-red-texte"
           def={DEFINITIONS.depenses_mois}
         />
         <Metric
           label="Revenus du mois"
           value={`+${formatEuro(m.revenus_mois)}`}
-          valueClass="text-teal-600"
+          valueClass="text-teal-texte"
           def={DEFINITIONS.revenus_mois}
         />
         <Metric
           label="Épargne nette"
           value={formatEuro(m.epargne_nette)}
-          valueClass={Number(m.epargne_nette) >= 0 ? 'text-purple-400' : 'text-red-600'}
+          valueClass={Number(m.epargne_nette) >= 0 ? 'text-purple-texte' : 'text-red-texte'}
           sub={`${formatPercent(m.taux_epargne)} du revenu`}
           def={DEFINITIONS.epargne_nette}
           defAlign="right"
@@ -243,7 +243,7 @@ function BudgetLine({ budget }) {
   const taux = Number(budget.taux_consommation)
   const largeur = Math.min(taux, 100)
   const barColor = taux >= 100 ? 'bg-red-600' : taux >= 80 ? 'bg-amber-600' : 'bg-teal-600'
-  const pctColor = taux >= 100 ? 'text-red-600' : taux >= 80 ? 'text-amber-600' : 'text-content-2'
+  const pctColor = taux >= 100 ? 'text-red-texte' : taux >= 80 ? 'text-amber-texte' : 'text-content-2'
 
   return (
     <div className="flex items-center gap-3">
@@ -271,7 +271,7 @@ function FluxLine({ flux }) {
           {flux.categorie_nom || '—'} · {formatDate(flux.date_flux)}
         </div>
       </div>
-      <span className={`text-sm font-medium ${isDepense ? 'text-red-600' : 'text-teal-600'}`}>
+      <span className={`text-sm font-medium ${isDepense ? 'text-red-texte' : 'text-teal-texte'}`}>
         {formatEuro(value)}
       </span>
     </div>

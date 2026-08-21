@@ -41,12 +41,12 @@ function CompteNode({ data }) {
     >
       <Handle type="target" position={Position.Left} style={{ background: '#94a3b8', width: 7, height: 7 }} />
       <div className="flex items-center gap-1.5 min-w-0">
-        {data.est_epargne && <PiggyBank size={13} className="text-teal-600 dark:text-teal-400 shrink-0" />}
+        {data.est_epargne && <PiggyBank size={13} className="text-teal-texte dark:text-teal-400 shrink-0" />}
         <span className="text-[13px] font-medium text-content truncate">{data.nom}</span>
       </div>
       <div className="flex items-center justify-between mt-0.5">
         <span className="text-[10px] uppercase tracking-wide text-content-3">solde net</span>
-        <span className={`text-[12px] font-semibold tabular-nums ${positif ? 'text-teal-600 dark:text-teal-400' : 'text-red-600 dark:text-red-400'}`}>
+        <span className={`text-[12px] font-semibold tabular-nums ${positif ? 'text-teal-texte dark:text-teal-400' : 'text-red-texte dark:text-red-400'}`}>
           {positif ? '+' : ''}{formatEuro(net)}
         </span>
       </div>

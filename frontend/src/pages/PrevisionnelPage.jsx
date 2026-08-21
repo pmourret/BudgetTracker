@@ -116,7 +116,7 @@ function SoldeProjeteCard({ bloc, moisCourant }) {
               <span
                 className={[
                   'text-xs tabular-nums',
-                  value < 0 ? 'text-red-600' : value > 0 ? 'text-teal-600' : 'text-content-3',
+                  value < 0 ? 'text-red-texte' : value > 0 ? 'text-teal-texte' : 'text-content-3',
                 ].join(' ')}
               >
                 {value > 0 ? '+' : ''}{formatEuro(value)}
@@ -149,7 +149,7 @@ function CapaciteCard({ bloc }) {
       action={<FiabiliteBadge fiabilite={bloc.fiabilite} />}
     >
       <div className="flex flex-col gap-3">
-        <div className={`text-3xl font-medium ${capacite < 0 ? 'text-red-600' : 'text-content'}`}>
+        <div className={`text-3xl font-medium ${capacite < 0 ? 'text-red-texte' : 'text-content'}`}>
           {formatEuro(capacite)}
         </div>
 

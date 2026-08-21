@@ -138,7 +138,7 @@ export default function ParametresPage() {
             </div>
 
             {dirty && (
-              <div className="flex items-start gap-2 text-xs text-amber-600">
+              <div className="flex items-start gap-2 text-xs text-amber-texte">
                 <AlertTriangle size={14} className="mt-0.5 shrink-0" />
                 <span>
                   Changer ce réglage recalcule le mois de tout l'historique des
@@ -160,7 +160,7 @@ export default function ParametresPage() {
                     'inline-flex items-center gap-1.5 text-xs',
                     feedback.type === 'success'
                       ? 'text-green-600'
-                      : 'text-red-600',
+                      : 'text-red-texte',
                   ].join(' ')}
                 >
                   {feedback.type === 'success' && <Check size={14} />}
@@ -218,7 +218,7 @@ export default function ParametresPage() {
                 <span
                   className={[
                     'inline-flex items-center gap-1.5 text-xs',
-                    vpFeedback.type === 'success' ? 'text-green-600' : 'text-red-600',
+                    vpFeedback.type === 'success' ? 'text-green-600' : 'text-red-texte',
                   ].join(' ')}
                 >
                   {vpFeedback.type === 'success' && <Check size={14} />}

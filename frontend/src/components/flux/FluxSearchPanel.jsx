@@ -321,16 +321,27 @@ export default function FluxSearchPanel({
 function MontantBadge({ montant }) {
   const value = Number(montant)
   return (
-    <span className={`text-sm font-medium ${value < 0 ? 'text-red-600' : 'text-teal-600'}`}>
+    <span className={`text-sm font-medium ${value < 0 ? 'text-red-texte' : 'text-teal-texte'}`}>
       {formatEuro(value)}
     </span>
   )
 }
 
+/**
+ * ⚠️ Les crans Tailwind bruts (`amber-700`, `teal-700`) **ne suivent pas le
+ * thème** : ils gardent la même valeur en sombre, où l'ambre tombait à 3,62:1
+ * sur un texte de 10 px. Les jetons `*-texte` de l'application, eux, ont leurs
+ * propres crans clair et sombre.
+ *
+ * ⚠️ Le fond aussi : `bg-amber-50` est une teinte claire fixe, qui restait
+ * claire en sombre — texte clair sur fond clair, 1,69:1. Une teinte
+ * **translucide** du cran de marque prend le fond sous elle et suit donc le
+ * thème toute seule. (D26 de la revue UI/UX.)
+ */
 const TAG_TONES = {
-  amber: 'bg-amber-100 text-amber-700 border-amber-200',
-  teal: 'bg-teal-100 text-teal-700 border-teal-200',
-  green: 'bg-green-100 text-green-700 border-green-200',
+  amber: 'bg-amber-600/15 text-amber-texte border-amber-600/30',
+  teal: 'bg-teal-600/15 text-teal-texte border-teal-600/30',
+  green: 'bg-teal-600/15 text-teal-texte border-teal-600/30',
 }
 
 function Tag({ label, tone = 'amber' }) {
@@ -384,7 +395,7 @@ function FluxActions({ flux, onEdit, onRembourser, inline = false }) {
       {onRembourser && peutEtreRembourse(flux) && (
         <button
           onClick={() => onRembourser(flux)} title="Enregistrer un remboursement"
-          className="p-1.5 rounded-md text-content-2 hover:text-teal-600 hover:bg-teal-50 cursor-pointer"
+          className="p-1.5 rounded-md text-content-2 hover:text-teal-texte hover:bg-teal-50 cursor-pointer"
         >
           <Undo2 size={13} />
         </button>
@@ -399,7 +410,7 @@ function FluxActions({ flux, onEdit, onRembourser, inline = false }) {
         onClick={handleDelete}
         title={flux.flux_rembourse ? 'Annuler le remboursement' : 'Supprimer'}
         disabled={deleteFlux.isPending}
-        className="p-1.5 rounded-md text-content-2 hover:text-red-600 hover:bg-red-50 cursor-pointer disabled:opacity-50"
+        className="p-1.5 rounded-md text-content-2 hover:text-red-texte hover:bg-red-50 cursor-pointer disabled:opacity-50"
       >
         <Trash2 size={13} />
       </button>

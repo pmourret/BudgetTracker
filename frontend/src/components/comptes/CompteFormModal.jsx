@@ -39,13 +39,13 @@ function SelectWithCreate({ label, value, onChange, options, error, required, on
     <div className="flex flex-col gap-1">
       <div className="flex items-center justify-between">
         <label className="text-sm font-medium text-content-2">
-          {label}{required && <span className="text-red-600"> *</span>}
+          {label}{required && <span className="text-red-texte"> *</span>}
         </label>
         {!showForm && (
           <button
             type="button"
             onClick={() => setShowForm(true)}
-            className="text-xs text-purple-600 hover:underline cursor-pointer"
+            className="text-xs text-purple-texte hover:underline cursor-pointer"
           >
             + Nouveau
           </button>

@@ -97,7 +97,7 @@ export default function ImportUploadModal({ isOpen, onClose, onImported }) {
 
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-content-2">
-            Fichier CSV <span className="text-red-600">*</span>
+            Fichier CSV <span className="text-red-texte">*</span>
           </label>
           <label className="flex items-center gap-2.5 h-11 lg:h-10 px-3 rounded-lg border border-border-app bg-surface cursor-pointer hover:bg-surface-3 text-sm text-content-2">
             <Upload size={16} />

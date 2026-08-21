@@ -27,7 +27,7 @@ export default function Metric({
         {def && <Tooltip {...def} align={defAlign} />}
       </div>
       <div className={`text-xl font-medium tabular-nums ${valueClass}`}>{value}</div>
-      {sub && <div className="text-[11px] text-teal-600 mt-0.5">{sub}</div>}
+      {sub && <div className="text-[11px] text-teal-texte mt-0.5">{sub}</div>}
     </div>
   )
 }
